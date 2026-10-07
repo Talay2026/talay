@@ -238,6 +238,12 @@ export default {
       if (url.pathname === "/b/thanks") {
         return await thanks(request, env, ctx, url);
       }
+      if (url.pathname === "/b/manage") {
+        return await managePage(env, ctx, url);
+      }
+      if (url.pathname === "/b/manage/action" && request.method === "POST") {
+        return await manageAction(request, env, ctx);
+      }
 
       const slug = url.pathname.slice(3).replace(/\/+$/, "").toLowerCase();
       const code = (url.searchParams.get("p") || "").toUpperCase();
@@ -269,12 +275,13 @@ const json = (obj, status = 200) => new Response(JSON.stringify(obj), {
   status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
 });
 
-async function stripe(env, method, path, params) {
+async function stripe(env, method, path, params, extraHeaders = {}) {
   const res = await fetch(`https://api.stripe.com/v1/${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
       ...(params ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
+      ...extraHeaders,
     },
     body: params ? new URLSearchParams(params) : undefined,
   });
@@ -391,6 +398,187 @@ async function thanks(request, env, ctx, url) {
   </dl>` : ""}
   <p class="hint" style="margin-top:2rem">${esc(t.questions(assistant))}</p>
 </main>`, 200, lang);
+}
+
+// ---------- Manage booking (for the dive center) ----------
+// Link in the center's email: talay.io/b/manage?t=[Manage token]. The token is a
+// random uuid made by Make when the booking is created; only the center gets it.
+// Rule (pilot): changes stay possible after the 2-hour window, but the page warns
+// and Make mails Talay ("late").
+
+const WINDOW_MS = 2 * 3600 * 1000;
+const okToken = (t) => /^[0-9a-fA-F-]{20,64}$/.test(String(t || ""));
+
+async function airtableFind(env, table, formula) {
+  // No cache: the status of a booking must always be current.
+  const api = new URL(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/${encodeURIComponent(table)}`);
+  api.searchParams.set("filterByFormula", formula);
+  api.searchParams.set("maxRecords", "1");
+  const res = await fetch(api, { headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` } });
+  if (!res.ok) throw new Error(`Airtable ${table}: ${res.status} ${await res.text()}`);
+  return (await res.json()).records?.[0] || null;
+}
+
+async function loadManaged(env, ctx, token) {
+  if (!okToken(token)) return null;
+  const rec = await airtableFind(env, "Bookings", `{Manage token} = '${token}'`);
+  if (!rec) return null;
+  const f = rec.fields;
+  const sessionId = first(f["Stripe session ID"]) || "";
+  if (!/^cs_[A-Za-z0-9_]{10,200}$/.test(sessionId)) return null;
+  const session = await stripe(env, "GET", `checkout/sessions/${sessionId}`);
+  const m = session.metadata || {};
+  const found = await loadBooking(env, ctx, m.center_slug, m.product_code);
+  const created = Date.parse(rec.createdTime);
+  return {
+    rec, f, session, m,
+    center: found?.center || {}, product: found?.product || {},
+    created, late: Date.now() > created + WINDOW_MS,
+    cancelled: /cancel|refund/i.test(String(first(f["Status"]) || "")),
+  };
+}
+
+const thaiTime = (ms) => new Date(ms).toLocaleString("en-GB", {
+  timeZone: "Asia/Bangkok", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+});
+
+async function managePage(env, ctx, url) {
+  const token = url.searchParams.get("t") || "";
+  if (!env.STRIPE_SECRET_KEY || !env.MAKE_CHANGES_URL || !env.MAKE_CHANGES_KEY) {
+    return page(problem("Booking changes are not set up yet.", "en"), 500, "en");
+  }
+  const b = await loadManaged(env, ctx, token);
+  if (!b) {
+    return page(`<main class="empty"><h1>This link doesn't work</h1>
+  <p>Open the link again from the booking email, or reply to that email.</p></main>`, 404, "en");
+  }
+  const { f, m, center, product } = b;
+  const centerName = first(center["Name"]) || m.center_name || "Dive center";
+  const logo = first(center["Logo"])?.thumbnails?.large?.url || first(center["Logo"])?.url || "";
+  const ref = first(f["Ref"]) || "";
+  const name = first(f["P name"]) || m.product_name || "";
+  const date = String(first(f["Activity date"]) || m.activity_date || "").slice(0, 10);
+  const divers = Number(first(f["Group size"])) || Number(m.divers) || 1;
+  const paid = Number(first(f["Deposit paid THB"])) || Number(m.deposit_thb) || 0;
+  const diver = first(f["Payer name"]) || "";
+  const minDate = earliestDate(num(product["Cutoff hour"]) || 15);
+  const maxDate = plusDays(minDate, 180);
+  const data = { token, minDate, maxDate, current: date, paid: thb(paid) };
+
+  const windowLine = b.late
+    ? `<p class="warn">The 2-hour window for changes has passed (booked ${esc(thaiTime(b.created))}, Koh Tao time). You can still move or cancel, but Talay will be notified.</p>`
+    : `<p class="hint">You can move or cancel this booking until ${esc(thaiTime(b.created + WINDOW_MS))} (Koh Tao time).</p>`;
+
+  return page(`
+<header class="center">
+  ${logo ? `<img class="logo" src="${esc(logo)}" alt="${esc(centerName)} logo">` : ""}
+  <div><p class="center-name">${esc(centerName)}</p><p class="island">Manage booking</p></div>
+</header>
+<main>
+  <h1>${esc(ref || "Booking")}</h1>
+  <p class="intro"><strong>${esc(name)}</strong>, ${esc(date ? fmtDate(date, "en") : "")}, ${esc(diversLabel(divers, "en"))}${diver ? `, ${esc(diver)}` : ""}. Deposit paid online: ${thb(paid)} THB.</p>
+  ${b.cancelled ? `<p class="msg">This booking is cancelled. The diver's deposit has been refunded.</p>` : `
+  ${windowLine}
+  <section class="field" style="margin-top:2rem">
+    <label for="date">Move to another date</label>
+    <input id="date" type="date" min="${minDate}" max="${maxDate}" aria-describedby="date-error">
+    <p id="date-error" class="error" role="alert" hidden></p>
+    <button type="button" id="move" class="book" style="margin-top:1rem">Move booking</button>
+    <p class="hint">The diver gets a WhatsApp message with the new date.</p>
+  </section>
+  <section class="field" style="margin-top:2.5rem;padding-top:1.5rem;border-top:1px solid var(--line)">
+    <label>Cancel</label>
+    <button type="button" id="cancel" class="book danger">Cancel and refund ${thb(paid)} THB</button>
+    <p class="hint">The full deposit goes back to the diver's card, and the diver gets a WhatsApp message.</p>
+  </section>
+  <p id="msg" class="msg" role="status" hidden></p>`}
+</main>
+<script id="data" type="application/json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>
+<script>
+(() => {
+  const d = JSON.parse(document.getElementById("data").textContent);
+  const $ = (id) => document.getElementById(id);
+  if (!$("move")) return;
+  const msg = $("msg");
+  function send(body, btn, doneText) {
+    $("move").disabled = true; $("cancel").disabled = true;
+    msg.hidden = false; msg.textContent = "Saving…";
+    fetch("/b/manage/action", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.assign({ t: d.token }, body)) })
+      .then((r) => r.json())
+      .then((r) => {
+        if (r.ok) { msg.textContent = r.message || doneText; return; }
+        msg.textContent = r.error || "Something went wrong. Try again.";
+        $("move").disabled = false; $("cancel").disabled = false;
+      })
+      .catch(() => { msg.textContent = "No connection. Try again."; $("move").disabled = false; $("cancel").disabled = false; });
+  }
+  $("move").onclick = () => {
+    const v = $("date").value, box = $("date-error");
+    let problem = "";
+    if (!v) problem = "Choose the new date first.";
+    else if (v === d.current) problem = "That is already the booked date.";
+    else if (v < d.minDate) problem = "That date is too soon. Choose " + d.minDate + " or later.";
+    else if (v > d.maxDate) problem = "That date is too far ahead.";
+    box.hidden = !problem; box.textContent = problem; $("date").classList.toggle("invalid", !!problem);
+    if (problem) return;
+    send({ action: "move", date: v }, $("move"), "Booking moved. The diver has been informed.");
+  };
+  $("cancel").onclick = () => {
+    if (!confirm("Cancel this booking and refund " + d.paid + " THB to the diver?")) return;
+    send({ action: "cancel" }, $("cancel"), "Booking cancelled and refunded. The diver has been informed.");
+  };
+})();
+</script>`, 200, "en", "Manage booking");
+}
+
+async function manageAction(request, env, ctx) {
+  let input;
+  try { input = await request.json(); } catch { return json({ error: "Invalid request." }, 400); }
+  if (!env.STRIPE_SECRET_KEY || !env.MAKE_CHANGES_URL || !env.MAKE_CHANGES_KEY) {
+    return json({ error: "Booking changes are not set up yet." }, 503);
+  }
+  const token = String(input.t || "");
+  const b = await loadManaged(env, ctx, token);
+  if (!b) return json({ error: "This link doesn't work." }, 404);
+  if (b.cancelled) return json({ error: "This booking is already cancelled." }, 409);
+
+  const tellMake = async (action, newDate = "") => {
+    const u = new URL(env.MAKE_CHANGES_URL);
+    u.searchParams.set("key", env.MAKE_CHANGES_KEY);
+    u.searchParams.set("token", token);
+    u.searchParams.set("action", action);
+    u.searchParams.set("new_date", newDate);
+    u.searchParams.set("late", b.late ? "true" : "false");
+    const res = await fetch(u);
+    if (!res.ok) throw new Error(`Make: ${res.status} ${await res.text()}`);
+  };
+
+  if (input.action === "move") {
+    const date = String(input.date || "");
+    const minDate = earliestDate(num(b.product["Cutoff hour"]) || 15);
+    const maxDate = plusDays(minDate, 180);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < minDate || date > maxDate) {
+      return json({ error: `Choose a date between ${fmtDate(minDate, "en")} and ${fmtDate(maxDate, "en")}.` }, 400);
+    }
+    await tellMake("move", date);
+    return json({ ok: true, message: `Booking moved to ${fmtDate(date, "en")}. The diver gets a WhatsApp message.` });
+  }
+
+  if (input.action === "cancel") {
+    const pi = typeof b.session.payment_intent === "string" ? b.session.payment_intent : b.session.payment_intent?.id;
+    if (!pi) return json({ error: "No payment found for this booking. Contact Talay." }, 409);
+    try {
+      await stripe(env, "POST", "refunds",
+        { payment_intent: pi, "metadata[cancelled_by]": "center", "metadata[booking]": String(first(b.f["Ref"]) || "") },
+        { "Idempotency-Key": `cancel-${token}` });
+    } catch (err) {
+      if (!/already.?refunded/i.test(String(err.message))) throw err;
+    }
+    await tellMake("cancel");
+    return json({ ok: true, message: "Booking cancelled. The full deposit is refunded to the diver's card, and the diver gets a WhatsApp message." });
+  }
+  return json({ error: "Unknown action." }, 400);
 }
 
 // ---------- Airtable ----------
@@ -612,14 +800,14 @@ function problem(text, lang) {
   return `<main class="empty"><h1>${esc(T[lang].problemTitle)}</h1><p>${esc(text)}</p></main>`;
 }
 
-function page(body, status = 200, lang = "en") {
+function page(body, status = 200, lang = "en", title = "") {
   const html = `<!doctype html>
 <html lang="${lang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>${esc(T[lang].title)}</title>
+<title>${esc(title || T[lang].title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -674,6 +862,9 @@ input[type=date]::-webkit-date-and-time-value{text-align:left}
 .book{width:100%;min-height:3.4rem;border:0;border-radius:12px;background:var(--sea);color:#fff;font:inherit;font-weight:600;font-size:1.05rem;cursor:pointer}
 .book:hover{background:#175E6B}
 .book:disabled{opacity:.6;cursor:default}
+.book.danger{background:#fff;color:#9E3B24;border:1.5px solid #D9A99A}
+.book.danger:hover{background:#FDF4F1}
+.warn{margin:0;padding:.8rem 1rem;border-radius:10px;background:#FFF3D6;color:#6B4A00;font-size:.95rem}
 .testmode{margin:0 0 1rem;padding:.5rem .8rem;border-radius:8px;background:#FFF3D6;color:#6B4A00;font-size:.85rem;font-weight:600}
 .msg{margin:.9rem 0 0;padding:.8rem 1rem;border-radius:10px;background:var(--shallow);font-size:.95rem}
 .practical{margin:2.25rem 0 0;padding-top:1.25rem;border-top:1px solid var(--line);display:grid;gap:.8rem}
