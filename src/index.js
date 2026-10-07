@@ -478,6 +478,8 @@ async function managePage(env, ctx, url) {
   <h1>${esc(ref || "Booking")}</h1>
   <p class="intro"><strong>${esc(name)}</strong>, ${esc(date ? fmtDate(date, "en") : "")}, ${esc(diversLabel(divers, "en"))}${diver ? `, ${esc(diver)}` : ""}. Deposit paid online: ${thb(paid)} THB.</p>
   ${b.cancelled ? `<p class="msg">This booking is cancelled. The diver's deposit has been refunded.</p>` : `
+  <p id="msg" class="msg" role="status" hidden></p>
+  <div id="actions">
   ${windowLine}
   <section class="field" style="margin-top:2rem">
     <label for="date">Move to another date</label>
@@ -491,7 +493,7 @@ async function managePage(env, ctx, url) {
     <button type="button" id="cancel" class="book danger">Cancel and refund ${thb(paid)} THB</button>
     <p class="hint">The full deposit goes back to the diver's card, and the diver gets a WhatsApp message.</p>
   </section>
-  <p id="msg" class="msg" role="status" hidden></p>`}
+  </div>`}
 </main>
 <script id="data" type="application/json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>
 <script>
@@ -503,11 +505,17 @@ async function managePage(env, ctx, url) {
   function send(body, btn, doneText) {
     $("move").disabled = true; $("cancel").disabled = true;
     msg.hidden = false; msg.textContent = "Saving…";
+    msg.scrollIntoView({ behavior: "smooth", block: "center" });
     fetch("/b/manage/action", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(Object.assign({ t: d.token }, body)) })
       .then((r) => r.json())
       .then((r) => {
-        if (r.ok) { msg.textContent = r.message || doneText; return; }
+        if (r.ok) {
+          msg.textContent = r.message || doneText;
+          $("actions").hidden = true;
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
         msg.textContent = r.error || "Something went wrong. Try again.";
         $("move").disabled = false; $("cancel").disabled = false;
       })
