@@ -63,6 +63,7 @@ const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const first = (v) => (Array.isArray(v) ? v[0] : v);
 const num = (v) => Number(first(v)) || 0;
+const cap = (t) => String(t).charAt(0).toUpperCase() + String(t).slice(1);
 const thb = (n) => Math.round(n).toLocaleString("en-US");
 
 function earliestDate(cutoffHour) {
@@ -85,19 +86,20 @@ function bookingPage(c, p, code) {
   const island = first(c["Island"]) || "";
   const assistant = first(c["Assistant name"]) || "us";
   const logo = first(c["Logo"])?.thumbnails?.large?.url || first(c["Logo"])?.url || "";
-  const meeting = first(c["Meeting point"]) || "";
+  const meeting = cap(first(c["Meeting point"]) || "");
 
   const name = first(p["Name"]) || code;
   const price = num(p["Price THB"]);
   const deposit = num(p["Deposit THB"]);
   const duration = first(p["Duration"]) || "";
   const included = first(p["Included"]) || "";
-  const checkIn = first(p["Check-in"]) || "";
+  const checkIn = cap(first(p["Check-in"]) || "");
   const cutoff = num(p["Cutoff hour"]) || 15;
 
   const minDate = earliestDate(cutoff);
   const maxDate = plusDays(minDate, 180);
-  const data = { price, deposit, max: MAX_DIVERS, assistant, payments: false };
+  const data = { price, deposit, max: MAX_DIVERS, assistant, payments: false,
+    minDate, maxDate, minLabel: fmtDate(minDate) };
 
   return `
 <header class="center">
@@ -173,11 +175,27 @@ function bookingPage(c, p, code) {
   }
   $("minus").onclick = () => { if (n > 1) { n--; render(); } };
   $("plus").onclick = () => { if (n < d.max) { n++; render(); } };
+  // iPhones ignore min/max on date fields, so check the date ourselves.
+  function dateProblem() {
+    const v = $("date").value;
+    if (!v) return "Choose a date first.";
+    if (v < d.minDate) return "That date is too soon to book online. Choose " + d.minLabel + " or later.";
+    if (v > d.maxDate) return "That date is too far ahead to book online. Message " + d.assistant + " on WhatsApp.";
+    return "";
+  }
+  $("date").addEventListener("change", () => {
+    const problem = dateProblem();
+    $("date").classList.toggle("invalid", !!problem && !!$("date").value);
+    const msg = $("msg");
+    if (problem && $("date").value) { msg.hidden = false; msg.textContent = problem; }
+    else { msg.hidden = true; }
+  });
   $("book").onclick = () => {
     const msg = $("msg");
     msg.hidden = false;
-    if (!$("date").value) {
-      msg.textContent = "Choose a date first.";
+    const problem = dateProblem();
+    if (problem) {
+      msg.textContent = problem;
       $("date").focus();
       return;
     }
@@ -242,6 +260,7 @@ h1{font-size:2.1rem;line-height:1.1;letter-spacing:-.02em;margin:0 0 .6rem;font-
 label,#divers-label{display:block;font-weight:600;margin-bottom:.4rem}
 input[type=date]{width:100%;font:inherit;color:inherit;padding:.75rem .9rem;border:1.5px solid var(--line);border-radius:10px;background:#fff;min-height:3rem}
 input[type=date]:focus-visible,.stepper button:focus-visible,.book:focus-visible{outline:3px solid var(--sea);outline-offset:2px}
+input[type=date].invalid{border-color:#B4492F}
 .hint{margin:.4rem 0 0;font-size:.85rem;color:var(--muted)}
 .stepper{display:inline-flex;align-items:center;border:1.5px solid var(--line);border-radius:10px;background:#fff;overflow:hidden}
 .stepper button{width:3rem;height:3rem;border:0;background:none;font:inherit;font-size:1.4rem;color:var(--sea);cursor:pointer}
