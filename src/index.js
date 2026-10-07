@@ -10,31 +10,160 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/b/")) return env.ASSETS.fetch(request);
-
-    const slug = url.pathname.slice(3).replace(/\/+$/, "").toLowerCase();
-    const code = (url.searchParams.get("p") || "").toUpperCase();
-
-    if (!/^[a-z0-9-]{1,60}$/.test(slug) || !/^[A-Z0-9]{1,12}$/.test(code)) {
-      return page(notFound(), 404);
-    }
     if (!env.AIRTABLE_TOKEN) {
       return page(problem("The booking page is not set up yet (missing key)."), 500);
     }
 
     try {
-      const [center, product] = await Promise.all([
-        airtableOne(env, ctx, "Centers", `{Slug} = '${slug}'`),
-        airtableOne(env, ctx, "Products",
-          `AND({Code} = '${code}', FIND('${slug}', ARRAYJOIN({C slug})))`),
-      ]);
-      if (!center || !product) return page(notFound(), 404);
-      return page(bookingPage(center, product, code));
+      if (url.pathname === "/b/checkout" && request.method === "POST") {
+        return await checkout(request, env, ctx, url);
+      }
+      if (url.pathname === "/b/thanks") {
+        return await thanks(env, ctx, url);
+      }
+
+      const slug = url.pathname.slice(3).replace(/\/+$/, "").toLowerCase();
+      const code = (url.searchParams.get("p") || "").toUpperCase();
+      const found = await loadBooking(env, ctx, slug, code);
+      if (!found) return page(notFound(), 404);
+      return page(bookingPage(found.center, found.product, code, slug, env));
     } catch (err) {
       console.error(err);
       return page(problem("We couldn't load this booking right now. Try again in a minute."), 502);
     }
   },
 };
+
+async function loadBooking(env, ctx, slug, code) {
+  if (!/^[a-z0-9-]{1,60}$/.test(slug) || !/^[A-Z0-9]{1,12}$/.test(code)) return null;
+  const [center, product] = await Promise.all([
+    airtableOne(env, ctx, "Centers", `{Slug} = '${slug}'`),
+    airtableOne(env, ctx, "Products",
+      `AND({Code} = '${code}', FIND('${slug}', ARRAYJOIN({C slug})))`),
+  ]);
+  return center && product ? { center, product } : null;
+}
+
+// ---------- Stripe ----------
+
+const json = (obj, status = 200) => new Response(JSON.stringify(obj), {
+  status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+});
+
+async function stripe(env, method, path, params) {
+  const res = await fetch(`https://api.stripe.com/v1/${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      ...(params ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
+    },
+    body: params ? new URLSearchParams(params) : undefined,
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(`Stripe ${path}: ${res.status} ${JSON.stringify(body.error || body)}`);
+  return body;
+}
+
+async function checkout(request, env, ctx, url) {
+  if (!env.STRIPE_SECRET_KEY) return json({ error: "Online payment is not available yet." }, 503);
+  let input;
+  try { input = await request.json(); } catch { return json({ error: "Invalid request." }, 400); }
+
+  const slug = String(input.slug || "").toLowerCase();
+  const code = String(input.code || "").toUpperCase();
+  const date = String(input.date || "");
+  const divers = Number(input.divers);
+
+  // Never trust the browser: reload prices and re-check every rule here.
+  const found = await loadBooking(env, ctx, slug, code);
+  if (!found) return json({ error: "This booking link doesn't work." }, 404);
+  const { center, product } = found;
+  const minDate = earliestDate(num(product["Cutoff hour"]) || 15);
+  const maxDate = plusDays(minDate, 180);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < minDate || date > maxDate) {
+    return json({ error: `Choose ${fmtDate(minDate)} or later.` }, 400);
+  }
+  if (!Number.isInteger(divers) || divers < 1 || divers > MAX_DIVERS) {
+    return json({ error: "Choose between 1 and 5 divers." }, 400);
+  }
+
+  const centerName = first(center["Name"]) || "Dive center";
+  const name = first(product["Name"]) || code;
+  const price = num(product["Price THB"]);
+  const deposit = num(product["Deposit THB"]);
+  const total = price * divers, paid = deposit * divers, balance = total - paid;
+  const back = `${url.origin}/b/${slug}?p=${code}`;
+
+  const meta = {
+    center_slug: slug, center_name: centerName, product_code: code, product_name: name,
+    activity_date: date, divers: String(divers),
+    total_thb: String(total), deposit_thb: String(paid), balance_thb: String(balance),
+  };
+  const params = {
+    mode: "payment",
+    "line_items[0][quantity]": String(divers),
+    "line_items[0][price_data][currency]": "thb",
+    "line_items[0][price_data][unit_amount]": String(deposit * 100), // THB in satang
+    "line_items[0][price_data][product_data][name]": `Deposit: ${name} at ${centerName}`,
+    "line_items[0][price_data][product_data][description]":
+      `${fmtDate(date)}, ${divers} ${divers === 1 ? "diver" : "divers"}. ` +
+      `You pay the remaining ${thb(balance)} THB at the shop.`,
+    "phone_number_collection[enabled]": "true",
+    success_url: `${url.origin}/b/thanks?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: back,
+    "payment_intent_data[description]": `${name} at ${centerName}, ${date}, ${divers}x`,
+  };
+  for (const [k, v] of Object.entries(meta)) {
+    params[`metadata[${k}]`] = v;
+    params[`payment_intent_data[metadata][${k}]`] = v;
+  }
+  const session = await stripe(env, "POST", "checkout/sessions", params);
+  return json({ url: session.url });
+}
+
+async function thanks(env, ctx, url) {
+  const id = url.searchParams.get("session_id") || "";
+  if (!env.STRIPE_SECRET_KEY || !/^cs_[A-Za-z0-9_]{10,200}$/.test(id)) return page(notFound(), 404);
+  const s = await stripe(env, "GET", `checkout/sessions/${id}`);
+  const m = s.metadata || {};
+  if (s.payment_status !== "paid") {
+    return page(problem("We haven't received your payment. Open the booking link again to try once more."), 402);
+  }
+  const found = await loadBooking(env, ctx, m.center_slug, m.product_code);
+  const c = found?.center || {}, p = found?.product || {};
+  const logo = first(c["Logo"])?.thumbnails?.large?.url || first(c["Logo"])?.url || "";
+  const assistant = first(c["Assistant name"]) || "us";
+  const meeting = cap(first(c["Meeting point"]) || "");
+  const checkIn = cap(first(p["Check-in"]) || "");
+  const n = Number(m.divers) || 1;
+
+  return page(`
+<header class="center">
+  ${logo ? `<img class="logo" src="${esc(logo)}" alt="${esc(m.center_name)} logo">` : ""}
+  <div><p class="center-name">${esc(m.center_name)}</p>${c["Island"] ? `<p class="island">${esc(first(c["Island"]))}</p>` : ""}</div>
+</header>
+<main>
+  <h1>You're booked</h1>
+  <p class="intro"><strong>${esc(m.product_name)}</strong>, ${esc(fmtDate(m.activity_date))}, ${n} ${n === 1 ? "diver" : "divers"}.</p>
+  <section class="slate" aria-label="Payment">
+    <div class="above">
+      <div class="row now"><span>Paid now</span><span><b>${thb(Number(m.deposit_thb))}</b> THB</span></div>
+    </div>
+    <svg class="waterline" viewBox="0 0 400 24" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0 12 C 50 2, 100 22, 150 12 S 250 2, 300 12 S 380 20, 400 12 V24 H0Z"/>
+    </svg>
+    <div class="below">
+      <div class="row"><span>Pay at the shop on the day</span><span><b>${thb(Number(m.balance_thb))}</b> THB</span></div>
+    </div>
+  </section>
+  <p class="msg">The team will confirm on WhatsApp. If they need to move or cancel your booking, they'll tell you within two hours and you get a full refund.</p>
+  ${(checkIn || meeting) ? `<dl class="practical">
+    ${checkIn ? `<div><dt>Check-in</dt><dd>${esc(checkIn)}</dd></div>` : ""}
+    ${meeting ? `<div><dt>Meeting point</dt><dd>${esc(meeting)}</dd></div>` : ""}
+  </dl>` : ""}
+  <p class="hint" style="margin-top:2rem">Questions? Reply to ${esc(assistant)} on WhatsApp.</p>
+</main>`);
+}
 
 // ---------- Airtable ----------
 
@@ -81,7 +210,7 @@ function plusDays(iso, days) {
 
 // ---------- Pages ----------
 
-function bookingPage(c, p, code) {
+function bookingPage(c, p, code, slug, env) {
   const centerName = first(c["Name"]) || "Dive center";
   const island = first(c["Island"]) || "";
   const assistant = first(c["Assistant name"]) || "us";
@@ -98,10 +227,13 @@ function bookingPage(c, p, code) {
 
   const minDate = earliestDate(cutoff);
   const maxDate = plusDays(minDate, 180);
-  const data = { price, deposit, max: MAX_DIVERS, assistant, payments: false,
+  const payments = !!env.STRIPE_SECRET_KEY;
+  const testMode = String(env.STRIPE_SECRET_KEY || "").startsWith("sk_test_");
+  const data = { price, deposit, max: MAX_DIVERS, assistant, payments, slug, code,
     minDate, maxDate, minLabel: fmtDate(minDate) };
 
   return `
+${testMode ? `<p class="testmode">Test mode: no real payment is taken.</p>` : ""}
 <header class="center">
   ${logo ? `<img class="logo" src="${esc(logo)}" alt="${esc(centerName)} logo">` : ""}
   <div>
@@ -207,7 +339,23 @@ function bookingPage(c, p, code) {
     if (!d.payments) {
       msg.textContent = "Online payment opens soon. For now, reply to " + d.assistant +
         " on WhatsApp with your date and number of divers, and the team will book you in.";
+      return;
     }
+    const btn = $("book");
+    btn.disabled = true;
+    msg.textContent = "Opening secure payment…";
+    fetch("/b/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug: d.slug, code: d.code, date: $("date").value, divers: n }),
+    })
+      .then((r) => r.json())
+      .then((r) => {
+        if (r.url) { window.location.href = r.url; return; }
+        msg.textContent = r.error || "Something went wrong. Try again.";
+        btn.disabled = false;
+      })
+      .catch(() => { msg.textContent = "No connection. Check your internet and try again."; btn.disabled = false; });
   };
   render();
 })();
@@ -288,6 +436,8 @@ input[type=date]::-webkit-date-and-time-value{text-align:left}
 .fine{margin:.35rem 0 0;font-size:.82rem;color:#A9C6CA}
 .book{width:100%;min-height:3.4rem;border:0;border-radius:12px;background:var(--sea);color:#fff;font:inherit;font-weight:600;font-size:1.05rem;cursor:pointer}
 .book:hover{background:#175E6B}
+.book:disabled{opacity:.6;cursor:default}
+.testmode{margin:0 0 1rem;padding:.5rem .8rem;border-radius:8px;background:#FFF3D6;color:#6B4A00;font-size:.85rem;font-weight:600}
 .msg{margin:.9rem 0 0;padding:.8rem 1rem;border-radius:10px;background:var(--shallow);font-size:.95rem}
 .practical{margin:2.25rem 0 0;padding-top:1.25rem;border-top:1px solid var(--line);display:grid;gap:.8rem}
 .practical div{display:grid;grid-template-columns:7.5rem 1fr;gap:.75rem}
