@@ -1,0 +1,17 @@
+{
+  // Talay website. De gewone site staat in /public.
+  // Alles onder /b/ (boekingspagina) gaat naar src/index.js.
+  "name": "snowy-sun-ea23",
+  "main": "src/index.js",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/b/*"]
+  },
+  "vars": {
+    "AIRTABLE_BASE": "appEXBMOJa73WiQHb"
+  },
+  "observability": { "enabled": true }
+  // De Airtable-sleutel staat als geheim AIRTABLE_TOKEN in Cloudflare, nooit hier.
+}
