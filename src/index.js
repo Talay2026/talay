@@ -26,7 +26,8 @@ export default {
       const code = (url.searchParams.get("p") || "").toUpperCase();
       const found = await loadBooking(env, ctx, slug, code);
       if (!found) return page(notFound(), 404);
-      return page(bookingPage(found.center, found.product, code, slug, env));
+      const ref = (url.searchParams.get("c") || "").slice(0, 64);
+      return page(bookingPage(found.center, found.product, code, slug, env, /^[A-Za-z0-9_-]{1,64}$/.test(ref) ? ref : ""));
     } catch (err) {
       console.error(err);
       return page(problem("We couldn't load this booking right now. Try again in a minute."), 502);
@@ -73,6 +74,7 @@ async function checkout(request, env, ctx, url) {
   const code = String(input.code || "").toUpperCase();
   const date = String(input.date || "");
   const divers = Number(input.divers);
+  const ref = /^[A-Za-z0-9_-]{1,64}$/.test(String(input.ref || "")) ? String(input.ref) : "";
 
   // Never trust the browser: reload prices and re-check every rule here.
   const found = await loadBooking(env, ctx, slug, code);
@@ -92,12 +94,13 @@ async function checkout(request, env, ctx, url) {
   const price = num(product["Price THB"]);
   const deposit = num(product["Deposit THB"]);
   const total = price * divers, paid = deposit * divers, balance = total - paid;
-  const back = `${url.origin}/b/${slug}?p=${code}`;
+  const back = `${url.origin}/b/${slug}?p=${code}${ref ? `&c=${ref}` : ""}`;
 
   const meta = {
     center_slug: slug, center_name: centerName, product_code: code, product_name: name,
     activity_date: date, divers: String(divers),
     total_thb: String(total), deposit_thb: String(paid), balance_thb: String(balance),
+    lead_ref: ref,
   };
   const params = {
     mode: "payment",
@@ -210,7 +213,7 @@ function plusDays(iso, days) {
 
 // ---------- Pages ----------
 
-function bookingPage(c, p, code, slug, env) {
+function bookingPage(c, p, code, slug, env, ref = "") {
   const centerName = first(c["Name"]) || "Dive center";
   const island = first(c["Island"]) || "";
   const assistant = first(c["Assistant name"]) || "us";
@@ -229,7 +232,7 @@ function bookingPage(c, p, code, slug, env) {
   const maxDate = plusDays(minDate, 180);
   const payments = !!env.STRIPE_SECRET_KEY;
   const testMode = String(env.STRIPE_SECRET_KEY || "").startsWith("sk_test_");
-  const data = { price, deposit, max: MAX_DIVERS, assistant, payments, slug, code,
+  const data = { price, deposit, max: MAX_DIVERS, assistant, payments, slug, code, ref,
     minDate, maxDate, minLabel: fmtDate(minDate) };
 
   return `
@@ -347,7 +350,7 @@ ${testMode ? `<p class="testmode">Test mode: no real payment is taken.</p>` : ""
     fetch("/b/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slug: d.slug, code: d.code, date: $("date").value, divers: n }),
+      body: JSON.stringify({ slug: d.slug, code: d.code, ref: d.ref, date: $("date").value, divers: n }),
     })
       .then((r) => r.json())
       .then((r) => {
