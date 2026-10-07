@@ -156,7 +156,7 @@ async function thanks(env, ctx, url) {
       <div class="row"><span>Pay at the shop on the day</span><span><b>${thb(Number(m.balance_thb))}</b> THB</span></div>
     </div>
   </section>
-  <p class="msg">The team will confirm on WhatsApp. If they need to move or cancel your booking, they'll tell you within two hours and you get a full refund.</p>
+  <p class="msg">If the team needs to change your booking, they'll message you within two hours.</p>
   ${(checkIn || meeting) ? `<dl class="practical">
     ${checkIn ? `<div><dt>Check-in</dt><dd>${esc(checkIn)}</dd></div>` : ""}
     ${meeting ? `<div><dt>Meeting point</dt><dd>${esc(meeting)}</dd></div>` : ""}
