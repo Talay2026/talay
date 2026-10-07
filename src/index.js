@@ -2,16 +2,233 @@
 // Reads the center and product from Airtable (read-only token) and renders a
 // white-label page: the diver sees the dive center, not Talay.
 // Everything outside /b/ is served from /public by the assets binding.
+//
+// Languages: English, French, German, Spanish. The page follows ?l=fr|de|es|en
+// if present, otherwise the language of the diver's phone or browser.
+// Optional Airtable fields per language (fallback to English when empty):
+//   Products: "Name FR", "Duration FR", "Included FR", "Check-in FR" (also DE, ES)
+//   Centers:  "Meeting point FR" (also DE, ES)
 
 const CACHE_SECONDS = 120; // limits Airtable API calls; logo links stay valid
 const MAX_DIVERS = 5; // 6+ goes to a person (rule from the conversation flow)
+const LANGS = ["en", "fr", "de", "es"];
+const LOCALES = { en: "en-GB", fr: "fr-FR", de: "de-DE", es: "es-ES" };
+
+// ---------- Texts ----------
+
+const T = {
+  en: {
+    title: "Book your dive",
+    testmode: "Test mode: no real payment is taken.",
+    includes: "Includes",
+    startDate: "Start date",
+    date: "Date",
+    earliest: (d) => `Earliest date you can still book online: ${d}.`,
+    diversLabel: "Number of divers",
+    less: "One diver less",
+    more: "One diver more",
+    group: (a) => `Coming with 6 or more? Message ${a} on WhatsApp and the team will plan it with you.`,
+    diver: "diver", divers: "divers",
+    totalFor: "Total for",
+    payNow: "Pay now to secure your spot",
+    payShop: "Pay at the shop on the day",
+    never: "You never pay more than the shop price.",
+    btn: ["Pay ", " THB and book"],
+    checkIn: "Check-in",
+    meeting: "Meeting point",
+    chooseDate: "Choose a date first.",
+    tooSoon: (m) => `That date is too soon to book online. Choose ${m} or later.`,
+    tooFar: (a) => `That date is too far ahead to book online. Message ${a} on WhatsApp.`,
+    noPay: (a) => `Online payment opens soon. For now, reply to ${a} on WhatsApp with your date and number of divers, and the team will book you in.`,
+    opening: "Opening secure payment…",
+    wrong: "Something went wrong. Try again.",
+    noConn: "No connection. Check your internet and try again.",
+    notAvailable: "Online payment is not available yet.",
+    invalid: "Invalid request.",
+    chooseFrom: (m) => `Choose ${m} or later.`,
+    chooseDivers: `Choose between 1 and ${MAX_DIVERS} divers.`,
+    deposit: (n, c) => `Deposit: ${n} at ${c}`,
+    stripeDesc: (d, lbl, b) => `${d}, ${lbl}. You pay the remaining ${b} THB at the shop.`,
+    booked: "You're booked",
+    paidNow: "Paid now",
+    change: "If the team needs to change your booking, they'll message you within two hours.",
+    questions: (a) => `Questions? Reply to ${a} on WhatsApp.`,
+    notPaid: "We haven't received your payment. Open the booking link again to try once more.",
+    notFoundTitle: "This booking link doesn't work",
+    notFoundText: "Open the link again from your WhatsApp chat with the dive center, or send them a message and they'll send a new one.",
+    problemTitle: "Booking page unavailable",
+    missingKey: "The booking page is not set up yet (missing key).",
+    loadFail: "We couldn't load this booking right now. Try again in a minute.",
+  },
+  fr: {
+    title: "Réservez votre plongée",
+    testmode: "Mode test : aucun paiement réel n'est effectué.",
+    includes: "Inclus :",
+    startDate: "Date de début",
+    date: "Date",
+    earliest: (d) => `Première date encore réservable en ligne : ${d}.`,
+    diversLabel: "Nombre de plongeurs",
+    less: "Un plongeur de moins",
+    more: "Un plongeur de plus",
+    group: (a) => `Vous êtes 6 ou plus ? Écrivez à ${a} sur WhatsApp et l'équipe organisera tout avec vous.`,
+    diver: "plongeur", divers: "plongeurs",
+    totalFor: "Total pour",
+    payNow: "À payer maintenant pour réserver votre place",
+    payShop: "À payer au centre le jour même",
+    never: "Vous ne payez jamais plus que le prix du centre.",
+    btn: ["Payer ", " THB et réserver"],
+    checkIn: "Check-in",
+    meeting: "Point de rendez-vous",
+    chooseDate: "Choisissez d'abord une date.",
+    tooSoon: (m) => `Cette date est trop proche pour réserver en ligne. Choisissez le ${m} ou plus tard.`,
+    tooFar: (a) => `Cette date est trop lointaine pour réserver en ligne. Écrivez à ${a} sur WhatsApp.`,
+    noPay: (a) => `Le paiement en ligne arrive bientôt. En attendant, envoyez à ${a} sur WhatsApp votre date et le nombre de plongeurs, et l'équipe s'occupe de votre réservation.`,
+    opening: "Ouverture du paiement sécurisé…",
+    wrong: "Une erreur s'est produite. Réessayez.",
+    noConn: "Pas de connexion. Vérifiez votre connexion internet et réessayez.",
+    notAvailable: "Le paiement en ligne n'est pas encore disponible.",
+    invalid: "Demande non valide.",
+    chooseFrom: (m) => `Choisissez le ${m} ou plus tard.`,
+    chooseDivers: `Choisissez entre 1 et ${MAX_DIVERS} plongeurs.`,
+    deposit: (n, c) => `Acompte : ${n} chez ${c}`,
+    stripeDesc: (d, lbl, b) => `${d}, ${lbl}. Vous payez le solde de ${b} THB au centre.`,
+    booked: "Votre réservation est confirmée",
+    paidNow: "Payé maintenant",
+    change: "Si l'équipe doit modifier votre réservation, elle vous écrira dans les deux heures.",
+    questions: (a) => `Des questions ? Répondez à ${a} sur WhatsApp.`,
+    notPaid: "Nous n'avons pas reçu votre paiement. Ouvrez à nouveau le lien de réservation pour réessayer.",
+    notFoundTitle: "Ce lien de réservation ne fonctionne pas",
+    notFoundText: "Ouvrez à nouveau le lien depuis votre conversation WhatsApp avec le centre de plongée, ou envoyez-leur un message et ils vous enverront un nouveau lien.",
+    problemTitle: "Page de réservation indisponible",
+    missingKey: "La page de réservation n'est pas encore configurée (clé manquante).",
+    loadFail: "Impossible de charger cette réservation pour le moment. Réessayez dans une minute.",
+  },
+  de: {
+    title: "Buche deinen Tauchgang",
+    testmode: "Testmodus: Es wird keine echte Zahlung abgebucht.",
+    includes: "Inklusive",
+    startDate: "Startdatum",
+    date: "Datum",
+    earliest: (d) => `Frühestes Datum, das du noch online buchen kannst: ${d}.`,
+    diversLabel: "Anzahl Taucher",
+    less: "Ein Taucher weniger",
+    more: "Ein Taucher mehr",
+    group: (a) => `Ihr seid 6 oder mehr? Schreib ${a} auf WhatsApp, dann plant das Team alles mit euch.`,
+    diver: "Taucher", divers: "Taucher",
+    totalFor: "Gesamt für",
+    payNow: "Jetzt zahlen und Platz sichern",
+    payShop: "Am Tag selbst im Shop zahlen",
+    never: "Du zahlst nie mehr als den Preis im Shop.",
+    btn: ["", " THB zahlen und buchen"],
+    checkIn: "Check-in",
+    meeting: "Treffpunkt",
+    chooseDate: "Wähle zuerst ein Datum.",
+    tooSoon: (m) => `Dieses Datum ist zu früh für eine Online-Buchung. Wähle ${m} oder später.`,
+    tooFar: (a) => `Dieses Datum liegt zu weit in der Zukunft für eine Online-Buchung. Schreib ${a} auf WhatsApp.`,
+    noPay: (a) => `Online-Zahlung kommt bald. Schick ${a} bis dahin auf WhatsApp dein Datum und die Anzahl Taucher, dann bucht das Team für dich.`,
+    opening: "Sichere Zahlung wird geöffnet…",
+    wrong: "Etwas ist schiefgelaufen. Versuch es noch einmal.",
+    noConn: "Keine Verbindung. Prüfe dein Internet und versuch es noch einmal.",
+    notAvailable: "Online-Zahlung ist noch nicht verfügbar.",
+    invalid: "Ungültige Anfrage.",
+    chooseFrom: (m) => `Wähle ${m} oder später.`,
+    chooseDivers: `Wähle zwischen 1 und ${MAX_DIVERS} Tauchern.`,
+    deposit: (n, c) => `Anzahlung: ${n} bei ${c}`,
+    stripeDesc: (d, lbl, b) => `${d}, ${lbl}. Den Rest von ${b} THB zahlst du im Shop.`,
+    booked: "Du bist gebucht",
+    paidNow: "Jetzt bezahlt",
+    change: "Falls das Team deine Buchung ändern muss, meldet es sich innerhalb von zwei Stunden bei dir.",
+    questions: (a) => `Fragen? Antworte ${a} auf WhatsApp.`,
+    notPaid: "Wir haben deine Zahlung nicht erhalten. Öffne den Buchungslink noch einmal, um es erneut zu versuchen.",
+    notFoundTitle: "Dieser Buchungslink funktioniert nicht",
+    notFoundText: "Öffne den Link noch einmal aus deinem WhatsApp-Chat mit der Tauchbasis, oder schreib ihnen, dann bekommst du einen neuen Link.",
+    problemTitle: "Buchungsseite nicht verfügbar",
+    missingKey: "Die Buchungsseite ist noch nicht eingerichtet (Schlüssel fehlt).",
+    loadFail: "Diese Buchung kann gerade nicht geladen werden. Versuch es in einer Minute noch einmal.",
+  },
+  es: {
+    title: "Reserva tu inmersión",
+    testmode: "Modo de prueba: no se realiza ningún pago real.",
+    includes: "Incluye",
+    startDate: "Fecha de inicio",
+    date: "Fecha",
+    earliest: (d) => `Primera fecha que aún puedes reservar online: ${d}.`,
+    diversLabel: "Número de buceadores",
+    less: "Un buceador menos",
+    more: "Un buceador más",
+    group: (a) => `¿Sois 6 o más? Escribe a ${a} por WhatsApp y el equipo lo organizará con vosotros.`,
+    diver: "buceador", divers: "buceadores",
+    totalFor: "Total para",
+    payNow: "Paga ahora para asegurar tu plaza",
+    payShop: "Paga en el centro el mismo día",
+    never: "Nunca pagas más que el precio del centro.",
+    btn: ["Pagar ", " THB y reservar"],
+    checkIn: "Check-in",
+    meeting: "Punto de encuentro",
+    chooseDate: "Elige primero una fecha.",
+    tooSoon: (m) => `Esa fecha es demasiado pronto para reservar online. Elige el ${m} o una fecha posterior.`,
+    tooFar: (a) => `Esa fecha está demasiado lejos para reservar online. Escribe a ${a} por WhatsApp.`,
+    noPay: (a) => `El pago online llegará pronto. Mientras tanto, envía a ${a} por WhatsApp tu fecha y el número de buceadores, y el equipo te hará la reserva.`,
+    opening: "Abriendo el pago seguro…",
+    wrong: "Algo salió mal. Inténtalo de nuevo.",
+    noConn: "Sin conexión. Revisa tu internet e inténtalo de nuevo.",
+    notAvailable: "El pago online aún no está disponible.",
+    invalid: "Solicitud no válida.",
+    chooseFrom: (m) => `Elige el ${m} o una fecha posterior.`,
+    chooseDivers: `Elige entre 1 y ${MAX_DIVERS} buceadores.`,
+    deposit: (n, c) => `Depósito: ${n} en ${c}`,
+    stripeDesc: (d, lbl, b) => `${d}, ${lbl}. El resto, ${b} THB, lo pagas en el centro.`,
+    booked: "Tu reserva está confirmada",
+    paidNow: "Pagado ahora",
+    change: "Si el equipo necesita cambiar tu reserva, te escribirá en un plazo de dos horas.",
+    questions: (a) => `¿Preguntas? Responde a ${a} por WhatsApp.`,
+    notPaid: "No hemos recibido tu pago. Abre de nuevo el enlace de reserva para volver a intentarlo.",
+    notFoundTitle: "Este enlace de reserva no funciona",
+    notFoundText: "Abre de nuevo el enlace desde tu chat de WhatsApp con el centro de buceo, o escríbeles y te enviarán uno nuevo.",
+    problemTitle: "Página de reserva no disponible",
+    missingKey: "La página de reserva aún no está configurada (falta la clave).",
+    loadFail: "No hemos podido cargar esta reserva ahora mismo. Inténtalo de nuevo en un minuto.",
+  },
+};
+
+const okLang = (l) => (LANGS.includes(String(l || "").toLowerCase()) ? String(l).toLowerCase() : "");
+
+function pickLang(request, url) {
+  const q = okLang(url.searchParams.get("l"));
+  if (q) return q;
+  const header = request.headers.get("Accept-Language") || "";
+  const prefs = header.split(",")
+    .map((part) => {
+      const [tag, ...params] = part.trim().split(";");
+      const qp = params.find((p) => p.trim().startsWith("q="));
+      return { lang: tag.trim().slice(0, 2).toLowerCase(), q: qp ? Number(qp.trim().slice(2)) || 0 : 1 };
+    })
+    .filter((x) => x.lang)
+    .sort((a, b) => b.q - a.q);
+  for (const p of prefs) if (LANGS.includes(p.lang)) return p.lang;
+  return "en";
+}
+
+const diversLabel = (n, lang) => `${n} ${n === 1 ? T[lang].diver : T[lang].divers}`;
+
+// Airtable field in the diver's language, falling back to the English field.
+function tr(rec, field, lang) {
+  if (lang !== "en") {
+    const v = first(rec[`${field} ${lang.toUpperCase()}`]);
+    if (v) return { v, translated: true };
+  }
+  return { v: first(rec[field]) || "", translated: lang === "en" };
+}
+
+// ---------- Router ----------
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/b/")) return env.ASSETS.fetch(request);
+    const lang = pickLang(request, url);
     if (!env.AIRTABLE_TOKEN) {
-      return page(problem("The booking page is not set up yet (missing key)."), 500);
+      return page(problem(T[lang].missingKey, lang), 500, lang);
     }
 
     try {
@@ -19,18 +236,19 @@ export default {
         return await checkout(request, env, ctx, url);
       }
       if (url.pathname === "/b/thanks") {
-        return await thanks(env, ctx, url);
+        return await thanks(request, env, ctx, url);
       }
 
       const slug = url.pathname.slice(3).replace(/\/+$/, "").toLowerCase();
       const code = (url.searchParams.get("p") || "").toUpperCase();
       const found = await loadBooking(env, ctx, slug, code);
-      if (!found) return page(notFound(), 404);
+      if (!found) return page(notFound(lang), 404, lang);
       const ref = (url.searchParams.get("c") || "").slice(0, 64);
-      return page(bookingPage(found.center, found.product, code, slug, env, /^[A-Za-z0-9_-]{1,64}$/.test(ref) ? ref : ""));
+      return page(bookingPage(found.center, found.product, code, slug, env, lang,
+        /^[A-Za-z0-9_-]{1,64}$/.test(ref) ? ref : ""), 200, lang);
     } catch (err) {
       console.error(err);
-      return page(problem("We couldn't load this booking right now. Try again in a minute."), 502);
+      return page(problem(T[lang].loadFail, lang), 502, lang);
     }
   },
 };
@@ -66,9 +284,11 @@ async function stripe(env, method, path, params) {
 }
 
 async function checkout(request, env, ctx, url) {
-  if (!env.STRIPE_SECRET_KEY) return json({ error: "Online payment is not available yet." }, 503);
   let input;
-  try { input = await request.json(); } catch { return json({ error: "Invalid request." }, 400); }
+  try { input = await request.json(); } catch { return json({ error: T.en.invalid }, 400); }
+  const lang = okLang(input.lang) || "en";
+  const t = T[lang];
+  if (!env.STRIPE_SECRET_KEY) return json({ error: t.notAvailable }, 503);
 
   const slug = String(input.slug || "").toLowerCase();
   const code = String(input.code || "").toUpperCase();
@@ -78,39 +298,40 @@ async function checkout(request, env, ctx, url) {
 
   // Never trust the browser: reload prices and re-check every rule here.
   const found = await loadBooking(env, ctx, slug, code);
-  if (!found) return json({ error: "This booking link doesn't work." }, 404);
+  if (!found) return json({ error: t.notFoundTitle }, 404);
   const { center, product } = found;
   const minDate = earliestDate(num(product["Cutoff hour"]) || 15);
   const maxDate = plusDays(minDate, 180);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < minDate || date > maxDate) {
-    return json({ error: `Choose ${fmtDate(minDate)} or later.` }, 400);
+    return json({ error: t.chooseFrom(fmtDate(minDate, lang)) }, 400);
   }
   if (!Number.isInteger(divers) || divers < 1 || divers > MAX_DIVERS) {
-    return json({ error: "Choose between 1 and 5 divers." }, 400);
+    return json({ error: t.chooseDivers }, 400);
   }
 
   const centerName = first(center["Name"]) || "Dive center";
-  const name = first(product["Name"]) || code;
+  const name = first(product["Name"]) || code; // English name: used in Airtable, Make and mails
+  const shownName = tr(product, "Name", lang).v || name;
   const price = num(product["Price THB"]);
   const deposit = num(product["Deposit THB"]);
   const total = price * divers, paid = deposit * divers, balance = total - paid;
-  const back = `${url.origin}/b/${slug}?p=${code}${ref ? `&c=${ref}` : ""}`;
+  const back = `${url.origin}/b/${slug}?p=${code}${ref ? `&c=${ref}` : ""}&l=${lang}`;
 
   const meta = {
     center_slug: slug, center_name: centerName, product_code: code, product_name: name,
     activity_date: date, divers: String(divers),
     total_thb: String(total), deposit_thb: String(paid), balance_thb: String(balance),
-    lead_ref: ref,
+    lead_ref: ref, lang,
   };
   const params = {
     mode: "payment",
+    locale: lang,
     "line_items[0][quantity]": String(divers),
     "line_items[0][price_data][currency]": "thb",
     "line_items[0][price_data][unit_amount]": String(deposit * 100), // THB in satang
-    "line_items[0][price_data][product_data][name]": `Deposit: ${name} at ${centerName}`,
+    "line_items[0][price_data][product_data][name]": t.deposit(shownName, centerName),
     "line_items[0][price_data][product_data][description]":
-      `${fmtDate(date)}, ${divers} ${divers === 1 ? "diver" : "divers"}. ` +
-      `You pay the remaining ${thb(balance)} THB at the shop.`,
+      t.stripeDesc(fmtDate(date, lang), diversLabel(divers, lang), thb(balance)),
     "phone_number_collection[enabled]": "true",
     success_url: `${url.origin}/b/thanks?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: back,
@@ -124,20 +345,24 @@ async function checkout(request, env, ctx, url) {
   return json({ url: session.url });
 }
 
-async function thanks(env, ctx, url) {
+async function thanks(request, env, ctx, url) {
   const id = url.searchParams.get("session_id") || "";
-  if (!env.STRIPE_SECRET_KEY || !/^cs_[A-Za-z0-9_]{10,200}$/.test(id)) return page(notFound(), 404);
+  let lang = pickLang(request, url);
+  if (!env.STRIPE_SECRET_KEY || !/^cs_[A-Za-z0-9_]{10,200}$/.test(id)) return page(notFound(lang), 404, lang);
   const s = await stripe(env, "GET", `checkout/sessions/${id}`);
   const m = s.metadata || {};
+  lang = okLang(m.lang) || lang;
+  const t = T[lang];
   if (s.payment_status !== "paid") {
-    return page(problem("We haven't received your payment. Open the booking link again to try once more."), 402);
+    return page(problem(t.notPaid, lang), 402, lang);
   }
   const found = await loadBooking(env, ctx, m.center_slug, m.product_code);
   const c = found?.center || {}, p = found?.product || {};
   const logo = first(c["Logo"])?.thumbnails?.large?.url || first(c["Logo"])?.url || "";
-  const assistant = first(c["Assistant name"]) || "us";
-  const meeting = cap(first(c["Meeting point"]) || "");
-  const checkIn = cap(first(p["Check-in"]) || "");
+  const assistant = first(c["Assistant name"]) || m.center_name || "";
+  const meeting = cap(tr(c, "Meeting point", lang).v);
+  const checkIn = cap(tr(p, "Check-in", lang).v);
+  const productName = tr(p, "Name", lang).v || m.product_name;
   const n = Number(m.divers) || 1;
 
   return page(`
@@ -146,26 +371,26 @@ async function thanks(env, ctx, url) {
   <div><p class="center-name">${esc(m.center_name)}</p>${c["Island"] ? `<p class="island">${esc(first(c["Island"]))}</p>` : ""}</div>
 </header>
 <main>
-  <h1>You're booked</h1>
-  <p class="intro"><strong>${esc(m.product_name)}</strong>, ${esc(fmtDate(m.activity_date))}, ${n} ${n === 1 ? "diver" : "divers"}.</p>
-  <section class="slate" aria-label="Payment">
+  <h1>${esc(t.booked)}</h1>
+  <p class="intro"><strong>${esc(productName)}</strong>, ${esc(fmtDate(m.activity_date, lang))}, ${esc(diversLabel(n, lang))}.</p>
+  <section class="slate" aria-label="${esc(t.paidNow)}">
     <div class="above">
-      <div class="row now"><span>Paid now</span><span><b>${thb(Number(m.deposit_thb))}</b> THB</span></div>
+      <div class="row now"><span>${esc(t.paidNow)}</span><span><b>${thb(Number(m.deposit_thb))}</b> THB</span></div>
     </div>
     <svg class="waterline" viewBox="0 0 400 24" preserveAspectRatio="none" aria-hidden="true">
       <path d="M0 12 C 50 2, 100 22, 150 12 S 250 2, 300 12 S 380 20, 400 12 V24 H0Z"/>
     </svg>
     <div class="below">
-      <div class="row"><span>Pay at the shop on the day</span><span><b>${thb(Number(m.balance_thb))}</b> THB</span></div>
+      <div class="row"><span>${esc(t.payShop)}</span><span><b>${thb(Number(m.balance_thb))}</b> THB</span></div>
     </div>
   </section>
-  <p class="msg">If the team needs to change your booking, they'll message you within two hours.</p>
+  <p class="msg">${esc(t.change)}</p>
   ${(checkIn || meeting) ? `<dl class="practical">
-    ${checkIn ? `<div><dt>Check-in</dt><dd>${esc(checkIn)}</dd></div>` : ""}
-    ${meeting ? `<div><dt>Meeting point</dt><dd>${esc(meeting)}</dd></div>` : ""}
+    ${checkIn ? `<div><dt>${esc(t.checkIn)}</dt><dd>${esc(checkIn)}</dd></div>` : ""}
+    ${meeting ? `<div><dt>${esc(t.meeting)}</dt><dd>${esc(meeting)}</dd></div>` : ""}
   </dl>` : ""}
-  <p class="hint" style="margin-top:2rem">Questions? Reply to ${esc(assistant)} on WhatsApp.</p>
-</main>`);
+  <p class="hint" style="margin-top:2rem">${esc(t.questions(assistant))}</p>
+</main>`, 200, lang);
 }
 
 // ---------- Airtable ----------
@@ -213,30 +438,41 @@ function plusDays(iso, days) {
 
 // ---------- Pages ----------
 
-function bookingPage(c, p, code, slug, env, ref = "") {
+function bookingPage(c, p, code, slug, env, lang, ref = "") {
+  const t = T[lang];
   const centerName = first(c["Name"]) || "Dive center";
   const island = first(c["Island"]) || "";
-  const assistant = first(c["Assistant name"]) || "us";
+  const assistant = first(c["Assistant name"]) || centerName;
   const logo = first(c["Logo"])?.thumbnails?.large?.url || first(c["Logo"])?.url || "";
-  const meeting = cap(first(c["Meeting point"]) || "");
+  const meeting = cap(tr(c, "Meeting point", lang).v);
 
-  const name = first(p["Name"]) || code;
+  const englishName = first(p["Name"]) || code;
+  const name = tr(p, "Name", lang).v || englishName;
   const price = num(p["Price THB"]);
   const deposit = num(p["Deposit THB"]);
-  const duration = first(p["Duration"]) || "";
-  const included = first(p["Included"]) || "";
-  const checkIn = cap(first(p["Check-in"]) || "");
+  const duration = tr(p, "Duration", lang).v;
+  const inc = tr(p, "Included", lang);
+  const includesWord = inc.translated ? t.includes : T.en.includes;
+  const checkIn = cap(tr(p, "Check-in", lang).v);
   const cutoff = num(p["Cutoff hour"]) || 15;
 
   const minDate = earliestDate(cutoff);
   const maxDate = plusDays(minDate, 180);
   const payments = !!env.STRIPE_SECRET_KEY;
   const testMode = String(env.STRIPE_SECRET_KEY || "").startsWith("sk_test_");
-  const data = { price, deposit, max: MAX_DIVERS, assistant, payments, slug, code, ref,
-    minDate, maxDate, minLabel: fmtDate(minDate) };
+  const isCourse = code === "OW" || /course|diver/i.test(englishName);
+  const minLabel = fmtDate(minDate, lang);
+  const data = {
+    price, deposit, max: MAX_DIVERS, payments, slug, code, ref, lang, minDate, maxDate,
+    s: {
+      diver: t.diver, divers: t.divers, chooseDate: t.chooseDate,
+      tooSoon: t.tooSoon(minLabel), tooFar: t.tooFar(assistant), noPay: t.noPay(assistant),
+      opening: t.opening, wrong: t.wrong, noConn: t.noConn,
+    },
+  };
 
   return `
-${testMode ? `<p class="testmode">Test mode: no real payment is taken.</p>` : ""}
+${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
 <header class="center">
   ${logo ? `<img class="logo" src="${esc(logo)}" alt="${esc(centerName)} logo">` : ""}
   <div>
@@ -249,46 +485,46 @@ ${testMode ? `<p class="testmode">Test mode: no real payment is taken.</p>` : ""
   <h1>${esc(name)}</h1>
   <p class="intro">
     ${duration ? `<strong>${esc(duration)}.</strong> ` : ""}
-    ${included ? `Includes ${esc(included)}.` : ""}
+    ${inc.v ? `${esc(includesWord)} ${esc(inc.v)}.` : ""}
   </p>
 
   <div class="field">
-    <label for="date">${code === "OW" || /course|diver/i.test(name) ? "Start date" : "Date"}</label>
+    <label for="date">${esc(isCourse ? t.startDate : t.date)}</label>
     <input id="date" type="date" min="${minDate}" max="${maxDate}" required aria-describedby="date-error">
     <p id="date-error" class="error" role="alert" hidden></p>
-    <p class="hint">Earliest date you can still book online: ${esc(fmtDate(minDate))}.</p>
+    <p class="hint">${esc(t.earliest(minLabel))}</p>
   </div>
 
   <div class="field">
-    <label id="divers-label">Number of divers</label>
+    <label id="divers-label">${esc(t.diversLabel)}</label>
     <div class="stepper" role="group" aria-labelledby="divers-label">
-      <button type="button" id="minus" aria-label="One diver less">−</button>
+      <button type="button" id="minus" aria-label="${esc(t.less)}">−</button>
       <output id="divers" aria-live="polite">1</output>
-      <button type="button" id="plus" aria-label="One diver more">+</button>
+      <button type="button" id="plus" aria-label="${esc(t.more)}">+</button>
     </div>
-    <p class="hint">Coming with 6 or more? Message ${esc(assistant)} on WhatsApp and the team will plan it with you.</p>
+    <p class="hint">${esc(t.group(assistant))}</p>
   </div>
 
-  <section class="slate" aria-label="Price">
+  <section class="slate" aria-label="${esc(t.payNow)}">
     <div class="above">
-      <div class="row total"><span>Total for <span id="lbl-divers">1 diver</span></span><span><b id="total">${thb(price)}</b> THB</span></div>
-      <div class="row now"><span>Pay now to secure your spot</span><span><b id="deposit">${thb(deposit)}</b> THB</span></div>
+      <div class="row total"><span>${esc(t.totalFor)} <span id="lbl-divers">${esc(diversLabel(1, lang))}</span></span><span><b id="total">${thb(price)}</b> THB</span></div>
+      <div class="row now"><span>${esc(t.payNow)}</span><span><b id="deposit">${thb(deposit)}</b> THB</span></div>
     </div>
     <svg class="waterline" viewBox="0 0 400 24" preserveAspectRatio="none" aria-hidden="true">
       <path d="M0 12 C 50 2, 100 22, 150 12 S 250 2, 300 12 S 380 20, 400 12 V24 H0Z"/>
     </svg>
     <div class="below">
-      <div class="row"><span>Pay at the shop on the day</span><span><b id="balance">${thb(price - deposit)}</b> THB</span></div>
-      <p class="fine">You never pay more than the shop price.</p>
+      <div class="row"><span>${esc(t.payShop)}</span><span><b id="balance">${thb(price - deposit)}</b> THB</span></div>
+      <p class="fine">${esc(t.never)}</p>
     </div>
   </section>
 
-  <button type="button" id="book" class="book">Pay <span id="btn-amount">${thb(deposit)}</span> THB and book</button>
+  <button type="button" id="book" class="book">${esc(t.btn[0])}<span id="btn-amount">${thb(deposit)}</span>${esc(t.btn[1])}</button>
   <p id="msg" class="msg" role="status" hidden></p>
 
   ${(checkIn || meeting) ? `<dl class="practical">
-    ${checkIn ? `<div><dt>Check-in</dt><dd>${esc(checkIn)}</dd></div>` : ""}
-    ${meeting ? `<div><dt>Meeting point</dt><dd>${esc(meeting)}</dd></div>` : ""}
+    ${checkIn ? `<div><dt>${esc(t.checkIn)}</dt><dd>${esc(checkIn)}</dd></div>` : ""}
+    ${meeting ? `<div><dt>${esc(t.meeting)}</dt><dd>${esc(meeting)}</dd></div>` : ""}
   </dl>` : ""}
 </main>
 
@@ -296,12 +532,13 @@ ${testMode ? `<p class="testmode">Test mode: no real payment is taken.</p>` : ""
 <script>
 (() => {
   const d = JSON.parse(document.getElementById("data").textContent);
+  const s = d.s;
   const $ = (id) => document.getElementById(id);
   const f = (n) => Math.round(n).toLocaleString("en-US");
   let n = 1;
   function render() {
     $("divers").textContent = n;
-    $("lbl-divers").textContent = n + (n === 1 ? " diver" : " divers");
+    $("lbl-divers").textContent = n + " " + (n === 1 ? s.diver : s.divers);
     $("total").textContent = f(d.price * n);
     $("deposit").textContent = f(d.deposit * n);
     $("btn-amount").textContent = f(d.deposit * n);
@@ -314,9 +551,9 @@ ${testMode ? `<p class="testmode">Test mode: no real payment is taken.</p>` : ""
   // iPhones ignore min/max on date fields, so check the date ourselves.
   function dateProblem() {
     const v = $("date").value;
-    if (!v) return "Choose a date first.";
-    if (v < d.minDate) return "That date is too soon to book online. Choose " + d.minLabel + " or later.";
-    if (v > d.maxDate) return "That date is too far ahead to book online. Message " + d.assistant + " on WhatsApp.";
+    if (!v) return s.chooseDate;
+    if (v < d.minDate) return s.tooSoon;
+    if (v > d.maxDate) return s.tooFar;
     return "";
   }
   function showDateError(problem) {
@@ -339,53 +576,50 @@ ${testMode ? `<p class="testmode">Test mode: no real payment is taken.</p>` : ""
       return;
     }
     msg.hidden = false;
-    if (!d.payments) {
-      msg.textContent = "Online payment opens soon. For now, reply to " + d.assistant +
-        " on WhatsApp with your date and number of divers, and the team will book you in.";
-      return;
-    }
+    if (!d.payments) { msg.textContent = s.noPay; return; }
     const btn = $("book");
     btn.disabled = true;
-    msg.textContent = "Opening secure payment…";
+    msg.textContent = s.opening;
     fetch("/b/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slug: d.slug, code: d.code, ref: d.ref, date: $("date").value, divers: n }),
+      body: JSON.stringify({ slug: d.slug, code: d.code, ref: d.ref, lang: d.lang, date: $("date").value, divers: n }),
     })
       .then((r) => r.json())
       .then((r) => {
         if (r.url) { window.location.href = r.url; return; }
-        msg.textContent = r.error || "Something went wrong. Try again.";
+        msg.textContent = r.error || s.wrong;
         btn.disabled = false;
       })
-      .catch(() => { msg.textContent = "No connection. Check your internet and try again."; btn.disabled = false; });
+      .catch(() => { msg.textContent = s.noConn; btn.disabled = false; });
   };
   render();
 })();
 </script>`;
 }
 
-function fmtDate(iso) {
-  return new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB",
+function fmtDate(iso, lang = "en") {
+  return new Date(iso + "T00:00:00Z").toLocaleDateString(LOCALES[lang] || "en-GB",
     { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
 }
 
-function notFound() {
-  return `<main class="empty"><h1>This booking link doesn't work</h1>
-  <p>Open the link again from your WhatsApp chat with the dive center, or send them a message and they'll send a new one.</p></main>`;
+function notFound(lang) {
+  const t = T[lang];
+  return `<main class="empty"><h1>${esc(t.notFoundTitle)}</h1>
+  <p>${esc(t.notFoundText)}</p></main>`;
 }
-function problem(text) {
-  return `<main class="empty"><h1>Booking page unavailable</h1><p>${esc(text)}</p></main>`;
+function problem(text, lang) {
+  return `<main class="empty"><h1>${esc(T[lang].problemTitle)}</h1><p>${esc(text)}</p></main>`;
 }
 
-function page(body, status = 200) {
+function page(body, status = 200, lang = "en") {
   const html = `<!doctype html>
-<html lang="en">
+<html lang="${lang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Book your dive</title>
+<title>${esc(T[lang].title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -395,7 +629,7 @@ function page(body, status = 200) {
 </html>`;
   return new Response(html, {
     status,
-    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Vary": "Accept-Language" },
   });
 }
 
