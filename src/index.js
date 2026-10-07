@@ -119,7 +119,8 @@ function bookingPage(c, p, code) {
 
   <div class="field">
     <label for="date">${code === "OW" || /course|diver/i.test(name) ? "Start date" : "Date"}</label>
-    <input id="date" type="date" min="${minDate}" max="${maxDate}" required>
+    <input id="date" type="date" min="${minDate}" max="${maxDate}" required aria-describedby="date-error">
+    <p id="date-error" class="error" role="alert" hidden></p>
     <p class="hint">Earliest date you can still book online: ${esc(fmtDate(minDate))}.</p>
   </div>
 
@@ -183,22 +184,26 @@ function bookingPage(c, p, code) {
     if (v > d.maxDate) return "That date is too far ahead to book online. Message " + d.assistant + " on WhatsApp.";
     return "";
   }
+  function showDateError(problem) {
+    const box = $("date-error");
+    $("date").classList.toggle("invalid", !!problem);
+    box.hidden = !problem;
+    box.textContent = problem || "";
+  }
   $("date").addEventListener("change", () => {
-    const problem = dateProblem();
-    $("date").classList.toggle("invalid", !!problem && !!$("date").value);
-    const msg = $("msg");
-    if (problem && $("date").value) { msg.hidden = false; msg.textContent = problem; }
-    else { msg.hidden = true; }
+    showDateError($("date").value ? dateProblem() : "");
+    $("msg").hidden = true;
   });
   $("book").onclick = () => {
     const msg = $("msg");
-    msg.hidden = false;
     const problem = dateProblem();
     if (problem) {
-      msg.textContent = problem;
-      $("date").focus();
+      msg.hidden = true;
+      showDateError(problem);
+      $("date").scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
+    msg.hidden = false;
     if (!d.payments) {
       msg.textContent = "Online payment opens soon. For now, reply to " + d.assistant +
         " on WhatsApp with your date and number of divers, and the team will book you in.";
@@ -247,6 +252,7 @@ const CSS = `
 :root{--ink:#0F2E35;--sea:#1C6E7D;--shallow:#E4F0F1;--deep:#123A43;--page:#FBFCFC;--line:#CFDFE1;--muted:#4F6B70}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
+html,body{overflow-x:hidden}
 body{margin:0;background:var(--page);color:var(--ink);font:400 17px/1.5 "Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
 .wrap{max-width:30rem;margin:0 auto;padding:1.5rem 1.25rem 3rem}
 .center{display:flex;align-items:center;gap:.85rem;margin-bottom:2rem}
@@ -258,9 +264,11 @@ h1{font-size:2.1rem;line-height:1.1;letter-spacing:-.02em;margin:0 0 .6rem;font-
 .intro strong{color:var(--ink);font-weight:600}
 .field{margin-bottom:1.5rem}
 label,#divers-label{display:block;font-weight:600;margin-bottom:.4rem}
-input[type=date]{width:100%;font:inherit;color:inherit;padding:.75rem .9rem;border:1.5px solid var(--line);border-radius:10px;background:#fff;min-height:3rem}
+input[type=date]{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;text-align:left;width:100%;font:inherit;color:inherit;padding:.75rem .9rem;border:1.5px solid var(--line);border-radius:10px;background:#fff;min-height:3rem}
 input[type=date]:focus-visible,.stepper button:focus-visible,.book:focus-visible{outline:3px solid var(--sea);outline-offset:2px}
-input[type=date].invalid{border-color:#B4492F}
+input[type=date].invalid{border-color:#B4492F;background:#FDF4F1}
+input[type=date]::-webkit-date-and-time-value{text-align:left}
+.error{margin:.5rem 0 0;color:#9E3B24;font-weight:600;font-size:.95rem}
 .hint{margin:.4rem 0 0;font-size:.85rem;color:var(--muted)}
 .stepper{display:inline-flex;align-items:center;border:1.5px solid var(--line);border-radius:10px;background:#fff;overflow:hidden}
 .stepper button{width:3rem;height:3rem;border:0;background:none;font:inherit;font-size:1.4rem;color:var(--sea);cursor:pointer}
