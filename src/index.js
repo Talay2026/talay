@@ -3,16 +3,16 @@
 // white-label page: the diver sees the dive center, not Talay.
 // Everything outside /b/ is served from /public by the assets binding.
 //
-// Languages: English, French, German, Spanish. The page follows ?l=fr|de|es|en
+// Languages: English, French, German, Spanish, Dutch. The page follows ?l=fr|de|es|nl|en
 // if present, otherwise the language of the diver's phone or browser.
 // Optional Airtable fields per language (fallback to English when empty):
-//   Products: "Name FR", "Duration FR", "Included FR", "Check-in FR" (also DE, ES)
-//   Centers:  "Meeting point FR" (also DE, ES)
+//   Products: "Name FR", "Duration FR", "Included FR", "Check-in FR" (also DE, ES, NL)
+//   Centers:  "Meeting point FR" (also DE, ES, NL)
 
 const CACHE_SECONDS = 120; // limits Airtable API calls; logo links stay valid
 const MAX_DIVERS = 5; // 6+ goes to a person (rule from the conversation flow)
-const LANGS = ["en", "fr", "de", "es"];
-const LOCALES = { en: "en-GB", fr: "fr-FR", de: "de-DE", es: "es-ES" };
+const LANGS = ["en", "fr", "de", "es", "nl"];
+const LOCALES = { en: "en-GB", fr: "fr-FR", de: "de-DE", es: "es-ES", nl: "nl-BE" };
 
 // ---------- Texts ----------
 
@@ -188,6 +188,49 @@ const T = {
     problemTitle: "Página de reserva no disponible",
     missingKey: "La página de reserva aún no está configurada (falta la clave).",
     loadFail: "No hemos podido cargar esta reserva ahora mismo. Inténtalo de nuevo en un minuto.",
+  },
+  nl: {
+    title: "Boek je duik",
+    testmode: "Testmodus: er wordt geen echte betaling uitgevoerd.",
+    includes: "Inbegrepen:",
+    startDate: "Startdatum",
+    date: "Datum",
+    earliest: (d) => `Vroegste datum die je nog online kan boeken: ${d}.`,
+    diversLabel: "Aantal duikers",
+    less: "Eén duiker minder",
+    more: "Eén duiker meer",
+    group: (a) => `Met 6 of meer? Stuur ${a} een bericht op WhatsApp, dan plant het team alles met jullie.`,
+    diver: "duiker", divers: "duikers",
+    totalFor: "Totaal voor",
+    payNow: "Nu betalen om je plaats vast te leggen",
+    payShop: "Op de dag zelf te betalen in het duikcentrum",
+    never: "Je betaalt nooit meer dan de prijs in het duikcentrum.",
+    btn: ["Betaal ", " THB en boek"],
+    checkIn: "Check-in",
+    meeting: "Afspraakpunt",
+    chooseDate: "Kies eerst een datum.",
+    tooSoon: (m) => `Die datum is te vroeg om online te boeken. Kies ${m} of later.`,
+    tooFar: (a) => `Die datum ligt te ver vooruit om online te boeken. Stuur ${a} een bericht op WhatsApp.`,
+    noPay: (a) => `Online betalen komt binnenkort. Stuur ${a} intussen op WhatsApp je datum en het aantal duikers, dan boekt het team je in.`,
+    opening: "Beveiligde betaling wordt geopend…",
+    wrong: "Er ging iets mis. Probeer het opnieuw.",
+    noConn: "Geen verbinding. Controleer je internet en probeer het opnieuw.",
+    notAvailable: "Online betalen is nog niet beschikbaar.",
+    invalid: "Ongeldige aanvraag.",
+    chooseFrom: (m) => `Kies ${m} of later.`,
+    chooseDivers: `Kies tussen 1 en ${MAX_DIVERS} duikers.`,
+    deposit: (n, c) => `Voorschot: ${n} bij ${c}`,
+    stripeDesc: (d, lbl, b) => `${d}, ${lbl}. De rest, ${b} THB, betaal je in het duikcentrum.`,
+    booked: "Je boeking staat vast",
+    paidNow: "Nu betaald",
+    change: "Moet het team je boeking aanpassen, dan stuurt het je binnen twee uur een bericht.",
+    questions: (a) => `Vragen? Antwoord ${a} op WhatsApp.`,
+    notPaid: "We hebben je betaling niet ontvangen. Open de boekingslink opnieuw om het nog eens te proberen.",
+    notFoundTitle: "Deze boekingslink werkt niet",
+    notFoundText: "Open de link opnieuw vanuit je WhatsApp-gesprek met het duikcentrum, of stuur hen een bericht, dan krijg je een nieuwe link.",
+    problemTitle: "Boekingspagina niet beschikbaar",
+    missingKey: "De boekingspagina is nog niet ingesteld (sleutel ontbreekt).",
+    loadFail: "We konden deze boeking nu niet laden. Probeer het over een minuut opnieuw.",
   },
 };
 
