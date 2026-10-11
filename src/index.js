@@ -10,7 +10,7 @@
 //   Centers:  "Meeting point FR" (also DE, ES, NL)
 
 const CACHE_SECONDS = 120; // limits Airtable API calls; logo links stay valid
-const MAX_DIVERS = 5; // 6+ goes to a person (rule from the conversation flow)
+const MAX_DIVERS = 10; // more than 10 goes to a person (rule from the conversation flow)
 const LANGS = ["en", "fr", "de", "es", "nl"];
 const LOCALES = { en: "en-GB", fr: "fr-FR", de: "de-DE", es: "es-ES", nl: "nl-BE" };
 
@@ -27,7 +27,7 @@ const T = {
     diversLabel: "Number of divers",
     less: "One diver less",
     more: "One diver more",
-    group: (a) => `Coming with 6 or more? Message ${a} on WhatsApp and the team will plan it with you.`,
+    group: (a) => `Coming with more than ${MAX_DIVERS}? Message ${a} on WhatsApp and the team will plan it with you.`,
     diver: "diver", divers: "divers",
     totalFor: "Total for",
     payNow: "Pay now to secure your spot",
@@ -70,7 +70,7 @@ const T = {
     diversLabel: "Nombre de plongeurs",
     less: "Un plongeur de moins",
     more: "Un plongeur de plus",
-    group: (a) => `Vous êtes 6 ou plus ? Écrivez à ${a} sur WhatsApp et l'équipe organisera tout avec vous.`,
+    group: (a) => `Vous êtes plus de ${MAX_DIVERS} ? Écrivez à ${a} sur WhatsApp et l'équipe organisera tout avec vous.`,
     diver: "plongeur", divers: "plongeurs",
     totalFor: "Total pour",
     payNow: "À payer maintenant pour réserver votre place",
@@ -113,7 +113,7 @@ const T = {
     diversLabel: "Anzahl Taucher",
     less: "Ein Taucher weniger",
     more: "Ein Taucher mehr",
-    group: (a) => `Ihr seid 6 oder mehr? Schreib ${a} auf WhatsApp, dann plant das Team alles mit euch.`,
+    group: (a) => `Ihr seid mehr als ${MAX_DIVERS}? Schreib ${a} auf WhatsApp, dann plant das Team alles mit euch.`,
     diver: "Taucher", divers: "Taucher",
     totalFor: "Gesamt für",
     payNow: "Jetzt zahlen und Platz sichern",
@@ -156,7 +156,7 @@ const T = {
     diversLabel: "Número de buceadores",
     less: "Un buceador menos",
     more: "Un buceador más",
-    group: (a) => `¿Sois 6 o más? Escribe a ${a} por WhatsApp y el equipo lo organizará con vosotros.`,
+    group: (a) => `¿Sois más de ${MAX_DIVERS}? Escribe a ${a} por WhatsApp y el equipo lo organizará con vosotros.`,
     diver: "buceador", divers: "buceadores",
     totalFor: "Total para",
     payNow: "Paga ahora para asegurar tu plaza",
@@ -199,7 +199,7 @@ const T = {
     diversLabel: "Aantal duikers",
     less: "Eén duiker minder",
     more: "Eén duiker meer",
-    group: (a) => `Met 6 of meer? Stuur ${a} een bericht op WhatsApp, dan plant het team alles met jullie.`,
+    group: (a) => `Met meer dan ${MAX_DIVERS}? Stuur ${a} een bericht op WhatsApp, dan plant het team alles met jullie.`,
     diver: "duiker", divers: "duikers",
     totalFor: "Totaal voor",
     payNow: "Nu betalen om je plaats vast te leggen",
