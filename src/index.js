@@ -381,7 +381,7 @@ async function checkout(request, env, ctx, url) {
     "line_items[0][price_data][unit_amount]": String(deposit * 100), // THB in satang
     "line_items[0][price_data][product_data][name]": t.deposit(shownName, centerName),
     "line_items[0][price_data][product_data][description]":
-      t.stripeDesc(fmtDate(date, lang), diversLabel(divers, lang), thb(balance)),
+      t.stripeDesc(fmtDate(date, lang), diversLabel(divers, lang), thb(balance, lang)),
     "phone_number_collection[enabled]": "true",
     success_url: `${url.origin}/b/thanks?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: back,
@@ -425,13 +425,13 @@ async function thanks(request, env, ctx, url) {
   <p class="intro"><strong>${esc(productName)}</strong>, ${esc(fmtDate(m.activity_date, lang))}, ${esc(diversLabel(n, lang))}.</p>
   <section class="slate" aria-label="${esc(t.paidNow)}">
     <div class="above">
-      <div class="row now"><span>${esc(t.paidNow)}</span><span><b>${thb(Number(m.deposit_thb))}</b> THB</span></div>
+      <div class="row now"><span>${esc(t.paidNow)}</span><span><b>${thb(Number(m.deposit_thb), lang)}</b> THB</span></div>
     </div>
     <svg class="waterline" viewBox="0 0 400 24" preserveAspectRatio="none" aria-hidden="true">
       <path d="M0 12 C 50 2, 100 22, 150 12 S 250 2, 300 12 S 380 20, 400 12 V24 H0Z"/>
     </svg>
     <div class="below">
-      <div class="row"><span>${esc(t.payShop)}</span><span><b>${thb(Number(m.balance_thb))}</b> THB</span></div>
+      <div class="row"><span>${esc(t.payShop)}</span><span><b>${thb(Number(m.balance_thb), lang)}</b> THB</span></div>
     </div>
   </section>
   <p class="msg">${esc(t.change)}</p>
@@ -660,7 +660,9 @@ const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) =>
 const first = (v) => (Array.isArray(v) ? v[0] : v);
 const num = (v) => Number(first(v)) || 0;
 const cap = (t) => String(t).charAt(0).toUpperCase() + String(t).slice(1);
-const thb = (n) => Math.round(n).toLocaleString("en-US");
+// Thousands separator per language: 12,500 (en), 12.500 (nl/de/es), 12 500 (fr).
+const SEP = { en: ",", nl: ".", de: ".", es: ".", fr: "\u00A0" };
+const thb = (n, lang = "en") => Math.round(n).toLocaleString("en-US").replace(/,/g, SEP[lang] ?? ",");
 
 function earliestDate(cutoffHour) {
   // Booking for day D closes at the cutoff hour (Thai time) on D-1.
@@ -702,7 +704,7 @@ function bookingPage(c, p, code, slug, env, lang, ref = "") {
   const isCourse = code === "OW" || /course|diver/i.test(englishName);
   const minLabel = fmtDate(minDate, lang);
   const data = {
-    price, deposit, max: MAX_DIVERS, payments, slug, code, ref, lang, minDate, maxDate,
+    price, deposit, sep: SEP[lang] ?? ",", max: MAX_DIVERS, payments, slug, code, ref, lang, minDate, maxDate,
     s: {
       diver: t.diver, divers: t.divers, chooseDate: t.chooseDate,
       tooSoon: t.tooSoon(minLabel), tooFar: t.tooFar(assistant), noPay: t.noPay(assistant),
@@ -746,19 +748,19 @@ ${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
 
   <section class="slate" aria-label="${esc(t.payNow)}">
     <div class="above">
-      <div class="row total"><span>${esc(t.totalFor)} <span id="lbl-divers">${esc(diversLabel(1, lang))}</span></span><span><b id="total">${thb(price)}</b> THB</span></div>
-      <div class="row now"><span>${esc(t.payNow)}</span><span><b id="deposit">${thb(deposit)}</b> THB</span></div>
+      <div class="row total"><span>${esc(t.totalFor)} <span id="lbl-divers">${esc(diversLabel(1, lang))}</span></span><span><b id="total">${thb(price, lang)}</b> THB</span></div>
+      <div class="row now"><span>${esc(t.payNow)}</span><span><b id="deposit">${thb(deposit, lang)}</b> THB</span></div>
     </div>
     <svg class="waterline" viewBox="0 0 400 24" preserveAspectRatio="none" aria-hidden="true">
       <path d="M0 12 C 50 2, 100 22, 150 12 S 250 2, 300 12 S 380 20, 400 12 V24 H0Z"/>
     </svg>
     <div class="below">
-      <div class="row"><span>${esc(t.payShop)}</span><span><b id="balance">${thb(price - deposit)}</b> THB</span></div>
+      <div class="row"><span>${esc(t.payShop)}</span><span><b id="balance">${thb(price - deposit, lang)}</b> THB</span></div>
       <p class="fine">${esc(t.never)}</p>
     </div>
   </section>
 
-  <button type="button" id="book" class="book">${esc(t.btn[0])}<span id="btn-amount">${thb(deposit)}</span>${esc(t.btn[1])}</button>
+  <button type="button" id="book" class="book">${esc(t.btn[0])}<span id="btn-amount">${thb(deposit, lang)}</span>${esc(t.btn[1])}</button>
   <p id="msg" class="msg" role="status" hidden></p>
 
   ${(checkIn || meeting) ? `<dl class="practical">
@@ -773,7 +775,7 @@ ${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
   const d = JSON.parse(document.getElementById("data").textContent);
   const s = d.s;
   const $ = (id) => document.getElementById(id);
-  const f = (n) => Math.round(n).toLocaleString("en-US");
+  const f = (n) => Math.round(n).toLocaleString("en-US").replace(/,/g, d.sep || ",");
   let n = 1;
   function render() {
     $("divers").textContent = n;
