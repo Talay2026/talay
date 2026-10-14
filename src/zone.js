@@ -50,16 +50,30 @@ export async function handleZone(request, env, ctx) {
 
     const p = url.pathname.replace(/\/+$/, "") || "/zone";
     if (p === "/zone") return html(app(center, centers, email));
+    const fresh = url.searchParams.get("fresh") === "1";
     if (p === "/zone/api/conversations") {
-      return json(await conversations(env, center, url.searchParams.get("view") === "all" ? "all" : "open"));
+      const view = url.searchParams.get("view") === "all" ? "all" : "open";
+      return json(await cached(env, `conv/${center.slug}/${view}`, view === "all" ? 60 : 20,
+        () => conversations(env, center, view), fresh));
     }
-    if (p === "/zone/api/chat") return json(publicChat(await chat(env, center, url.searchParams.get("c"))));
-    if (p === "/zone/api/bookings") return json(await bookings(env, center));
-    if (p === "/zone/api/dashboard") return json(await dashboard(env, center, url.searchParams.get("period")));
-    if (p === "/zone/api/unfinished") return json(await unfinished(env, center));
+    if (p === "/zone/api/chat") {
+      const id = url.searchParams.get("c");
+      if (!okId(id)) return json({ error: "Unknown conversation" });
+      return json(await cached(env, `chat/${center.slug}/${id}`, 20, async () => publicChat(await chat(env, center, id)), fresh));
+    }
+    if (p === "/zone/api/products") {
+      const id = url.searchParams.get("c");
+      if (!okId(id)) return json({ error: "Bad request" });
+      return json(await cached(env, `prod/${center.slug}/${id}`, 300, () => products(env, center, id), fresh));
+    }
+    if (p === "/zone/api/bookings") return json(await cached(env, `book/${center.slug}`, 60, () => bookings(env, center), fresh));
+    if (p === "/zone/api/dashboard") {
+      const per = /^\d{4}-\d{2}$/.test(url.searchParams.get("period") || "") ? url.searchParams.get("period") : "";
+      return json(await cached(env, `dash/${center.slug}/${per || "30d"}`, 300, () => dashboard(env, center, per), fresh));
+    }
+    if (p === "/zone/api/unfinished") return json(await cached(env, `unf/${center.slug}`, 180, () => unfinished(env, center), fresh));
     if (p === "/zone/api/settings" && request.method === "GET") return json(await settings(env, center));
     if (p === "/zone/api/settings" && request.method === "POST") return await saveSettings(request, env, center, email);
-    if (p === "/zone/api/products") return json(await products(env, center, url.searchParams.get("c")));
     if (request.method === "POST") {
       if (p === "/zone/api/reply") return await reply(request, env, center);
       if (p === "/zone/api/handback") return await leadAction(request, env, center, "handback");
@@ -163,6 +177,33 @@ async function centersFor(env, email) {
     .filter((c) => /^[a-z0-9-]{1,60}$/.test(c.slug));
 }
 
+
+// ---------- Cache ----------
+// Airtable allows 100,000 API calls per month on the Team plan and 5 per second per base,
+// and Make needs most of those. The zone therefore keeps short-lived copies in the
+// Cloudflare cache, shared by everyone of the same center; own actions clear them.
+
+const CACHE_HOST = "https://zone-cache.talay.internal/";
+async function cached(env, key, ttl, fn, fresh = false) {
+  const req = new Request(CACHE_HOST + env.AIRTABLE_BASE + "/" + key);
+  const cache = caches.default;
+  if (!fresh) {
+    const hit = await cache.match(req);
+    if (hit) return hit.json();
+  }
+  const value = await fn();
+  await cache.put(req, new Response(JSON.stringify(value), {
+    headers: { "Content-Type": "application/json", "Cache-Control": `max-age=${ttl}` },
+  }));
+  return value;
+}
+async function forget(env, keys) {
+  await Promise.all(keys.map((k) => caches.default.delete(new Request(CACHE_HOST + env.AIRTABLE_BASE + "/" + k))));
+}
+const forgetConversation = (env, center, id) => forget(env, [
+  `conv/${center.slug}/open`, `conv/${center.slug}/all`, `chat/${center.slug}/${id}`, `lead/${id}`,
+]);
+
 // ---------- API ----------
 
 const DAY = 24 * 3600 * 1000;
@@ -176,6 +217,22 @@ function langCode(v) {
 }
 
 async function leadsFor(env, ids) {
+  const map = {};
+  // Leads change rarely between messages: keep each one 5 minutes in the cache.
+  const missing = [];
+  await Promise.all(ids.map(async (id) => {
+    const hit = await caches.default.match(new Request(CACHE_HOST + env.AIRTABLE_BASE + "/lead/" + id));
+    if (hit) { const r = await hit.json(); if (r) map[id] = r; } else missing.push(id);
+  }));
+  const fetched = await leadsFetch(env, missing);
+  await Promise.all(missing.map((id) => caches.default.put(
+    new Request(CACHE_HOST + env.AIRTABLE_BASE + "/lead/" + id),
+    new Response(JSON.stringify(fetched[id] || null), { headers: { "Content-Type": "application/json", "Cache-Control": "max-age=300" } }),
+  )));
+  return Object.assign(map, fetched);
+}
+
+async function leadsFetch(env, ids) {
   const map = {};
   for (let i = 0; i < ids.length; i += 40) {
     const part = ids.slice(i, i + 40);
@@ -324,6 +381,7 @@ async function reply(request, env, center) {
     }]));
   }
   await Promise.all(writes);
+  await forgetConversation(env, center, id);
   return json({ ok: true });
 }
 
@@ -340,6 +398,7 @@ async function leadAction(request, env, center, action) {
   const fields = { "Human took over at": new Date().toISOString() };
   if (action === "handback") fields["Human took over"] = false;
   await atWrite(env, "Leads", "PATCH", [{ id: c._leadRec.id, fields }]);
+  await forgetConversation(env, center, id);
   return json({ ok: true });
 }
 
@@ -1113,7 +1172,7 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 
 // Runs in the browser (inserted with toString), so it may not use anything from this module.
 function zoneClient(cfg) {
-  var current = null, lastList = "", lastChat = "", filter = "open", items = [], needSeen = null;
+  var current = null, lastList = "", lastChat = "", filter = "open", items = [], needSeen = null, chatSeenAt = null, freshNext = false, freshList = false;
   var soundOn = true, audio = null;
   try { soundOn = localStorage.getItem("talay-sound") !== "off"; } catch (e) {}
   var $ = function (s) { return document.querySelector(s); };
@@ -1189,9 +1248,12 @@ function zoneClient(cfg) {
 
   function loadList() {
     var view = filter === "open" || filter === "need" ? "open" : "all";
-    api("conversations?view=" + view).then(function (d) {
+    var fr = freshList ? "&fresh=1" : ""; freshList = false;
+    api("conversations?view=" + view + fr).then(function (d) {
       if (view === "open") badge(d.conversations);
       var key = view + JSON.stringify(d.conversations);
+      var cur = current && d.conversations.filter(function (c) { return c.id === current; })[0];
+      if (cur && chatSeenAt && cur.lastAt !== chatSeenAt) { freshNext = true; loadChat(false); }
       if (key === lastList) { tick(); return; }
       lastList = key; items = d.conversations; render();
     }).catch(function (e) { if (e.message !== "auth") $("#list").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; });
@@ -1235,7 +1297,7 @@ function zoneClient(cfg) {
 
   // ---- chat
   function openChat(id) {
-    current = id; lastChat = "";
+    current = id; lastChat = ""; chatSeenAt = null;
     document.querySelectorAll(".item").forEach(function (b) { b.classList.toggle("on", b.dataset.id === id); });
     $("#convos").classList.add("open");
     $("#pane").innerHTML = '<div class="placeholder">Loading…</div>';
@@ -1246,8 +1308,10 @@ function zoneClient(cfg) {
   function loadChat(scroll) {
     if (!current) return;
     var id = current;
-    api("chat?c=" + encodeURIComponent(id)).then(function (d) {
+    var fr = freshNext ? "&fresh=1" : ""; freshNext = false;
+    api("chat?c=" + encodeURIComponent(id) + fr).then(function (d) {
       if (id !== current) return;
+      if (d.messages && d.messages.length) chatSeenAt = d.messages[d.messages.length - 1].at;
       var key = JSON.stringify([d.messages.length, d.canReply, d.needsYou, d.lead]);
       if (key === lastChat) return;
       var draft = $("#txt") ? $("#txt").value : "";
@@ -1320,7 +1384,7 @@ function zoneClient(cfg) {
 
   function act(kind, btn) {
     btn.disabled = true;
-    post(kind, { c: current }).then(function () { lastChat = ""; lastList = ""; loadChat(false); loadList(); })
+    post(kind, { c: current }).then(function () { lastChat = ""; lastList = ""; freshNext = true; freshList = true; loadChat(false); loadList(); })
       .catch(function (e) { btn.disabled = false; alert(e.message); });
   }
 
@@ -1330,7 +1394,7 @@ function zoneClient(cfg) {
     var sig = ($("#sig").value || "").trim(); if (sig) v += "\n– " + sig;
     b.disabled = true; b.textContent = "Sending…";
     post("reply", { c: current, text: v }).then(function () {
-      t.value = ""; lastChat = ""; lastList = ""; loadChat(true); loadList();
+      t.value = ""; lastChat = ""; lastList = ""; freshNext = true; freshList = true; loadChat(true); loadList();
     }).catch(function (e) { n.textContent = e.message; n.className = "note err"; })
       .finally(function () { b.disabled = false; b.textContent = "Send"; });
   }
@@ -1524,7 +1588,7 @@ function zoneClient(cfg) {
     $("#blist").querySelectorAll("[data-uchat]").forEach(function (a) { a.onclick = function (e) { e.preventDefault(); go(Number(a.dataset.uchat), false); }; });
   }
   loadUnfinished();
-  setInterval(function () { if (!document.hidden) loadUnfinished(); }, 120000);
+  setInterval(function () { if (!document.hidden && $("#books").classList.contains("on")) loadUnfinished(); }, 300000);
 
   // ---- dashboard
   var ddata = null;
@@ -1597,7 +1661,9 @@ function zoneClient(cfg) {
     a.download = "talay-statement-" + (ddata.period || "30d") + ".csv"; a.click();
   };
   loadList();
-  setInterval(function () { if (document.hidden) return; loadList(); loadChat(false); }, 10000);
-  // Keep counting Needs you while the "All" or "Booked" view is open.
-  setInterval(function () { if (!document.hidden && filter !== "open" && filter !== "need") api("conversations?view=open").then(function (d) { badge(d.conversations); }).catch(function () {}); }, 20000);
+  // Polling is kept light on purpose (Airtable limits): the list every 30 s while the page
+  // is visible; the open conversation only when the list shows something new in it.
+  setInterval(function () { if (!document.hidden) loadList(); }, 30000);
+  setInterval(function () { if (!document.hidden && filter !== "open" && filter !== "need") api("conversations?view=open").then(function (d) { badge(d.conversations); }).catch(function () {}); }, 60000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) { lastList = ""; loadList(); } });
 }
