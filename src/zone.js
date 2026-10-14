@@ -72,6 +72,12 @@ export async function handleZone(request, env, ctx) {
       return json(await cached(env, `dash/${center.slug}/${per || "30d"}`, 300, () => dashboard(env, center, per), fresh));
     }
     if (p === "/zone/api/unfinished") return json(await cached(env, `unf/${center.slug}`, 180, () => unfinished(env, center), fresh));
+    if (p === "/zone/api/tickets") return json(await cached(env, `tick/${center.slug}`, 30, () => tickets(env, center), fresh));
+    if (p === "/zone/api/ticket" && request.method === "GET") return json(await ticketDetail(env, center, url.searchParams.get("id")));
+    if (p === "/zone/api/ticket" && request.method === "POST") return await ticketAction(request, env, center, email, "create");
+    if (p === "/zone/api/ticket-message" && request.method === "POST") return await ticketAction(request, env, center, email, "message");
+    if (p === "/zone/api/ticket-approve" && request.method === "POST") return await ticketAction(request, env, center, email, "approve");
+    if (p === "/zone/api/ticket-close" && request.method === "POST") return await ticketAction(request, env, center, email, "close");
     if (p === "/zone/api/settings" && request.method === "GET") return json(await settings(env, center));
     if (p === "/zone/api/settings" && request.method === "POST") return await saveSettings(request, env, center, email);
     if (request.method === "POST") {
@@ -687,6 +693,97 @@ async function unfinished(env, center) {
   };
 }
 
+
+// ---------- Support tickets ----------
+// Airtable table "Tickets": Title, Number (autonumber), Center (slug), Type, Priority, Status
+// (New | In progress | Waiting for you | Done), Description, Created by, Contact ID, Context,
+// Quote, Approved (checkbox), Record ID (formula RECORD_ID()), Created at, Updated at.
+// Table "Ticket messages": Text, Ticket (link to Tickets), Ticket ID (lookup of Record ID),
+// Author, From Talay (checkbox), Sent at.
+
+const T_TYPES = ["Bug", "Wrong answer", "Improvement", "Custom request", "Question"];
+const T_PRIOS = ["Low", "Normal", "Urgent"];
+const okRec = (v) => /^rec[A-Za-z0-9]{10,20}$/.test(String(v || ""));
+
+function ticketOut(r) {
+  const f = r.fields;
+  return {
+    id: r.id, number: first(f["Number"]) || "", title: first(f["Title"]) || "", type: first(f["Type"]) || "",
+    priority: first(f["Priority"]) || "Normal", status: first(f["Status"]) || "New",
+    description: first(f["Description"]) || "", by: first(f["Created by"]) || "", contact: first(f["Contact ID"]) || "",
+    context: first(f["Context"]) || "", quote: first(f["Quote"]) || "", approved: !!f["Approved"],
+    created: first(f["Created at"]) || r.createdTime, updated: first(f["Updated at"]) || r.createdTime,
+  };
+}
+
+async function tickets(env, center) {
+  const recs = await at(env, "Tickets", { formula: `{Center} = '${q(center.slug)}'`, max: 500 });
+  const list = recs.map(ticketOut).sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
+  return { tickets: list, waiting: list.filter((t) => t.status === "Waiting for you").length };
+}
+
+async function ticketFor(env, center, id) {
+  if (!okRec(id)) return null;
+  const res = await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Tickets/${id}`,
+    { headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` } });
+  if (!res.ok) return null;
+  const r = await res.json();
+  return String(first(r.fields["Center"]) || "") === center.slug ? r : null;
+}
+
+async function ticketDetail(env, center, id) {
+  const r = await ticketFor(env, center, id);
+  if (!r) return { error: "Ticket not found." };
+  const msgs = await at(env, "Ticket messages", {
+    formula: `{Ticket ID} & '' = '${q(id)}'`, sort: [{ field: "Sent at", direction: "asc" }], max: 300,
+  });
+  return {
+    ticket: ticketOut(r),
+    messages: msgs.map((m) => ({
+      text: first(m.fields["Text"]) || "", author: first(m.fields["Author"]) || "",
+      talay: !!m.fields["From Talay"], at: first(m.fields["Sent at"]) || m.createdTime,
+    })),
+  };
+}
+
+async function ticketAction(request, env, center, email, kind) {
+  const b = await readBody(request);
+  if (!b) return json({ error: "Bad request" }, 400);
+  const clip = (v, n) => String(v || "").trim().slice(0, n);
+  if (kind === "create") {
+    const title = clip(b.title, 140), description = clip(b.description, 5000);
+    if (!title) return json({ error: "Give the ticket a short title." }, 400);
+    const fields = {
+      Title: title, Description: description, Center: center.slug,
+      Type: T_TYPES.includes(b.type) ? b.type : "Question",
+      Priority: T_PRIOS.includes(b.priority) ? b.priority : "Normal",
+      Status: "New", "Created by": email,
+    };
+    if (okId(b.contact)) fields["Contact ID"] = String(b.contact);
+    if (b.context) fields["Context"] = clip(b.context, 5000);
+    const out = await atWrite(env, "Tickets", "POST", [{ fields }]);
+    await forget(env, [`tick/${center.slug}`]);
+    return json({ ok: true, id: out.records?.[0]?.id });
+  }
+  const r = await ticketFor(env, center, b.id);
+  if (!r) return json({ error: "Ticket not found." }, 404);
+  if (kind === "message") {
+    const text = clip(b.text, 5000);
+    if (!text) return json({ error: "Type a message first." }, 400);
+    await atWrite(env, "Ticket messages", "POST", [{ fields: { Text: text, Ticket: [r.id], Author: email } }]);
+    const st = first(r.fields["Status"]);
+    if (st === "Waiting for you" || st === "Done") await atWrite(env, "Tickets", "PATCH", [{ id: r.id, fields: { Status: "In progress" } }]);
+  } else if (kind === "approve") {
+    if (!center.admin) return json({ error: "Only an admin of your dive center can approve a quote." }, 403);
+    await atWrite(env, "Tickets", "PATCH", [{ id: r.id, fields: { Approved: true, Status: "In progress" } }]);
+    await atWrite(env, "Ticket messages", "POST", [{ fields: { Text: "✅ Quote approved.", Ticket: [r.id], Author: email } }]);
+  } else if (kind === "close") {
+    await atWrite(env, "Tickets", "PATCH", [{ id: r.id, fields: { Status: "Done" } }]);
+  }
+  await forget(env, [`tick/${center.slug}`]);
+  return json({ ok: true });
+}
+
 // ---------- Settings ----------
 // Centers fields: Staff emails, Alert Email, Escalation hours (+ FR/DE/ES/NL), Mia paused
 // (checkbox), and read-only info shown to the team.
@@ -911,7 +1008,7 @@ header a,header button.lnk{color:#C9D4D7;font:inherit;font-size:14px;text-decora
 nav{display:flex;gap:4px;padding:8px 18px 0;border-bottom:1px solid var(--line);flex:none}
 nav button{font:inherit;font-weight:700;font-size:15px;background:none;border:0;color:var(--muted);padding:10px 14px;border-bottom:3px solid transparent;cursor:pointer}
 nav button.on{color:var(--deep);border-bottom-color:var(--sand)}
-nav .count[hidden],.chip .count[hidden]{display:none}
+nav .count[hidden],.chip .count[hidden],#tcount[hidden]{display:none}
 .chip .count{display:inline-block;min-width:18px;padding:0 5px;margin-left:6px;border-radius:999px;background:var(--sand);color:#0A2029;font-size:11px;line-height:18px;text-align:center}
 nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--sand);color:#0A2029;font-size:12px;line-height:20px;text-align:center}
 .view{display:none;flex:1;min-height:0}
@@ -1065,6 +1162,32 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
   body.print-statement .kpis,body.print-statement .grid2,body.print-statement .btools{display:none !important}
   body.print-statement .st-head{display:block}
 }
+
+#supp{flex-direction:column;overflow-y:auto}
+.tlist{display:grid;gap:8px}
+.titem{display:flex;gap:12px;align-items:center;width:100%;text-align:left;font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer}
+.titem:hover{border-color:var(--deep)}
+.titem .tt{flex:1;min-width:0}
+.titem .tt b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.titem .tt small{color:var(--muted)}
+.ts{font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px;white-space:nowrap;border:1px solid var(--line)}
+.ts.New{background:var(--paper-2)}
+.ts.In-progress{background:var(--mia)}
+.ts.Waiting-for-you{background:var(--sand);color:#0A2029;border-color:var(--sand)}
+.ts.Done{background:var(--team)}
+.tform{display:grid;gap:10px}
+.tform label{display:grid;gap:4px;font-size:13px;font-weight:700;color:var(--muted)}
+.tform input,.tform select,.tform textarea{font:inherit;font-size:15px;font-weight:400;border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--paper-2);color:var(--deep)}
+.tform textarea{min-height:110px;resize:vertical}
+.tform .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ctx{white-space:pre-wrap;font-size:13px;background:var(--paper-2);border:1px dashed var(--line);border-radius:10px;padding:10px 12px;color:var(--muted)}
+.tmsg{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--card);white-space:pre-wrap}
+.tmsg.talay{background:var(--mia)}
+.tmsg small{display:block;color:var(--muted);font-size:12px;margin-bottom:4px;white-space:normal}
+.quote{border:2px solid var(--sand);border-radius:12px;padding:12px 14px;background:var(--card)}
+.rep{font:inherit;font-size:11px;font-weight:700;background:none;border:0;color:var(--muted);cursor:pointer;padding:0;margin-left:8px;text-decoration:underline}
+.m:hover .rep{color:var(--deep)}
+@media (max-width:760px){.tform .two{grid-template-columns:1fr}}
 :focus-visible{outline:3px solid var(--sand);outline-offset:2px}
 @media (max-width:760px){
   .list{width:100%;border-right:0}
@@ -1077,7 +1200,7 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 </style></head>
 <body>
 <header>${logo}<b>${esc(center.name)}</b><span class="sp"></span>${switcher}<button class="lnk" id="sound" type="button">🔔 Sound on</button><a href="/cdn-cgi/access/logout" title="${esc(email)}">Sign out</a></header>
-<nav><button class="on" data-v="convos">Conversations<span class="count" id="count" hidden></span></button><button data-v="books">Bookings</button><button data-v="dash">Dashboard</button><button data-v="sett">Settings</button></nav>
+<nav><button class="on" data-v="convos">Conversations<span class="count" id="count" hidden></span></button><button data-v="books">Bookings</button><button data-v="dash">Dashboard</button><button data-v="sett">Settings</button><button data-v="supp">Support<span class="count" id="tcount" hidden></span></button></nav>
 
 <section id="convos" class="view on">
   <div class="list">
@@ -1150,6 +1273,18 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
       <p class="d">To change any of this, message Jonas at <a href="mailto:jonas@talay.io">jonas@talay.io</a>.</p>
       <dl class="info" id="info"></dl>
     </div>
+  </div>
+</section>
+
+<section id="supp" class="view">
+  <div class="bwrap">
+    <div class="btools">
+      <button class="chip on" data-t="open">Open</button>
+      <button class="chip" data-t="done">Done</button>
+      <span class="sp"></span>
+      <button class="btn" id="tNew" type="button">New ticket</button>
+    </div>
+    <div id="tbody"><div class="bempty">Loading…</div></div>
   </div>
 </section>
 
@@ -1233,6 +1368,7 @@ function zoneClient(cfg) {
       if (b.dataset.v === "dash") loadDash();
       if (b.dataset.v === "books") loadBookings();
       if (b.dataset.v === "sett") loadSettings();
+      if (b.dataset.v === "supp") { tview = null; loadTickets(); }
     };
   });
 
@@ -1333,12 +1469,13 @@ function zoneClient(cfg) {
         (facts ? '<div class="facts">' + facts + "</div>" : "") +
         '<div class="msgs" id="msgs">' + (function () {
           var prevDay = "";
-          return d.messages.map(function (m) {
+          return d.messages.map(function (m, idx) {
             var who = m.dir === "Customer" ? "" : (m.dir === "Team" ? "Team" : cfg.assistant);
             var dt = new Date(m.at), day = dt.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
             var sep = day !== prevDay ? '<div class="day">' + esc(day) + "</div>" : ""; prevDay = day;
+            var rep = m.dir === "Mia" ? '<button class="rep" type="button" data-rep="' + idx + '" title="Report this answer to Talay">Report</button>' : "";
             return sep + '<div class="m ' + esc(m.dir) + '">' + (who ? '<span class="who">' + esc(who) + "</span>" : "") + esc(m.text) +
-              "<small>" + esc(dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })) + "</small></div>";
+              "<small>" + esc(dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })) + rep + "</small></div>";
           }).join("");
         })() + "</div>" +
         (d.canReply
@@ -1349,6 +1486,18 @@ function zoneClient(cfg) {
             '<div class="note" id="note">Ctrl/⌘ + Enter sends. A reply pauses ' + esc(cfg.assistant) + " for this diver until you let her take over (or 4 hours after your last message).</div>"
           : '<div class="closed">More than 24 hours since the diver\'s last message, so WhatsApp no longer allows a free reply. Read only.</div>');
 
+      document.querySelectorAll("[data-rep]").forEach(function (b) {
+        b.onclick = function () {
+          var i = Number(b.dataset.rep), mia = d.messages[i], before = [];
+          for (var j = i - 1; j >= 0 && before.length < 3; j--) if (d.messages[j].dir === "Customer") before.unshift(d.messages[j].text);
+          var q = before.length ? before[before.length - 1] : "";
+          newTicket({
+            type: "Wrong answer", contact: d.id,
+            title: "Wrong answer" + (q ? ": " + q.slice(0, 60) : ""),
+            context: (before.length ? "Diver:\n" + before.join("\n") + "\n\n" : "") + cfg.assistant + ":\n" + mia.text + "\n\n(" + clock(mia.at) + ", " + (L.name || L.contact || "diver") + ")",
+          });
+        };
+      });
       $(".back").onclick = function () { current = null; $("#convos").classList.remove("open"); document.querySelectorAll(".item").forEach(function (b) { b.classList.remove("on"); }); };
       var box = $("#msgs");
       var place = function () { box.scrollTop = keepTop === null ? box.scrollHeight : keepTop; };
@@ -1660,6 +1809,89 @@ function zoneClient(cfg) {
     a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv" }));
     a.download = "talay-statement-" + (ddata.period || "30d") + ".csv"; a.click();
   };
+
+  // ---- support
+  var tdata = null, tfilter = "open", tview = null;
+  var TYPES = ["Bug", "Wrong answer", "Improvement", "Custom request", "Question"];
+  function tsClass(st) { return "ts " + String(st).replace(/ /g, "-"); }
+  document.querySelectorAll(".chip[data-t]").forEach(function (c) {
+    c.onclick = function () { tfilter = c.dataset.t; tview = null; document.querySelectorAll(".chip[data-t]").forEach(function (x) { x.classList.toggle("on", x === c); }); renderTickets(); };
+  });
+  $("#tNew").onclick = function () { newTicket({}); };
+  function loadTickets(fresh) {
+    return api("tickets" + (fresh ? "?fresh=1" : "")).then(function (d) {
+      tdata = d; var el = $("#tcount"); el.hidden = !d.waiting; el.textContent = d.waiting;
+      if (!tview && $("#supp").classList.contains("on")) renderTickets();
+    }).catch(function (e) { if (e.message !== "auth" && $("#supp").classList.contains("on")) $("#tbody").innerHTML = '<div class="bempty">' + esc(e.message) + "</div>"; });
+  }
+  function renderTickets() {
+    if (!tdata) return;
+    var list = tdata.tickets.filter(function (t) { return tfilter === "done" ? t.status === "Done" : t.status !== "Done"; });
+    if (!list.length) {
+      $("#tbody").innerHTML = '<div class="bempty">' + (tfilter === "done" ? "No closed tickets yet." :
+        "No open tickets. Something not working, a wrong answer from " + esc(cfg.assistant) + ", or an idea? Click <b>New ticket</b>, or <b>Report</b> under any message from " + esc(cfg.assistant) + ".") + "</div>";
+      return;
+    }
+    $("#tbody").innerHTML = '<div class="tlist">' + list.map(function (t) {
+      return '<button class="titem" data-tid="' + esc(t.id) + '"><div class="tt"><b>' + (t.number ? "#" + esc(t.number) + " · " : "") + esc(t.title) + "</b><small>" +
+        esc(t.type) + (t.priority === "Urgent" ? " · Urgent" : "") + " · " + esc(t.by) + " · updated " + ago(t.updated) + (ago(t.updated) === "now" ? "" : " ago") +
+        '</small></div><span class="' + tsClass(t.status) + '">' + esc(t.status) + "</span></button>";
+    }).join("") + "</div>";
+    $("#tbody").querySelectorAll("[data-tid]").forEach(function (b) { b.onclick = function () { openTicket(b.dataset.tid); }; });
+  }
+  function newTicket(pre) {
+    document.querySelector('nav button[data-v="supp"]').click();
+    tview = "new";
+    $("#tbody").innerHTML = '<div class="scard"><h3>New ticket</h3><p class="d">Tell Talay what\'s wrong or what you\'d like. Jonas gets it right away and answers here.</p>' +
+      '<div class="tform"><div class="two"><label>Type<select id="nType">' + TYPES.map(function (t) { return "<option" + (t === (pre.type || "Question") ? " selected" : "") + ">" + t + "</option>"; }).join("") + "</select></label>" +
+      '<label>Priority<select id="nPrio"><option>Low</option><option selected>Normal</option><option>Urgent</option></select></label></div>' +
+      '<label>Title<input id="nTitle" maxlength="140" value="' + esc(pre.title || "") + '"></label>' +
+      '<label>What happened, or what would you like?<textarea id="nDesc" placeholder="' + (pre.type === "Wrong answer" ? "What should " + esc(cfg.assistant) + " have answered?" : "Be as concrete as you can.") + '"></textarea></label>' +
+      (pre.context ? '<label>Conversation<div class="ctx" id="nCtx">' + esc(pre.context) + "</div></label>" : "") +
+      '<div class="srow"><button class="btn" id="nSend" type="button">Send ticket</button><button class="ghost" id="nCancel" type="button">Cancel</button></div><div class="smsg" id="nMsg"></div></div></div>';
+    $("#nCancel").onclick = function () { tview = null; renderTickets(); };
+    $("#nSend").onclick = function () {
+      var btn = this; btn.disabled = true;
+      post("ticket", { type: $("#nType").value, priority: $("#nPrio").value, title: $("#nTitle").value, description: $("#nDesc").value, contact: pre.contact || "", context: pre.context || "" })
+        .then(function (r) { loadTickets(true).then(function () { if (r.id) openTicket(r.id); else { tview = null; renderTickets(); } }); })
+        .catch(function (e) { btn.disabled = false; say("#nMsg", e.message, true); });
+    };
+    (pre.title ? $("#nDesc") : $("#nTitle")).focus();
+  }
+  function openTicket(id) {
+    tview = id;
+    $("#tbody").innerHTML = '<div class="bempty">Loading…</div>';
+    api("ticket?id=" + encodeURIComponent(id)).then(function (d) {
+      if (tview !== id) return;
+      var t = d.ticket;
+      var html = '<div class="scard"><div class="srow" style="margin-bottom:8px"><button class="ghost" id="tBack" type="button">‹ All tickets</button><span class="sp" style="flex:1"></span><span class="' + tsClass(t.status) + '">' + esc(t.status) + "</span></div>" +
+        "<h3>" + (t.number ? "#" + esc(t.number) + " · " : "") + esc(t.title) + '</h3><p class="d">' + esc(t.type) + " · " + esc(t.priority) + " · opened by " + esc(t.by) + " · " + esc(clock(t.created)) + "</p>" +
+        (t.description ? '<div class="tmsg" style="margin-bottom:10px">' + esc(t.description) + "</div>" : "") +
+        (t.context ? '<div class="ctx" style="margin-bottom:10px">' + esc(t.context) + "</div>" : "") +
+        (t.contact ? '<p style="margin:0 0 10px"><a href="#" id="tChat">Open the conversation</a></p>' : "") +
+        (t.quote ? '<div class="quote" style="margin-bottom:10px"><b>Quote from Talay</b><div style="white-space:pre-wrap;margin-top:4px">' + esc(t.quote) + "</div>" +
+          (t.approved ? '<p style="margin:8px 0 0"><span class="ts Done">Approved</span></p>' : '<p style="margin:8px 0 0"><button class="btn" id="tApprove" type="button">Approve quote</button></p>') + "</div>" : "") +
+        '<div style="display:grid;gap:8px;margin-bottom:12px">' + d.messages.map(function (m) {
+          return '<div class="tmsg' + (m.talay ? " talay" : "") + '"><small>' + (m.talay ? "Talay" : esc(m.author)) + " · " + esc(clock(m.at)) + "</small>" + esc(m.text) + "</div>";
+        }).join("") + "</div>" +
+        '<div class="tform"><textarea id="tReply" placeholder="Write a message to Talay…"></textarea><div class="srow"><button class="btn" id="tSend" type="button">Send</button>' +
+        (t.status !== "Done" ? '<button class="ghost" id="tClose" type="button">Mark as solved</button>' : "") + '</div><div class="smsg" id="tMsg"></div></div></div>';
+      $("#tbody").innerHTML = html;
+      $("#tBack").onclick = function () { tview = null; renderTickets(); };
+      if ($("#tChat")) $("#tChat").onclick = function (e) {
+        e.preventDefault(); document.querySelector('nav button[data-v="convos"]').click();
+        var all = document.querySelector('.chip[data-f="all"]'); if (all && filter === "open") all.click(); openChat(t.contact);
+      };
+      var act = function (path, body, ok) {
+        return post(path, body).then(function () { loadTickets(true); openTicket(id); }).catch(function (e) { say("#tMsg", e.message, true); });
+      };
+      $("#tSend").onclick = function () { var v = $("#tReply").value.trim(); if (!v) return; this.disabled = true; act("ticket-message", { id: id, text: v }); };
+      if ($("#tClose")) $("#tClose").onclick = function () { act("ticket-close", { id: id }); };
+      if ($("#tApprove")) $("#tApprove").onclick = function () { if (confirm("Approve this quote?")) act("ticket-approve", { id: id }); };
+    }).catch(function (e) { if (e.message !== "auth") $("#tbody").innerHTML = '<div class="bempty">' + esc(e.message) + "</div>"; });
+  }
+  loadTickets();
+  setInterval(function () { if (!document.hidden) loadTickets(); }, 120000);
   loadList();
   // Polling is kept light on purpose (Airtable limits): the list every 30 s while the page
   // is visible; the open conversation only when the list shows something new in it.
