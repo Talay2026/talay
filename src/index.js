@@ -9,6 +9,8 @@
 //   Products: "Name FR", "Duration FR", "Included FR", "Check-in FR" (also DE, ES, NL)
 //   Centers:  "Meeting point FR" (also DE, ES, NL)
 
+import { handleZone } from "./zone.js"; // customer zone for dive centers: talay.io/zone
+
 const CACHE_SECONDS = 120; // limits Airtable API calls; logo links stay valid
 const MAX_DIVERS = 10; // more than 10 goes to a person (rule from the conversation flow)
 const LANGS = ["en", "fr", "de", "es", "nl"];
@@ -268,6 +270,9 @@ function tr(rec, field, lang) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname === "/zone" || url.pathname.startsWith("/zone/")) {
+      return handleZone(request, env, ctx);
+    }
     if (!url.pathname.startsWith("/b/")) return env.ASSETS.fetch(request);
     const lang = pickLang(request, url);
     if (!env.AIRTABLE_TOKEN) {
