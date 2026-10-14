@@ -516,7 +516,7 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
   <iframe title="Dashboard" loading="lazy" data-src="https://airtable.com/embed/appEXBMOJa73WiQHb/shrkzC7WhyMBUsEiO"></iframe>
 </section>
 
-<script>(${zoneClient.toString()})(${JSON.stringify(cfg).replace(/</g, "\\u003c")});</script>
+<script>   var __name = function (f) { return f; };(${zoneClient.toString()})(${JSON.stringify(cfg).replace(/</g, "\\u003c")});</script>
 </body></html>`;
 }
 
