@@ -55,6 +55,7 @@ export async function handleZone(request, env, ctx) {
     }
     if (p === "/zone/api/chat") return json(publicChat(await chat(env, center, url.searchParams.get("c"))));
     if (p === "/zone/api/bookings") return json(await bookings(env, center));
+    if (p === "/zone/api/dashboard") return json(await dashboard(env, center, url.searchParams.get("period")));
     if (p === "/zone/api/unfinished") return json(await unfinished(env, center));
     if (p === "/zone/api/settings" && request.method === "GET") return json(await settings(env, center));
     if (p === "/zone/api/settings" && request.method === "POST") return await saveSettings(request, env, center, email);
@@ -433,6 +434,99 @@ async function bookings(env, center) {
 
 
 
+
+// ---------- Dashboard ----------
+// Leads fields used: Status, Response seconds, Outside hours (1/0), Handed over (1/0),
+// Handover at, Follow-ups sent, Language, Center (link). Bookings: Total value THB,
+// Deposit paid THB, Commission THB, Refunded THB, Status, Group size, P name, Ref,
+// Activity date, Payer name. Periods follow Koh Tao time and the record's creation date.
+
+function periodRange(period) {
+  const TZ = 7 * 3600 * 1000;
+  const nowThai = new Date(Date.now() + TZ);
+  let start, end, label;
+  const m = String(period || "").match(/^(\d{4})-(\d{2})$/);
+  if (m) {
+    start = Date.UTC(+m[1], +m[2] - 1, 1) - TZ;
+    end = Date.UTC(+m[1], +m[2], 1) - TZ;
+    label = new Date(Date.UTC(+m[1], +m[2] - 1, 15)).toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  } else {
+    end = Date.now();
+    start = end - 30 * DAY;
+    label = "Last 30 days";
+  }
+  const months = [];
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(Date.UTC(nowThai.getUTCFullYear(), nowThai.getUTCMonth() - i, 15));
+    months.push({ value: d.toISOString().slice(0, 7), label: d.toLocaleDateString("en-GB", { month: "long", year: "numeric" }) });
+  }
+  return { start, end, label, months };
+}
+
+async function dashboard(env, center, period) {
+  const { start, end, label, months } = periodRange(period);
+  const iso = (ms) => new Date(ms).toISOString();
+  const inPeriod = `IS_AFTER(CREATED_TIME(), '${iso(start - 1000)}'), IS_BEFORE(CREATED_TIME(), '${iso(end)}')`;
+  const [leads, books] = await Promise.all([
+    at(env, "Leads", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${inPeriod})`, max: 5000 }),
+    at(env, "Bookings", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${inPeriod})`, max: 5000 }),
+  ]);
+  const n = (v) => Number(first(v)) || 0;
+  const cx = (b) => /cancel|refund/i.test(String(first(b.fields["Status"]) || ""));
+  const live = books.filter((b) => !cx(b));
+
+  const resp = leads.map((l) => n(l.fields["Response seconds"])).filter((x) => x > 0 && x < 3600);
+  const booked = leads.filter((l) => /booked/i.test(String(first(l.fields["Status"]) || "")));
+  const langs = {}, prods = {};
+  leads.forEach((l) => { const k = String(first(l.fields["Language"]) || "?").toUpperCase(); langs[k] = (langs[k] || 0) + 1; });
+  live.forEach((b) => {
+    const k = String(first(b.fields["P name"]) || "Other");
+    prods[k] = prods[k] || { bookings: 0, divers: 0, value: 0 };
+    prods[k].bookings++; prods[k].divers += n(b.fields["Group size"]) || 1; prods[k].value += n(b.fields["Total value THB"]);
+  });
+
+  // Weekly series (Monday-based weeks, Koh Tao time).
+  const TZ = 7 * 3600 * 1000;
+  const weekKey = (ms) => { const d = new Date(ms + TZ); const day = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - day); return d.toISOString().slice(0, 10); };
+  const weeks = {};
+  for (let t = start; t < end; t += DAY) weeks[weekKey(t)] = { week: weekKey(t), conversations: 0, bookings: 0 };
+  leads.forEach((l) => { const k = weekKey(Date.parse(l.createdTime)); if (weeks[k]) weeks[k].conversations++; });
+  live.forEach((b) => { const k = weekKey(Date.parse(b.createdTime)); if (weeks[k]) weeks[k].bookings++; });
+
+  const sum = (arr, k) => arr.reduce((a, b) => a + n(b.fields[k]), 0);
+  const statement = books.map((b) => {
+    const f = b.fields;
+    return {
+      ref: first(f["Ref"]) || "", created: b.createdTime, date: first(f["Activity date"]) || "",
+      product: String(first(f["P name"]) || ""), name: first(f["Payer name"]) || "",
+      divers: n(f["Group size"]) || 1, total: n(f["Total value THB"]), commission: n(f["Commission THB"]) || n(f["Deposit paid THB"]),
+      refunded: n(f["Refunded THB"]), status: first(f["Status"]) || "Confirmed", cancelled: cx(b),
+    };
+  }).sort((a, b) => a.created.localeCompare(b.created));
+
+  return {
+    label, months, period: period || "30d", center: center.name,
+    kpi: {
+      conversations: leads.length,
+      outsideHours: sum(leads, "Outside hours"),
+      handedOver: leads.filter((l) => n(l.fields["Handed over"]) || first(l.fields["Handover at"])).length,
+      avgResponse: resp.length ? Math.round(resp.reduce((a, b) => a + b, 0) / resp.length) : null,
+      bookings: live.length,
+      divers: live.reduce((a, b) => a + (n(b.fields["Group size"]) || 1), 0),
+      conversion: leads.length ? Math.round((booked.length / leads.length) * 1000) / 10 : 0,
+      afterFollowUp: booked.filter((l) => n(l.fields["Follow-ups sent"]) > 0).length,
+      revenue: sum(live, "Total value THB"),
+      atShop: live.reduce((a, b) => a + n(b.fields["Balance at shop"]), 0),
+      commission: statement.reduce((a, r) => a + r.commission, 0),
+      refunded: statement.reduce((a, r) => a + r.refunded, 0),
+    },
+    languages: Object.entries(langs).sort((a, b) => b[1] - a[1]),
+    products: Object.entries(prods).sort((a, b) => b[1].value - a[1].value),
+    weeks: Object.values(weeks),
+    statement,
+  };
+}
+
 // ---------- Unfinished bookings ----------
 // Stripe Checkout sessions of the last 7 days for this center that were never paid:
 // the diver picked a product, date and number of divers, then left the payment page.
@@ -493,8 +587,12 @@ async function unfinished(env, center) {
   // Find the lead behind each lead_ref through the c=... code in its booking link.
   const refs = [...new Set(items.map((i) => i.ref).filter((r) => /^[A-Za-z0-9_-]{1,64}$/.test(r)))];
   const byRef = {};
-  for (let i = 0; i < refs.length; i += 30) {
-    const part = refs.slice(i, i + 30);
+  // The lead code in booking links is the respond.io Contact ID (Leads → External ID).
+  const direct = await leadsFor(env, refs.filter(okId));
+  for (const [id, rec] of Object.entries(direct)) byRef[id] = rec.fields;
+  const rest = refs.filter((r) => !byRef[r]);
+  for (let i = 0; i < rest.length; i += 30) {
+    const part = rest.slice(i, i + 30);
     const leads = await at(env, "Leads", {
       formula: `OR(${part.map((r) => `FIND('c=${q(r)}&', {Booking link} & '&')`).join(",")})`,
       fields: ["Name", "Contact", "External ID", "Language", "Last message at", "Booking link", "Status"],
@@ -882,6 +980,32 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 .ptable tr.off td.nm{color:var(--muted)}
 .lock{font-size:13px;color:var(--muted);background:var(--paper-2);border:1px dashed var(--line);border-radius:10px;padding:8px 12px;margin-top:4px}
 .ro input,.ro select,.ro button.btn,.ro .people button{pointer-events:none;opacity:.55}
+
+#dash{flex-direction:column;overflow-y:auto}
+.psel{font:inherit;font-weight:700;font-size:15px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;background:var(--card);color:var(--deep)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.kpi small{display:block;color:var(--muted);font-size:13px}
+.kpi b{font-size:24px;display:block}
+.kpi span{font-size:12px;color:var(--muted)}
+.kpi.hi{background:#0A2029;color:#F4F0E6;border-color:#0A2029}
+.kpi.hi small,.kpi.hi span{color:#C9D4D7}
+.grid2{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:14px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.panel h4{margin:0 0 10px;font-size:14px}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-bottom:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.barrow{display:flex;align-items:center;gap:8px;font-size:13px;margin:5px 0}
+.barrow .lb{width:70px;color:var(--muted);flex:none}
+.barrow .bar{height:10px;border-radius:5px;background:var(--sand);min-width:2px}
+.st-head{display:none}
+@media (max-width:760px){.grid2{grid-template-columns:1fr}}
+@media print{
+  body.print-statement #dash{display:flex !important}
+  body.print-statement #books,body.print-statement #convos,body.print-statement #sett{display:none !important}
+  body.print-statement .kpis,body.print-statement .grid2,body.print-statement .btools{display:none !important}
+  body.print-statement .st-head{display:block}
+}
 :focus-visible{outline:3px solid var(--sand);outline-offset:2px}
 @media (max-width:760px){
   .list{width:100%;border-right:0}
@@ -971,8 +1095,15 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 </section>
 
 <section id="dash" class="view">
-  <div class="bar">Results via ${esc(center.assistant)}, live. <a href="https://airtable.com/appEXBMOJa73WiQHb/shrkzC7WhyMBUsEiO" target="_blank" rel="noopener">Open full screen</a></div>
-  <iframe title="Dashboard" loading="lazy" data-src="https://airtable.com/embed/appEXBMOJa73WiQHb/shrkzC7WhyMBUsEiO"></iframe>
+  <div class="bwrap">
+    <div class="btools">
+      <select id="period" aria-label="Period" class="psel"></select>
+      <span class="sp"></span>
+      <button class="ghost" id="stPrint" type="button">Print statement</button>
+      <button class="ghost" id="stCsv" type="button">Download CSV</button>
+    </div>
+    <div id="dbody"><div class="bempty">Loading…</div></div>
+  </div>
 </section>
 
 <script>var __name = function (f) { return f; }; // Wrangler adds __name(...) calls when bundling
@@ -1040,7 +1171,7 @@ function zoneClient(cfg) {
     b.onclick = function () {
       document.querySelectorAll("nav button").forEach(function (x) { x.classList.toggle("on", x === b); });
       document.querySelectorAll(".view").forEach(function (v) { v.classList.toggle("on", v.id === b.dataset.v); });
-      if (b.dataset.v === "dash") { var f = $("#dash iframe"); if (!f.src) f.src = f.dataset.src; }
+      if (b.dataset.v === "dash") loadDash();
       if (b.dataset.v === "books") loadBookings();
       if (b.dataset.v === "sett") loadSettings();
     };
@@ -1380,7 +1511,7 @@ function zoneClient(cfg) {
         else act.push('<span class="st">No chat linked</span>');
         if (i.chat) act.push('<a href="#" data-uchat="' + k + '">Chat</a>');
         return "<tr><td>" + who + "</td><td>" + esc(i.product) + "</td><td>" + esc(dayLabel(i.date)) + '</td><td class="num">' + i.divers +
-          '</td><td class="num">' + thb(i.total) + "</td><td>" + ago(i.at) + ' ago</td><td class="keep noprint">' + act.join(" · ") + "</td></tr>";
+          '</td><td class="num">' + thb(i.total) + "</td><td>" + (ago(i.at) === "now" ? "just now" : ago(i.at) + " ago") + '</td><td class="keep noprint">' + act.join(" · ") + "</td></tr>";
       }).join("") + "</tbody></table></div>" +
       '<p style="color:var(--muted);font-size:13px">WhatsApp only allows a free message within 24 hours of the diver\'s last message, so older ones can\'t get a reminder from here.</p>';
     function go(k, draft) {
@@ -1394,6 +1525,77 @@ function zoneClient(cfg) {
   }
   loadUnfinished();
   setInterval(function () { if (!document.hidden) loadUnfinished(); }, 120000);
+
+  // ---- dashboard
+  var ddata = null;
+  function fmtSec(s) { if (s == null) return "–"; if (s < 60) return s + " s"; return Math.floor(s / 60) + " min " + (s % 60) + " s"; }
+  function pct(a, b) { return b ? Math.round(a / b * 100) + "%" : "–"; }
+  $("#period").onchange = function () { loadDash(); };
+  function loadDash() {
+    var p = $("#period").value || "";
+    $("#dbody").style.opacity = ".5";
+    api("dashboard" + (p ? "?period=" + encodeURIComponent(p) : "")).then(function (d) {
+      ddata = d; $("#dbody").style.opacity = "";
+      var sel = $("#period");
+      if (!sel.options.length) {
+        sel.innerHTML = '<option value="">Last 30 days</option>' + d.months.map(function (m) { return '<option value="' + m.value + '">' + esc(m.label) + "</option>"; }).join("");
+      }
+      renderDash();
+    }).catch(function (e) { $("#dbody").style.opacity = ""; if (e.message !== "auth") $("#dbody").innerHTML = '<div class="bempty">' + esc(e.message) + "</div>"; });
+  }
+  function renderDash() {
+    var d = ddata, k = d.kpi;
+    var kp = function (label, val, sub, hi) { return '<div class="kpi' + (hi ? " hi" : "") + '"><small>' + label + "</small><b>" + val + "</b>" + (sub ? "<span>" + sub + "</span>" : "") + "</div>"; };
+    var maxW = Math.max(1, Math.max.apply(null, d.weeks.map(function (w) { return Math.max(w.conversations, w.bookings); })));
+    var W = Math.max(d.weeks.length, 1), bw = 100 / W;
+    var bars = d.weeks.map(function (w, i) {
+      var h1 = w.conversations / maxW * 100, h2 = w.bookings / maxW * 100, x = i * bw;
+      return '<rect x="' + (x + bw * 0.12) + '" y="' + (100 - h1) + '" width="' + (bw * 0.36) + '" height="' + h1 + '" fill="#9FB2B8" rx="1"><title>' + w.conversations + " conversations</title></rect>" +
+        '<rect x="' + (x + bw * 0.52) + '" y="' + (100 - h2) + '" width="' + (bw * 0.36) + '" height="' + h2 + '" fill="#E8B04B" rx="1"><title>' + w.bookings + " bookings</title></rect>";
+    }).join("");
+    var labels = d.weeks.map(function (w) { return '<span style="flex:1;text-align:center">' + new Date(w.week + "T12:00:00Z").toLocaleDateString([], { day: "numeric", month: "short" }) + "</span>"; }).join("");
+    var langMax = Math.max(1, d.languages.length ? d.languages[0][1] : 1);
+    var html =
+      '<div class="kpis">' +
+        kp("Revenue via " + esc(cfg.assistant), thb(k.revenue), k.bookings + " bookings · " + k.divers + " divers", true) +
+        kp("Conversations", k.conversations, k.outsideHours + " outside office hours (" + pct(k.outsideHours, k.conversations) + ")") +
+        kp("Booking conversion", k.conversion + "%", k.afterFollowUp + " booked after a follow-up") +
+        kp(esc(cfg.assistant) + "'s response time", fmtSec(k.avgResponse), "average first reply") +
+        kp("Handed over to your team", k.handedOver, pct(k.handedOver, k.conversations) + " of conversations") +
+        kp("Collected at your shop", thb(k.atShop), "balance paid on arrival") +
+      "</div>" +
+      '<div class="grid2"><div class="panel"><h4>Per week</h4><div class="legend"><span><i style="background:#9FB2B8"></i>Conversations</span><span><i style="background:#E8B04B"></i>Bookings</span></div>' +
+        '<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:160px;display:block">' + bars + "</svg>" +
+        '<div style="display:flex;font-size:11px;color:var(--muted);margin-top:4px">' + labels + "</div></div>" +
+        '<div class="panel"><h4>Languages</h4>' + (d.languages.length ? d.languages.map(function (l) {
+          return '<div class="barrow"><span class="lb">' + esc(l[0]) + '</span><span class="bar" style="width:' + (l[1] / langMax * 70) + '%"></span><span>' + l[1] + "</span></div>"; }).join("") : '<div class="bempty">No conversations yet.</div>') + "</div></div>" +
+      (d.products.length ? '<div class="panel" style="margin-bottom:14px"><h4>Bookings per product</h4><div class="bscroll"><table class="btable"><thead><tr><th>Product</th><th class="num">Bookings</th><th class="num">Divers</th><th class="num">Value</th></tr></thead><tbody>' +
+        d.products.map(function (p) { return "<tr><td>" + esc(p[0]) + '</td><td class="num">' + p[1].bookings + '</td><td class="num">' + p[1].divers + '</td><td class="num">' + thb(p[1].value) + "</td></tr>"; }).join("") + "</tbody></table></div></div>" : "") +
+      '<div class="panel"><div class="st-head"><h2 style="margin:0">Talay statement · ' + esc(d.center) + "</h2><p>" + esc(d.label) + "</p></div>" +
+        "<h4>Statement · " + esc(d.label) + "</h4>" +
+        '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">Talay\'s commission is the online deposit the diver pays when booking; your team collects the rest at the shop. Nothing to transfer: this is your overview.</p>' +
+        (d.statement.length ? '<div class="bscroll"><table class="btable"><thead><tr><th>Booked</th><th>Ref</th><th>Diver</th><th>Product</th><th>Dive date</th><th class="num">Divers</th><th class="num">Value</th><th class="num">Commission</th><th>Status</th></tr></thead><tbody>' +
+          d.statement.map(function (r) {
+            return '<tr class="' + (r.cancelled ? "cx" : "") + '"><td>' + new Date(r.created).toLocaleDateString([], { day: "numeric", month: "short" }) + "</td><td>" + esc(r.ref) + "</td><td>" + esc(r.name) + "</td><td>" + esc(r.product) + "</td><td>" + (r.date ? esc(dayLabel(r.date)) : "") +
+              '</td><td class="num">' + r.divers + '</td><td class="num">' + thb(r.total) + '</td><td class="num">' + thb(r.commission) + '</td><td class="keep">' + esc(r.status) + (r.refunded ? "<br><small>Refunded " + thb(r.refunded) + "</small>" : "") + "</td></tr>";
+          }).join("") +
+          '<tr><td colspan="6"><b>Total</b></td><td class="num"><b>' + thb(k.revenue) + '</b></td><td class="num"><b>' + thb(k.commission - k.refunded) + "</b></td><td>" + (k.refunded ? "after " + thb(k.refunded) + " refunded" : "") + "</td></tr>" +
+          "</tbody></table></div>" : '<div class="bempty">No bookings in this period.</div>') + "</div>";
+    $("#dbody").innerHTML = html;
+  }
+  $("#stPrint").onclick = function () {
+    document.body.classList.add("print-statement"); window.print();
+    setTimeout(function () { document.body.classList.remove("print-statement"); }, 500);
+  };
+  $("#stCsv").onclick = function () {
+    if (!ddata) return;
+    var rows = [["Booked", "Ref", "Diver", "Product", "Dive date", "Divers", "Value THB", "Commission THB", "Refunded THB", "Status"]].concat(
+      ddata.statement.map(function (r) { return [r.created.slice(0, 10), r.ref, r.name, r.product, r.date, r.divers, r.total, r.commission, r.refunded, r.status]; }));
+    var csv = rows.map(function (r) { return r.map(function (v) { v = String(v == null ? "" : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(","); }).join("\n");
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv" }));
+    a.download = "talay-statement-" + (ddata.period || "30d") + ".csv"; a.click();
+  };
   loadList();
   setInterval(function () { if (document.hidden) return; loadList(); loadChat(false); }, 10000);
   // Keep counting Needs you while the "All" or "Booked" view is open.
