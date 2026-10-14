@@ -297,6 +297,7 @@ export default {
       const code = (url.searchParams.get("p") || "").toUpperCase();
       const found = await loadBooking(env, ctx, slug, code);
       if (!found) return page(notFound(lang), 404, lang);
+      if (!found.product["Active"]) return page(closedPage(found.center, found.product, lang), 200, lang);
       const ref = (url.searchParams.get("c") || "").slice(0, 64);
       return page(bookingPage(found.center, found.product, code, slug, env, lang,
         /^[A-Za-z0-9_-]{1,64}$/.test(ref) ? ref : ""), 200, lang);
@@ -355,6 +356,7 @@ async function checkout(request, env, ctx, url) {
   const found = await loadBooking(env, ctx, slug, code);
   if (!found) return json({ error: t.notFoundTitle }, 404);
   const { center, product } = found;
+  if (!product["Active"]) return json({ error: CLOSED[lang].title }, 409);
   const minDate = earliestDate(num(product["Cutoff hour"]) || 15);
   const maxDate = plusDays(minDate, 180);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < minDate || date > maxDate) {
@@ -847,6 +849,21 @@ ${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
 function fmtDate(iso, lang = "en") {
   return new Date(iso + "T00:00:00Z").toLocaleDateString(LOCALES[lang] || "en-GB",
     { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+}
+
+// A product switched off in the customer zone (Products → Active) can't be booked online.
+const CLOSED = {
+  en: { title: "Online booking is closed for now", text: (a) => `Send ${a} a message on WhatsApp and we'll help you further.` },
+  nl: { title: "Online boeken is even niet mogelijk", text: (a) => `Stuur ${a} een bericht op WhatsApp, dan helpen we je verder.` },
+  fr: { title: "La réservation en ligne est fermée pour le moment", text: (a) => `Envoyez un message à ${a} sur WhatsApp et nous vous aiderons.` },
+  de: { title: "Online-Buchung ist gerade geschlossen", text: (a) => `Schreib ${a} eine Nachricht auf WhatsApp, dann helfen wir dir weiter.` },
+  es: { title: "La reserva online está cerrada por ahora", text: (a) => `Envía un mensaje a ${a} por WhatsApp y te ayudamos.` },
+};
+function closedPage(c, p, lang) {
+  const t = CLOSED[lang] || CLOSED.en;
+  const name = tr(p, "Name", lang).v || first(p["Name"]) || "";
+  const assistant = first(c["Assistant name"]) || first(c["Name"]) || "us";
+  return `<main class="empty"><h1>${esc(t.title)}</h1><p>${esc(name)}</p><p>${esc(t.text(assistant))}</p></main>`;
 }
 
 function notFound(lang) {

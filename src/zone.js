@@ -21,6 +21,7 @@
 //   Centers: Slug, Name, Assistant name, Staff emails, Logo
 
 const WINDOW_H = 24; // WhatsApp customer service window
+const splitEmails = (v) => String(v || "").toLowerCase().split(/[\s,;]+/).filter(Boolean);
 const okId = (v) => /^[A-Za-z0-9:_-]{1,64}$/.test(String(v || ""));
 const first = (v) => (Array.isArray(v) ? v[0] : v);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) =>
@@ -154,6 +155,7 @@ async function centersFor(env, email) {
       slug: String(first(r.fields["Slug"]) || "").toLowerCase(),
       name: first(r.fields["Name"]) || "Dive center",
       assistant: first(r.fields["Assistant name"]) || "Mia",
+      admin: splitEmails(r.fields["Admin emails"]).includes(email),
       logo: first(r.fields["Logo"])?.thumbnails?.large?.url || first(r.fields["Logo"])?.url || "",
     }))
     .filter((c) => /^[a-z0-9-]{1,60}$/.test(c.slug));
@@ -362,7 +364,7 @@ async function products(env, center, id) {
   const list = recs.map((r) => {
     const p = r.fields;
     const code = String(first(p["Code"]) || "").toUpperCase();
-    if (!/^[A-Z0-9]{1,12}$/.test(code)) return null;
+    if (!/^[A-Z0-9]{1,12}$/.test(code) || !p["Active"]) return null;
     const name = (lang !== "en" && first(p[`Name ${lang.toUpperCase()}`])) || first(p["Name"]) || code;
     const link = `https://talay.io/b/${center.slug}?p=${code}${ref ? `&c=${ref}` : ""}&l=${lang}`;
     return { code, name: first(p["Name"]) || code, price: Number(first(p["Price THB"])) || 0,
@@ -441,7 +443,6 @@ const HOURS_TEXT = {
   DE: (a, b) => `täglich von ${a} bis ${b} Uhr (thailändische Zeit)`,
   ES: (a, b) => `todos los días de ${a} a ${b} (hora de Tailandia)`,
 };
-const splitEmails = (v) => String(v || "").toLowerCase().split(/[\s,;]+/).filter(Boolean);
 const hhmm = (v) => { const m = String(v || "").match(/^(\d{1,2}):(\d{2})$/); return m && +m[1] < 24 && +m[2] < 60 ? `${+m[1]}:${m[2]}` : null; };
 
 async function centerRecord(env, center) {
@@ -455,7 +456,19 @@ async function settings(env, center) {
   const f = await centerRecord(env, center);
   const hours = String(first(f["Escalation hours"]) || "").match(/(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/);
   const s = (k) => String(first(f[k]) ?? "");
+  const prods = await at(env, "Products", { formula: `FIND('${q(center.slug)}', ARRAYJOIN({C slug}))` });
+  const products = prods.map((r) => {
+    const p = r.fields;
+    return {
+      id: r.id, code: String(first(p["Code"]) || ""), name: String(first(p["Name"]) || ""),
+      category: String(first(p["Category"]) || ""),
+      price: Number(first(p["Price THB"])) || 0, deposit: Number(first(p["Deposit THB"])) || 0,
+      pct: Math.round((Number(first(p["Commission pct"])) || 0) * 1000) / 10,
+      cutoff: Number(first(p["Cutoff hour"])) || 15, active: !!p["Active"],
+    };
+  }).sort((a, b) => a.price - b.price);
   return {
+    admin: center.admin, admins: splitEmails(f["Admin emails"]), products,
     staff: splitEmails(f["Staff emails"]),
     alert: s("Alert Email"),
     hoursText: s("Escalation hours"),
@@ -472,6 +485,10 @@ async function settings(env, center) {
 async function saveSettings(request, env, center, email) {
   const body = await readBody(request);
   if (!body) return json({ error: "Bad request" }, 400);
+  if (body.action !== "mia" && !center.admin) {
+    return json({ error: "Only an admin of your dive center can change this." }, 403);
+  }
+  if (body.action === "product") return await saveProduct(env, center, email, body);
   const fields = {};
   if (body.action === "team") {
     const list = [...new Set(splitEmails((body.emails || []).join("\n")))];
@@ -504,6 +521,80 @@ async function saveSettings(request, env, center, email) {
     if (/UNKNOWN_FIELD_NAME/.test(t)) return json({ error: "This setting isn't available yet. Ask Jonas to finish the setup." }, 500);
     return json({ error: "Could not save. Try again." }, 502);
   }
+  await logChange(env, center, email, describe(body));
+  return json({ ok: true });
+}
+
+
+function describe(b) {
+  if (b.action === "team") return `team: ${(b.emails || []).join(", ")}`;
+  if (b.action === "alert") return `alert email: ${b.email}`;
+  if (b.action === "hours") return `office hours: ${b.from}–${b.to}`;
+  if (b.action === "mia") return b.paused ? "paused the assistant" : "turned the assistant back on";
+  return b.action;
+}
+
+// Appends one line to Centers → "Change log" (long text). Skipped quietly if the field is missing.
+async function logChange(env, center, email, what) {
+  try {
+    const f = await centerRecord(env, center);
+    const stamp = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 16).replace("T", " ");
+    const line = `${stamp} (Thai time) ${email}: ${what}`;
+    const log = (line + "\n" + String(f["Change log"] || "")).slice(0, 20000);
+    await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Centers/${center.id}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ fields: { "Change log": log } }),
+    });
+  } catch (e) { console.error("log", e); }
+}
+
+// Price, booking deadline and "bookable online" per product. The deposit is a formula in
+// Airtable (price × commission %), so it follows the price. The matching price field in
+// Centers (OW price, DSD price, …) is updated too, because texts read it.
+const CENTER_PRICE = { OW: "OW price", DSD: "DSD price", FUN: "FUN price", FUN10: "FUN10 price", AOW: "AOW price" };
+async function saveProduct(env, center, email, b) {
+  if (!/^rec[A-Za-z0-9]{10,20}$/.test(String(b.id || ""))) return json({ error: "Bad request" }, 400);
+  const res = await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Products/${b.id}`,
+    { headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` } });
+  if (!res.ok) return json({ error: "Product not found." }, 404);
+  const p = (await res.json()).fields || {};
+  if (!String(p["C slug"] || "").includes(center.slug)) return json({ error: "Product not found." }, 404);
+  const price = Math.round(Number(b.price));
+  const cutoff = Math.round(Number(b.cutoff));
+  if (!(price >= 100 && price <= 500000)) return json({ error: "Enter a price between 100 and 500,000 THB." }, 400);
+  if (!(cutoff >= 0 && cutoff <= 23)) return json({ error: "Choose a booking deadline between 0:00 and 23:00." }, 400);
+  const fields = { "Price THB": price, "Cutoff hour": cutoff, Active: !!b.active };
+  const up = await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Products/${b.id}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ fields }),
+  });
+  if (!up.ok) { console.error("product", up.status, await up.text()); return json({ error: "Could not save. Try again." }, 502); }
+  // If Deposit THB is a plain number (not a formula), keep it at price × commission %.
+  // When it is a formula, Airtable refuses this write and the formula does the job.
+  const pct = Number(first(p["Commission pct"])) || 0;
+  if (pct > 0) {
+    await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Products/${b.id}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ fields: { "Deposit THB": Math.round(price * pct) } }),
+    }).catch(() => {});
+  }
+  const code = String(first(p["Code"]) || "").toUpperCase();
+  if (CENTER_PRICE[code]) {
+    await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Centers/${center.id}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ fields: { [CENTER_PRICE[code]]: price.toLocaleString("en-US") }, typecast: true }),
+    }).catch(() => {});
+  }
+  const old = Number(first(p["Price THB"])) || 0, oldCut = Number(first(p["Cutoff hour"])) || 0, oldAct = !!p["Active"];
+  const parts = [];
+  if (old !== price) parts.push(`price ${old.toLocaleString("en-US")} → ${price.toLocaleString("en-US")} THB`);
+  if (oldCut !== cutoff) parts.push(`deadline ${oldCut}:00 → ${cutoff}:00`);
+  if (oldAct !== !!b.active) parts.push(b.active ? "bookable online" : "online booking closed");
+  if (parts.length) await logChange(env, center, email, `${first(p["Name"]) || code}: ${parts.join(", ")}`);
   return json({ ok: true });
 }
 
@@ -681,6 +772,16 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 .info{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;font-size:14px}
 .info dt{color:var(--muted)}
 .info dd{margin:0}
+
+.ptable{width:100%;border-collapse:collapse;font-size:14px}
+.ptable th{text-align:left;font-size:12px;color:var(--muted);font-weight:700;padding:6px 8px;border-bottom:1px solid var(--line)}
+.ptable td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.ptable input[type=number]{font:inherit;font-size:14px;width:100px;border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:var(--paper-2);color:var(--deep)}
+.ptable select{font:inherit;font-size:14px;border:1px solid var(--line);border-radius:8px;padding:5px 6px;background:var(--paper-2);color:var(--deep)}
+.ptable .muted{color:var(--muted);font-size:13px}
+.ptable tr.off td.nm{color:var(--muted)}
+.lock{font-size:13px;color:var(--muted);background:var(--paper-2);border:1px dashed var(--line);border-radius:10px;padding:8px 12px;margin-top:4px}
+.ro input,.ro select,.ro button.btn,.ro .people button{pointer-events:none;opacity:.55}
 :focus-visible{outline:3px solid var(--sand);outline-offset:2px}
 @media (max-width:760px){
   .list{width:100%;border-right:0}
@@ -734,19 +835,26 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
       <div class="switch"><span class="pill" id="miaState">…</span><button class="ghost" id="miaToggle" type="button">…</button></div>
       <div class="smsg" id="miaMsg"></div>
     </div>
-    <div class="scard">
+    <div class="lock" id="adminNote" hidden>Only an admin of your dive center can change prices, office hours, the alert email and the team. You can still pause ${esc(center.assistant)}.</div>
+    <div class="scard adm">
+      <h3>Products and prices</h3>
+      <p class="d">What divers pay and until when they can book online. The online deposit is your commission to Talay and follows the price automatically. Changes reach ${esc(center.assistant)} and the booking page within about two minutes.</p>
+      <div class="bscroll"><table class="ptable"><thead><tr><th>Product</th><th>Price (THB)</th><th>Deposit</th><th>Book until (day before)</th><th>Bookable online</th><th></th></tr></thead><tbody id="prods"></tbody></table></div>
+      <div class="smsg" id="pMsg"></div>
+    </div>
+    <div class="scard adm">
       <h3>Office hours</h3>
       <p class="d">${esc(center.assistant)} tells divers when your team answers personally (Thai time, every day). The text is updated in all five languages.</p>
       <div class="srow"><label>From <input type="time" id="hFrom" step="900"></label><label>to <input type="time" id="hTo" step="900"></label><button class="btn" id="hSave" type="button">Save</button></div>
       <div class="smsg" id="hMsg"></div>
     </div>
-    <div class="scard">
+    <div class="scard adm">
       <h3>Alert email</h3>
       <p class="d">Where handovers, large groups and reminders are sent. A shared inbox works best.</p>
       <div class="srow"><input type="email" id="aEmail" placeholder="team@yourdivecenter.com"><button class="btn" id="aSave" type="button">Save</button></div>
       <div class="smsg" id="aMsg"></div>
     </div>
-    <div class="scard">
+    <div class="scard adm">
       <h3>Team</h3>
       <p class="d">Everyone here can sign in at talay.io/zone with a code sent to their email.</p>
       <ul class="people" id="team"></ul>
@@ -1085,6 +1193,26 @@ function zoneClient(cfg) {
   function loadSettings() {
     return api("settings").then(function (d) {
       sdata = d;
+      $("#adminNote").hidden = d.admin;
+      document.querySelectorAll(".scard.adm").forEach(function (c) { c.classList.toggle("ro", !d.admin); });
+      $("#prods").innerHTML = d.products.map(function (p) {
+        var hours = ""; for (var h = 8; h <= 22; h++) hours += '<option value="' + h + '"' + (h === p.cutoff ? " selected" : "") + ">" + h + ":00</option>";
+        return '<tr class="' + (p.active ? "" : "off") + '" data-id="' + esc(p.id) + '" data-pct="' + p.pct + '"><td class="nm">' + esc(p.name) + '<br><span class="muted">' + esc(p.code) + "</span></td>" +
+          '<td><input type="number" min="100" step="50" value="' + p.price + '" class="pp"></td>' +
+          '<td class="muted dep">' + Math.round(p.deposit).toLocaleString("en-US") + " THB<br>" + p.pct + "%</td>" +
+          '<td><select class="pc">' + hours + "</select></td>" +
+          '<td><input type="checkbox" class="pa"' + (p.active ? " checked" : "") + "></td>" +
+          '<td><button class="ghost ps" type="button">Save</button></td></tr>';
+      }).join("");
+      $("#prods").querySelectorAll("tr").forEach(function (tr) {
+        var pp = tr.querySelector(".pp");
+        pp.oninput = function () { tr.querySelector(".dep").innerHTML = Math.round((Number(pp.value) || 0) * Number(tr.dataset.pct) / 100).toLocaleString("en-US") + " THB<br>" + tr.dataset.pct + "%"; };
+        tr.querySelector(".ps").onclick = function () {
+          var btn = this, name = tr.querySelector(".nm").firstChild.textContent;
+          save({ action: "product", id: tr.dataset.id, price: Number(pp.value), cutoff: Number(tr.querySelector(".pc").value), active: tr.querySelector(".pa").checked },
+            "#pMsg", name + " saved.", btn);
+        };
+      });
       $("#miaState").textContent = d.paused ? "Paused" : "Answering divers";
       $("#miaState").className = "pill " + (d.paused ? "off" : "on");
       $("#miaToggle").textContent = d.paused ? "Turn " + cfg.assistant + " back on" : "Pause " + cfg.assistant;
