@@ -53,6 +53,7 @@ export async function handleZone(request, env, ctx) {
       return json(await conversations(env, center, url.searchParams.get("view") === "all" ? "all" : "open"));
     }
     if (p === "/zone/api/chat") return json(publicChat(await chat(env, center, url.searchParams.get("c"))));
+    if (p === "/zone/api/bookings") return json(await bookings(env, center));
     if (p === "/zone/api/products") return json(await products(env, center, url.searchParams.get("c")));
     if (request.method === "POST") {
       if (p === "/zone/api/reply") return await reply(request, env, center);
@@ -368,6 +369,62 @@ async function products(env, center, id) {
   return { lang, products: list };
 }
 
+
+// ---------- Bookings ----------
+// Airtable Bookings: Ref, Activity date, Product (link), Group size, Payer name, Payer phone,
+// Total value THB, Deposit paid THB, Balance at shop, Status, Refunded THB, Manage token,
+// Late change, Center (link, shows the center Name).
+
+const thaiDate = (ms) => new Date(ms + 7 * 3600 * 1000).toISOString().slice(0, 10);
+
+async function bookings(env, center) {
+  const now = Date.now();
+  const from = thaiDate(now - 31 * DAY), to = thaiDate(now + 91 * DAY);
+  const recs = await at(env, "Bookings", {
+    formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ` +
+      `IS_AFTER({Activity date}, DATETIME_PARSE('${from}', 'YYYY-MM-DD')), ` +
+      `IS_BEFORE({Activity date}, DATETIME_PARSE('${to}', 'YYYY-MM-DD')))`,
+    fields: ["Ref", "Activity date", "P name", "Group size", "Payer name", "Payer phone", "Total value THB",
+      "Deposit paid THB", "Balance at shop", "Status", "Refunded THB", "Manage token", "Late change"],
+    sort: [{ field: "Activity date", direction: "asc" }],
+    max: 1000,
+  });
+
+  // Link each booking to its WhatsApp conversation via the phone number.
+  const phones = [...new Set(recs.map((r) => String(first(r.fields["Payer phone"]) || "")).filter((p) => /^\+?[0-9 ]{6,20}$/.test(p)))];
+  const byPhone = {};
+  for (let i = 0; i < phones.length; i += 40) {
+    const part = phones.slice(i, i + 40);
+    const leads = await at(env, "Leads", {
+      formula: `OR(${part.map((p) => `{Contact} & '' = '${q(p)}'`).join(",")})`,
+      fields: ["Contact", "External ID"],
+    });
+    for (const l of leads) {
+      const id = String(first(l.fields["External ID"]) || "");
+      if (okId(id)) byPhone[String(first(l.fields["Contact"]) || "")] = id;
+    }
+  }
+
+  const n = (v) => Number(first(v)) || 0;
+  return {
+    today: thaiDate(now), tomorrow: thaiDate(now + DAY),
+    bookings: recs.map((r) => {
+      const f = r.fields;
+      const phone = String(first(f["Payer phone"]) || "");
+      const token = String(first(f["Manage token"]) || "");
+      return {
+        ref: first(f["Ref"]) || "", date: first(f["Activity date"]) || "",
+        product: String(first(f["P name"]) || ""), divers: n(f["Group size"]) || 1,
+        name: first(f["Payer name"]) || "", phone,
+        total: n(f["Total value THB"]), deposit: n(f["Deposit paid THB"]), balance: n(f["Balance at shop"]),
+        refunded: n(f["Refunded THB"]), status: first(f["Status"]) || "", late: !!f["Late change"],
+        manage: /^[0-9a-fA-F-]{20,64}$/.test(token) ? `/b/manage?t=${token}` : "",
+        chat: byPhone[phone] || "",
+      };
+    }),
+  };
+}
+
 // ---------- Pages ----------
 
 function text(t, status = 200) {
@@ -425,6 +482,7 @@ header a,header button.lnk{color:#C9D4D7;font:inherit;font-size:14px;text-decora
 nav{display:flex;gap:4px;padding:8px 18px 0;border-bottom:1px solid var(--line);flex:none}
 nav button{font:inherit;font-weight:700;font-size:15px;background:none;border:0;color:var(--muted);padding:10px 14px;border-bottom:3px solid transparent;cursor:pointer}
 nav button.on{color:var(--deep);border-bottom-color:var(--sand)}
+nav .count[hidden]{display:none}
 nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--sand);color:#0A2029;font-size:12px;line-height:20px;text-align:center}
 .view{display:none;flex:1;min-height:0}
 .view.on{display:flex}
@@ -437,7 +495,9 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 .items{overflow-y:auto;flex:1}
 .items .empty{padding:24px 18px;color:var(--muted)}
 .item{display:block;width:100%;text-align:left;font:inherit;color:inherit;background:none;border:0;border-bottom:1px solid var(--line);padding:13px 16px;cursor:pointer}
-.item:hover,.item.on{background:var(--card)}
+.item{border-left:3px solid transparent}
+.item:hover{background:var(--card)}
+.item.on{background:var(--card);border-left-color:var(--sand)}
 .item .top{display:flex;align-items:center;gap:6px}
 .item .nm{font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .item .tm{font-size:12px;color:var(--muted)}
@@ -451,20 +511,22 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 .left.soon{color:var(--warn);font-weight:700}
 .pane{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
 .pane .head{padding:12px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.pane .head b{font-size:17px}
+.pane .head b{font-size:18px}
+.pane .head .sub{font-size:13px;color:var(--muted)}
 .facts{display:flex;flex-wrap:wrap;gap:6px 14px;padding:10px 20px;border-bottom:1px solid var(--line);font-size:13px;color:var(--muted);background:var(--paper-2)}
 .facts span b{color:var(--deep);font-weight:700}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
 .ghost{font:inherit;font-size:13px;font-weight:700;border:1px solid var(--line);background:var(--card);color:var(--deep);border-radius:999px;padding:6px 12px;cursor:pointer}
 .ghost:hover{border-color:var(--deep)}
 .back{display:none;font:inherit;background:none;border:0;font-size:22px;color:var(--deep);cursor:pointer;padding:0 6px 0 0}
-.msgs{flex:1;overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;gap:8px}
-.m{max-width:78%;padding:8px 12px 20px;border-radius:12px;position:relative;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px}
+.msgs{flex:1;overflow-y:auto;padding:20px max(20px,calc((100% - 880px)/2));display:flex;flex-direction:column;gap:10px}
+.m{max-width:72%;min-width:120px;padding:9px 13px 6px;border-radius:14px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;line-height:1.45;box-shadow:0 1px 1px rgba(10,32,41,.06)}
 .m.Customer{background:var(--in);align-self:flex-start;border-top-left-radius:3px;border:1px solid var(--line)}
 .m.Mia{background:var(--mia);align-self:flex-end;border-top-right-radius:3px}
 .m.Team{background:var(--team);align-self:flex-end;border-top-right-radius:3px}
-.m small{position:absolute;right:10px;bottom:3px;font-size:11px;color:var(--muted)}
-.m .who{display:block;font-size:11px;font-weight:800;color:var(--muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em}
+.m small{display:block;text-align:right;margin-top:3px;font-size:11px;color:var(--muted);white-space:nowrap}
+.day{align-self:center;font-size:12px;font-weight:700;color:var(--muted);background:var(--paper-2);border:1px solid var(--line);border-radius:999px;padding:2px 10px;margin:6px 0}
+.m .who{display:block;font-size:11px;font-weight:800;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em;white-space:normal}
 .compose{border-top:1px solid var(--line);padding:10px 16px 12px;display:flex;gap:10px;align-items:flex-end;background:var(--paper-2)}
 .compose textarea{flex:1;font:inherit;font-size:15px;min-height:46px;max-height:200px;resize:vertical;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--card);color:var(--deep)}
 .btn{font:inherit;font-weight:700;border:0;border-radius:999px;padding:11px 20px;cursor:pointer;background:var(--sand);color:#0A2029}
@@ -481,6 +543,38 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 #dash iframe{flex:1;border:0;width:100%;background:#fff}
 #dash .bar{padding:10px 18px;font-size:14px;color:var(--muted)}
 #dash .bar a{color:var(--deep);font-weight:700}
+
+#books{flex-direction:column;overflow-y:auto}
+.bwrap{width:100%;max-width:1000px;margin:0 auto;padding:16px 20px 40px}
+.btools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.btools .sp{flex:1}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.cardn{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.cardn small{display:block;color:var(--muted);font-size:13px}
+.cardn b{font-size:24px}
+.dayh{font-size:15px;font-weight:800;margin:18px 0 8px;display:flex;gap:10px;align-items:baseline}
+.dayh span{font-weight:500;color:var(--muted);font-size:13px}
+.prodh{font-size:13px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 6px}
+.btable{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:14px}
+.btable th{text-align:left;font-size:12px;color:var(--muted);font-weight:700;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--paper-2)}
+.btable td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.btable tr:last-child td{border-bottom:0}
+.btable .num{text-align:right;white-space:nowrap}
+.btable tr.cx td{color:var(--muted);text-decoration:line-through}
+.btable tr.cx td.keep{text-decoration:none}
+.btable a{color:var(--deep);font-weight:700}
+.bscroll{overflow-x:auto}
+.st{font-size:11px;font-weight:800;border-radius:999px;padding:2px 8px;white-space:nowrap;border:1px solid var(--line)}
+.st.ok{background:var(--team)}
+.st.mv{background:#FCEBC8;color:#0A2029}
+.st.cx{background:var(--line)}
+.bempty{color:var(--muted);padding:20px 0}
+@media print{
+  header,nav,.btools .chip,.btools button,#convos,#dash,.noprint{display:none !important}
+  body{background:#fff;color:#000}
+  #books{display:flex !important;overflow:visible}
+  .btable{border-color:#999}
+}
 :focus-visible{outline:3px solid var(--sand);outline-offset:2px}
 @media (max-width:760px){
   .list{width:100%;border-right:0}
@@ -493,7 +587,7 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 </style></head>
 <body>
 <header>${logo}<b>${esc(center.name)}</b><span class="sp"></span>${switcher}<button class="lnk" id="sound" type="button">🔔 Sound on</button><a href="/cdn-cgi/access/logout" title="${esc(email)}">Sign out</a></header>
-<nav><button class="on" data-v="convos">Conversations<span class="count" id="count" hidden></span></button><button data-v="dash">Dashboard</button></nav>
+<nav><button class="on" data-v="convos">Conversations<span class="count" id="count" hidden></span></button><button data-v="books">Bookings</button><button data-v="dash">Dashboard</button></nav>
 
 <section id="convos" class="view on">
   <div class="list">
@@ -511,12 +605,28 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
   <div class="pane" id="pane"><div class="placeholder">Pick a conversation.<br><br><b>Open</b> shows every diver who wrote in the last 24 hours: WhatsApp only lets you reply freely within that window. <b>Needs you</b> means ${esc(center.assistant)} handed it over to your team.</div></div>
 </section>
 
+<section id="books" class="view">
+  <div class="bwrap">
+    <div class="btools">
+      <button class="chip on" data-r="today">Today</button>
+      <button class="chip" data-r="tomorrow">Tomorrow</button>
+      <button class="chip" data-r="next">Next 30 days</button>
+      <button class="chip" data-r="past">Past 30 days</button>
+      <span class="sp"></span>
+      <button class="ghost" id="print" type="button">Print list</button>
+    </div>
+    <div id="bcards" class="cards"></div>
+    <div id="blist"><div class="bempty">Loading…</div></div>
+  </div>
+</section>
+
 <section id="dash" class="view">
   <div class="bar">Results via ${esc(center.assistant)}, live. <a href="https://airtable.com/appEXBMOJa73WiQHb/shrkzC7WhyMBUsEiO" target="_blank" rel="noopener">Open full screen</a></div>
   <iframe title="Dashboard" loading="lazy" data-src="https://airtable.com/embed/appEXBMOJa73WiQHb/shrkzC7WhyMBUsEiO"></iframe>
 </section>
 
-<script>   var __name = function (f) { return f; };(${zoneClient.toString()})(${JSON.stringify(cfg).replace(/</g, "\\u003c")});</script>
+<script>var __name = function (f) { return f; }; // Wrangler adds __name(...) calls when bundling
+(${zoneClient.toString()})(${JSON.stringify(cfg).replace(/</g, "\\u003c")});</script>
 </body></html>`;
 }
 
@@ -581,14 +691,15 @@ function zoneClient(cfg) {
       document.querySelectorAll("nav button").forEach(function (x) { x.classList.toggle("on", x === b); });
       document.querySelectorAll(".view").forEach(function (v) { v.classList.toggle("on", v.id === b.dataset.v); });
       if (b.dataset.v === "dash") { var f = $("#dash iframe"); if (!f.src) f.src = f.dataset.src; }
+      if (b.dataset.v === "books") loadBookings();
     };
   });
 
   // ---- list
-  document.querySelectorAll(".chip").forEach(function (c) {
+  document.querySelectorAll(".chip[data-f]").forEach(function (c) {
     c.onclick = function () {
       filter = c.dataset.f;
-      document.querySelectorAll(".chip").forEach(function (x) { x.classList.toggle("on", x === c); });
+      document.querySelectorAll(".chip[data-f]").forEach(function (x) { x.classList.toggle("on", x === c); });
       lastList = ""; loadList();
     };
   });
@@ -658,23 +769,32 @@ function zoneClient(cfg) {
       var key = JSON.stringify([d.messages.length, d.canReply, d.needsYou, d.lead]);
       if (key === lastChat) return;
       var draft = $("#txt") ? $("#txt").value : "";
+      var oldBox = $("#msgs"), keepTop = null;
+      if (!scroll && oldBox && oldBox.scrollHeight - oldBox.scrollTop - oldBox.clientHeight > 120) keepTop = oldBox.scrollTop;
       lastChat = key;
       var L = d.lead, l = left(d.closesAt);
       var actions = "";
       if (d.hasLead && L.human) actions += '<button class="ghost" id="handback">Let ' + esc(cfg.assistant) + " take over</button>";
       if (d.hasLead && d.needsYou && !L.human) actions += '<button class="ghost" id="handled">Mark as handled</button>';
       var facts = fact("Language", L.language && L.language.toUpperCase()) + fact("Level", L.cert) + fact("Dates", L.dates) +
-        fact("Group", L.group) + fact("Interested in", L.interested) + fact("Status", L.status) + fact("WhatsApp", L.contact) +
+        fact("Group", L.group) + fact("Interested in", L.interested) + fact("Status", L.status) + fact("WhatsApp", L.contact !== L.name ? L.contact : "") +
         (L.human ? "<span><b>Team is handling this.</b> " + esc(cfg.assistant) + " is paused for this diver.</span>" : "");
 
       $("#pane").innerHTML =
-        '<div class="head"><button class="back" aria-label="Back">‹</button><b>' + esc(L.name || "Diver") + "</b>" +
+        '<div class="head"><button class="back" aria-label="Back">‹</button><div><b>' + esc(L.name || L.contact || "Diver") + "</b>" +
+        (l.t ? '<div class="sub">' + esc(l.t) + "</div>" : "") + "</div>" +
         (d.needsYou ? '<span class="tag need">Needs you</span>' : "") + '<div class="actions">' + actions + "</div></div>" +
         (facts ? '<div class="facts">' + facts + "</div>" : "") +
-        '<div class="msgs" id="msgs">' + d.messages.map(function (m) {
-          var who = m.dir === "Customer" ? "" : (m.dir === "Team" ? "Team" : cfg.assistant);
-          return '<div class="m ' + esc(m.dir) + '">' + (who ? '<span class="who">' + esc(who) + "</span>" : "") + esc(m.text) + "<small>" + esc(clock(m.at)) + "</small></div>";
-        }).join("") + "</div>" +
+        '<div class="msgs" id="msgs">' + (function () {
+          var prevDay = "";
+          return d.messages.map(function (m) {
+            var who = m.dir === "Customer" ? "" : (m.dir === "Team" ? "Team" : cfg.assistant);
+            var dt = new Date(m.at), day = dt.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
+            var sep = day !== prevDay ? '<div class="day">' + esc(day) + "</div>" : ""; prevDay = day;
+            return sep + '<div class="m ' + esc(m.dir) + '">' + (who ? '<span class="who">' + esc(who) + "</span>" : "") + esc(m.text) +
+              "<small>" + esc(dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })) + "</small></div>";
+          }).join("");
+        })() + "</div>" +
         (d.canReply
           ? '<div class="bar2"><span>Sign as</span><input id="sig" maxlength="30" placeholder="your name">' +
             '<select id="prod" aria-label="Booking link"><option value="">+ Booking link…</option></select>' +
@@ -685,7 +805,8 @@ function zoneClient(cfg) {
 
       $(".back").onclick = function () { current = null; $("#convos").classList.remove("open"); document.querySelectorAll(".item").forEach(function (b) { b.classList.remove("on"); }); };
       var box = $("#msgs");
-      if (scroll || box.scrollHeight - box.scrollTop - box.clientHeight < 200) box.scrollTop = box.scrollHeight;
+      var place = function () { box.scrollTop = keepTop === null ? box.scrollHeight : keepTop; };
+      place(); requestAnimationFrame(place); setTimeout(place, 250);
       if ($("#handback")) $("#handback").onclick = function () { act("handback", this); };
       if ($("#handled")) $("#handled").onclick = function () { act("handled", this); };
       if (d.canReply) {
@@ -731,6 +852,84 @@ function zoneClient(cfg) {
       .finally(function () { b.disabled = false; b.textContent = "Send"; });
   }
 
+
+  // ---- bookings
+  var bdata = null, brange = "today";
+  function thb(n) { return Math.round(n).toLocaleString("en-US") + " THB"; }
+  function dayLabel(iso) { return new Date(iso + "T12:00:00Z").toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" }); }
+  function addDays(iso, n) { var d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+  document.querySelectorAll(".chip[data-r]").forEach(function (c) {
+    c.onclick = function () {
+      brange = c.dataset.r;
+      document.querySelectorAll(".chip[data-r]").forEach(function (x) { x.classList.toggle("on", x === c); });
+      renderBookings();
+    };
+  });
+  $("#print").onclick = function () { window.print(); };
+  function loadBookings() {
+    api("bookings").then(function (d) { bdata = d; renderBookings(); })
+      .catch(function (e) { if (e.message !== "auth") $("#blist").innerHTML = '<div class="bempty">' + esc(e.message) + "</div>"; });
+  }
+  function isCx(b) { return /cancel|refund/i.test(b.status); }
+  function stTag(b) {
+    var s = b.status || "Confirmed", cls = isCx(b) ? "cx" : (/move/i.test(s) ? "mv" : "ok");
+    return '<span class="st ' + cls + '">' + esc(s) + (b.late ? " · late" : "") + "</span>";
+  }
+  function renderBookings() {
+    if (!bdata) return;
+    var t = bdata.today, list = bdata.bookings.filter(function (b) {
+      if (brange === "today") return b.date === t;
+      if (brange === "tomorrow") return b.date === bdata.tomorrow;
+      if (brange === "next") return b.date >= t && b.date <= addDays(t, 30);
+      return b.date < t && b.date >= addDays(t, -30);
+    });
+    if (brange === "past") list.reverse();
+    var live = list.filter(function (b) { return !isCx(b); });
+    var sum = function (k) { return live.reduce(function (a, b) { return a + b[k]; }, 0); };
+    $("#bcards").innerHTML =
+      '<div class="cardn"><small>Divers</small><b>' + sum("divers") + "</b></div>" +
+      '<div class="cardn"><small>Bookings</small><b>' + live.length + "</b></div>" +
+      '<div class="cardn"><small>' + (brange === "past" ? "Collected at the shop" : "To collect at the shop") + "</small><b>" + thb(sum("balance")) + "</b></div>" +
+      '<div class="cardn"><small>Paid online</small><b>' + thb(sum("deposit")) + "</b></div>";
+    if (!list.length) {
+      $("#blist").innerHTML = '<div class="bempty">' + (brange === "today" ? "No bookings via " + esc(cfg.assistant) + " for today." :
+        brange === "tomorrow" ? "No bookings via " + esc(cfg.assistant) + " for tomorrow yet." : "No bookings in this period.") + "</div>";
+      return;
+    }
+    var html = "", days = {};
+    list.forEach(function (b) { (days[b.date] = days[b.date] || []).push(b); });
+    Object.keys(days).forEach(function (day) {
+      var rows = days[day], dl = rows.filter(function (b) { return !isCx(b); });
+      var divers = dl.reduce(function (a, b) { return a + b.divers; }, 0);
+      html += '<div class="dayh">' + esc(dayLabel(day)) + "<span>" + divers + " diver" + (divers === 1 ? "" : "s") + " · " +
+        dl.length + " booking" + (dl.length === 1 ? "" : "s") + "</span></div>";
+      var prods = {};
+      rows.forEach(function (b) { (prods[b.product || "Other"] = prods[b.product || "Other"] || []).push(b); });
+      Object.keys(prods).forEach(function (p) {
+        html += '<div class="prodh">' + esc(p) + '</div><div class="bscroll"><table class="btable"><thead><tr>' +
+          "<th>Ref</th><th>Name</th><th>Phone</th><th class=\"num\">Divers</th><th class=\"num\">Paid online</th><th class=\"num\">At the shop</th><th>Status</th><th class=\"noprint\"></th></tr></thead><tbody>" +
+          prods[p].map(function (b) {
+            var links = [];
+            if (b.chat) links.push('<a href="#" data-chat="' + esc(b.chat) + '">Chat</a>');
+            if (b.manage && !isCx(b) && b.date >= t) links.push('<a href="' + esc(b.manage) + '" target="_blank" rel="noopener">Move / cancel</a>');
+            var wa = b.phone ? '<a href="https://wa.me/' + esc(b.phone.replace(/[^0-9]/g, "")) + '" target="_blank" rel="noopener">' + esc(b.phone) + "</a>" : "";
+            return '<tr class="' + (isCx(b) ? "cx" : "") + '"><td>' + esc(b.ref) + "</td><td>" + esc(b.name) + "</td><td>" + wa + '</td><td class="num">' + b.divers +
+              '</td><td class="num">' + thb(b.deposit) + '</td><td class="num">' + (isCx(b) ? "–" : thb(b.balance)) + '</td><td class="keep">' + stTag(b) +
+              (b.refunded ? '<br><small>Refunded ' + thb(b.refunded) + "</small>" : "") + '</td><td class="keep noprint">' + links.join(" · ") + "</td></tr>";
+          }).join("") + "</tbody></table></div>";
+      });
+    });
+    $("#blist").innerHTML = html;
+    $("#blist").querySelectorAll("[data-chat]").forEach(function (a) {
+      a.onclick = function (e) {
+        e.preventDefault();
+        document.querySelector('nav button[data-v="convos"]').click();
+        var all = document.querySelector('.chip[data-f="all"]'); if (all && filter === "open") all.click();
+        openChat(a.dataset.chat);
+      };
+    });
+  }
+  setInterval(function () { if (!document.hidden && $("#books").classList.contains("on")) loadBookings(); }, 60000);
   loadList();
   setInterval(function () { if (document.hidden) return; loadList(); loadChat(false); }, 10000);
   // Keep counting Needs you while the "All" or "Booked" view is open.
