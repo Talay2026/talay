@@ -55,6 +55,7 @@ export async function handleZone(request, env, ctx) {
     }
     if (p === "/zone/api/chat") return json(publicChat(await chat(env, center, url.searchParams.get("c"))));
     if (p === "/zone/api/bookings") return json(await bookings(env, center));
+    if (p === "/zone/api/unfinished") return json(await unfinished(env, center));
     if (p === "/zone/api/settings" && request.method === "GET") return json(await settings(env, center));
     if (p === "/zone/api/settings" && request.method === "POST") return await saveSettings(request, env, center, email);
     if (p === "/zone/api/products") return json(await products(env, center, url.searchParams.get("c")));
@@ -431,6 +432,97 @@ async function bookings(env, center) {
 }
 
 
+
+// ---------- Unfinished bookings ----------
+// Stripe Checkout sessions of the last 7 days for this center that were never paid:
+// the diver picked a product, date and number of divers, then left the payment page.
+// Linked to the lead via lead_ref (the c=... code in the booking link).
+
+const REMIND = {
+  en: (p, d, l) => `Hi! I saw you picked *${p}* for ${d}, but the booking didn't go through, so your spot isn't reserved yet. You can finish it here 👇\n${l}`,
+  nl: (p, d, l) => `Hoi! Ik zag dat je *${p}* koos voor ${d}, maar de boeking is niet afgerond, dus je plaats is nog niet gereserveerd. Je kan je boeking hier afronden 👇\n${l}`,
+  fr: (p, d, l) => `Bonjour ! J'ai vu que vous avez choisi *${p}* pour le ${d}, mais la réservation n'a pas abouti : votre place n'est donc pas encore réservée. Vous pouvez la finaliser ici 👇\n${l}`,
+  de: (p, d, l) => `Hi! Ich habe gesehen, dass du *${p}* für ${d} ausgewählt hast, aber die Buchung wurde nicht abgeschlossen, dein Platz ist also noch nicht reserviert. Hier kannst du sie abschließen 👇\n${l}`,
+  es: (p, d, l) => `¡Hola! Vi que elegiste *${p}* para el ${d}, pero la reserva no se completó, así que tu plaza aún no está reservada. Puedes terminarla aquí 👇\n${l}`,
+};
+const LOCALE = { en: "en-GB", nl: "nl-BE", fr: "fr-FR", de: "de-DE", es: "es-ES" };
+
+async function unfinished(env, center) {
+  if (!env.STRIPE_SECRET_KEY) return { items: [] };
+  const since = Math.floor((Date.now() - 7 * DAY) / 1000);
+  const sessions = [];
+  let after = "";
+  for (let page = 0; page < 5; page++) {
+    const u = new URL("https://api.stripe.com/v1/checkout/sessions");
+    u.searchParams.set("limit", "100");
+    u.searchParams.set("created[gte]", String(since));
+    if (after) u.searchParams.set("starting_after", after);
+    const res = await fetch(u, { headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}` } });
+    if (!res.ok) throw new Error(`Stripe: ${res.status} ${await res.text()}`);
+    const body = await res.json();
+    sessions.push(...(body.data || []));
+    if (!body.has_more || !body.data?.length) break;
+    after = body.data[body.data.length - 1].id;
+  }
+  const mine = sessions.filter((s) => (s.metadata || {}).center_slug === center.slug);
+  const today = thaiDate(Date.now());
+
+  // Newest first; keep one unpaid attempt per diver, and drop it if the diver paid later.
+  mine.sort((a, b) => b.created - a.created);
+  const paidAfter = {};
+  const items = [];
+  const seen = new Set();
+  for (const s of mine) {
+    const m = s.metadata || {};
+    const key = m.lead_ref || s.id;
+    if (s.status === "complete") { if (!(key in paidAfter)) paidAfter[key] = s.created; continue; }
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (paidAfter[key] && paidAfter[key] > s.created) continue;
+    if (!m.activity_date || m.activity_date < today) continue;
+    items.push({
+      id: s.id, ref: m.lead_ref || "", at: new Date(s.created * 1000).toISOString(),
+      state: s.status === "open" ? "open" : "expired",
+      code: String(m.product_code || ""), product: String(m.product_name || m.product_code || ""),
+      date: m.activity_date, divers: Number(m.divers) || 1,
+      total: Number(m.total_thb) || 0, deposit: Number(m.deposit_thb) || 0,
+      lang: ["en", "nl", "fr", "de", "es"].includes(m.lang) ? m.lang : "en",
+    });
+  }
+
+  // Find the lead behind each lead_ref through the c=... code in its booking link.
+  const refs = [...new Set(items.map((i) => i.ref).filter((r) => /^[A-Za-z0-9_-]{1,64}$/.test(r)))];
+  const byRef = {};
+  for (let i = 0; i < refs.length; i += 30) {
+    const part = refs.slice(i, i + 30);
+    const leads = await at(env, "Leads", {
+      formula: `OR(${part.map((r) => `FIND('c=${q(r)}&', {Booking link} & '&')`).join(",")})`,
+      fields: ["Name", "Contact", "External ID", "Language", "Last message at", "Booking link", "Status"],
+    });
+    for (const l of leads) {
+      const r = String(first(l.fields["Booking link"]) || "").match(/[?&]c=([A-Za-z0-9_-]{1,64})/)?.[1];
+      if (r) byRef[r] = l.fields;
+    }
+  }
+
+  return {
+    items: items.map((i) => {
+      const f = byRef[i.ref] || {};
+      const chat = String(first(f["External ID"]) || "");
+      const last = Date.parse(first(f["Last message at"]) || 0) || 0;
+      const lang = first(f["Language"]) ? langCode(first(f["Language"])) : i.lang;
+      const when = new Date(i.date + "T12:00:00Z").toLocaleDateString(LOCALE[lang] || "en-GB", { weekday: "long", day: "numeric", month: "long" });
+      const link = `https://talay.io/b/${center.slug}?p=${encodeURIComponent(i.code)}${i.ref ? `&c=${i.ref}` : ""}&l=${lang}`;
+      return {
+        ...i, name: String(first(f["Name"]) || ""), phone: String(first(f["Contact"]) || ""),
+        chat: okId(chat) ? chat : "", canMessage: last > 0 && Date.now() - last < DAY,
+        booked: /booked/i.test(String(first(f["Status"]) || "")),
+        reminder: (REMIND[lang] || REMIND.en)(i.product, when, link),
+      };
+    }),
+  };
+}
+
 // ---------- Settings ----------
 // Centers fields: Staff emails, Alert Email, Escalation hours (+ FR/DE/ES/NL), Mia paused
 // (checkbox), and read-only info shown to the team.
@@ -655,7 +747,8 @@ header a,header button.lnk{color:#C9D4D7;font:inherit;font-size:14px;text-decora
 nav{display:flex;gap:4px;padding:8px 18px 0;border-bottom:1px solid var(--line);flex:none}
 nav button{font:inherit;font-weight:700;font-size:15px;background:none;border:0;color:var(--muted);padding:10px 14px;border-bottom:3px solid transparent;cursor:pointer}
 nav button.on{color:var(--deep);border-bottom-color:var(--sand)}
-nav .count[hidden]{display:none}
+nav .count[hidden],.chip .count[hidden]{display:none}
+.chip .count{display:inline-block;min-width:18px;padding:0 5px;margin-left:6px;border-radius:999px;background:var(--sand);color:#0A2029;font-size:11px;line-height:18px;text-align:center}
 nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--sand);color:#0A2029;font-size:12px;line-height:20px;text-align:center}
 .view{display:none;flex:1;min-height:0}
 .view.on{display:flex}
@@ -819,6 +912,7 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
       <button class="chip" data-r="tomorrow">Tomorrow</button>
       <button class="chip" data-r="next">Next 30 days</button>
       <button class="chip" data-r="past">Past 30 days</button>
+      <button class="chip" data-r="unfinished">Not paid yet<span class="count" id="ucount" hidden></span></button>
       <span class="sp"></span>
       <button class="ghost" id="print" type="button">Print list</button>
     </div>
@@ -1062,6 +1156,7 @@ function zoneClient(cfg) {
       if (d.canReply) {
         var t = $("#txt"), s = $("#sig");
         t.value = draft;
+        if (pendingDraft) { t.value = pendingDraft; pendingDraft = null; t.focus(); }
         try { s.value = localStorage.getItem("talay-sig") || ""; } catch (e) {}
         s.oninput = function () { try { localStorage.setItem("talay-sig", s.value); } catch (e) {} };
         t.onkeydown = function (e) { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send(); };
@@ -1113,6 +1208,7 @@ function zoneClient(cfg) {
       brange = c.dataset.r;
       document.querySelectorAll(".chip[data-r]").forEach(function (x) { x.classList.toggle("on", x === c); });
       renderBookings();
+      if (brange === "unfinished") loadUnfinished();
     };
   });
   $("#print").onclick = function () { window.print(); };
@@ -1126,6 +1222,7 @@ function zoneClient(cfg) {
     return '<span class="st ' + cls + '">' + esc(s) + (b.late ? " · late" : "") + "</span>";
   }
   function renderBookings() {
+    if (brange === "unfinished") { renderUnfinished(); return; }
     if (!bdata) return;
     var t = bdata.today, list = bdata.bookings.filter(function (b) {
       if (brange === "today") return b.date === t;
@@ -1246,6 +1343,50 @@ function zoneClient(cfg) {
     var btn = this;
     save({ action: "team", emails: sdata.staff.concat([e]) }, "#tMsg", e + " can now sign in.", btn).then(function () { $("#tEmail").value = ""; });
   };
+
+  // ---- unfinished bookings
+  var udata = null, pendingDraft = null;
+  function loadUnfinished() {
+    return api("unfinished").then(function (d) {
+      udata = d; var n = d.items.filter(function (i) { return !i.booked; }).length, el = $("#ucount");
+      el.hidden = !n; el.textContent = n;
+      if (brange === "unfinished") renderUnfinished();
+    }).catch(function (e) { if (brange === "unfinished" && e.message !== "auth") $("#blist").innerHTML = '<div class="bempty">' + esc(e.message) + "</div>"; });
+  }
+  function renderUnfinished() {
+    if (!udata) { $("#bcards").innerHTML = ""; $("#blist").innerHTML = '<div class="bempty">Loading…</div>'; return; }
+    var list = udata.items;
+    var value = list.reduce(function (a, i) { return a + i.total; }, 0);
+    $("#bcards").innerHTML =
+      '<div class="cardn"><small>Started, not paid (7 days)</small><b>' + list.length + "</b></div>" +
+      '<div class="cardn"><small>Divers</small><b>' + list.reduce(function (a, i) { return a + i.divers; }, 0) + "</b></div>" +
+      '<div class="cardn"><small>Value still open</small><b>' + thb(value) + "</b></div>";
+    if (!list.length) { $("#blist").innerHTML = '<div class="bempty">Nobody left the payment page in the last 7 days. 🎉</div>'; return; }
+    $("#blist").innerHTML = '<p class="d" style="color:var(--muted);font-size:14px;margin:0 0 10px">These divers chose a date and went to the payment page, but didn\'t pay. A friendly reminder often brings them back.</p>' +
+      '<div class="bscroll"><table class="btable"><thead><tr><th>Diver</th><th>Product</th><th>For</th><th class="num">Divers</th><th class="num">Value</th><th>Left</th><th class="noprint"></th></tr></thead><tbody>' +
+      list.map(function (i, k) {
+        var who = esc(i.name || i.phone || "Unknown diver") + (i.phone && i.name !== i.phone ? '<br><small style="color:var(--muted)">' + esc(i.phone) + "</small>" : "");
+        var act = [];
+        if (i.booked) act.push('<span class="st ok">Booked since</span>');
+        else if (i.chat && i.canMessage) act.push('<a href="#" data-remind="' + k + '">Send reminder</a>');
+        else if (i.chat) act.push('<span class="st">Outside 24 h</span>');
+        else act.push('<span class="st">No chat linked</span>');
+        if (i.chat) act.push('<a href="#" data-uchat="' + k + '">Chat</a>');
+        return "<tr><td>" + who + "</td><td>" + esc(i.product) + "</td><td>" + esc(dayLabel(i.date)) + '</td><td class="num">' + i.divers +
+          '</td><td class="num">' + thb(i.total) + "</td><td>" + ago(i.at) + ' ago</td><td class="keep noprint">' + act.join(" · ") + "</td></tr>";
+      }).join("") + "</tbody></table></div>" +
+      '<p style="color:var(--muted);font-size:13px">WhatsApp only allows a free message within 24 hours of the diver\'s last message, so older ones can\'t get a reminder from here.</p>';
+    function go(k, draft) {
+      var i = udata.items[k]; pendingDraft = draft ? i.reminder : null;
+      document.querySelector('nav button[data-v="convos"]').click();
+      var all = document.querySelector('.chip[data-f="all"]'); if (all && filter === "open") all.click();
+      openChat(i.chat);
+    }
+    $("#blist").querySelectorAll("[data-remind]").forEach(function (a) { a.onclick = function (e) { e.preventDefault(); go(Number(a.dataset.remind), true); }; });
+    $("#blist").querySelectorAll("[data-uchat]").forEach(function (a) { a.onclick = function (e) { e.preventDefault(); go(Number(a.dataset.uchat), false); }; });
+  }
+  loadUnfinished();
+  setInterval(function () { if (!document.hidden) loadUnfinished(); }, 120000);
   loadList();
   setInterval(function () { if (document.hidden) return; loadList(); loadChat(false); }, 10000);
   // Keep counting Needs you while the "All" or "Booked" view is open.
