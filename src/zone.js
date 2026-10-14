@@ -505,7 +505,14 @@ async function unfinished(env, center) {
     }
   }
 
+  const check = {
+    stripeMode: String(env.STRIPE_SECRET_KEY).startsWith("sk_test_") ? "test" : String(env.STRIPE_SECRET_KEY).slice(0, 3),
+    sessions7d: sessions.length, forThisCenter: mine.length,
+    unpaid: mine.filter((s) => s.status !== "complete").length,
+    centersSeen: [...new Set(sessions.map((s) => (s.metadata || {}).center_slug || "(none)"))].slice(0, 10),
+  };
   return {
+    check,
     items: items.map((i) => {
       const f = byRef[i.ref] || {};
       const chat = String(first(f["External ID"]) || "");
