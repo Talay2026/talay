@@ -54,6 +54,8 @@ export async function handleZone(request, env, ctx) {
     }
     if (p === "/zone/api/chat") return json(publicChat(await chat(env, center, url.searchParams.get("c"))));
     if (p === "/zone/api/bookings") return json(await bookings(env, center));
+    if (p === "/zone/api/settings" && request.method === "GET") return json(await settings(env, center));
+    if (p === "/zone/api/settings" && request.method === "POST") return await saveSettings(request, env, center, email);
     if (p === "/zone/api/products") return json(await products(env, center, url.searchParams.get("c")));
     if (request.method === "POST") {
       if (p === "/zone/api/reply") return await reply(request, env, center);
@@ -148,6 +150,7 @@ async function centersFor(env, email) {
     .filter((r) => String(r.fields["Staff emails"] || "").toLowerCase()
       .split(/[\s,;]+/).includes(email))
     .map((r) => ({
+      id: r.id,
       slug: String(first(r.fields["Slug"]) || "").toLowerCase(),
       name: first(r.fields["Name"]) || "Dive center",
       assistant: first(r.fields["Assistant name"]) || "Mia",
@@ -425,6 +428,85 @@ async function bookings(env, center) {
   };
 }
 
+
+// ---------- Settings ----------
+// Centers fields: Staff emails, Alert Email, Escalation hours (+ FR/DE/ES/NL), Mia paused
+// (checkbox), and read-only info shown to the team.
+
+const EMAIL = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]{2,}$/;
+const HOURS_TEXT = {
+  "": (a, b) => `daily from ${a} to ${b} (Thai time)`,
+  NL: (a, b) => `elke dag van ${a.replace(":", ".")} tot ${b.replace(":", ".")} uur (Thaise tijd)`,
+  FR: (a, b) => `tous les jours de ${a.replace(":", "h")} à ${b.replace(":", "h")} (heure thaïlandaise)`,
+  DE: (a, b) => `täglich von ${a} bis ${b} Uhr (thailändische Zeit)`,
+  ES: (a, b) => `todos los días de ${a} a ${b} (hora de Tailandia)`,
+};
+const splitEmails = (v) => String(v || "").toLowerCase().split(/[\s,;]+/).filter(Boolean);
+const hhmm = (v) => { const m = String(v || "").match(/^(\d{1,2}):(\d{2})$/); return m && +m[1] < 24 && +m[2] < 60 ? `${+m[1]}:${m[2]}` : null; };
+
+async function centerRecord(env, center) {
+  const res = await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Centers/${center.id}`,
+    { headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` } });
+  if (!res.ok) throw new Error(`Airtable Centers: ${res.status} ${await res.text()}`);
+  return (await res.json()).fields || {};
+}
+
+async function settings(env, center) {
+  const f = await centerRecord(env, center);
+  const hours = String(first(f["Escalation hours"]) || "").match(/(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/);
+  const s = (k) => String(first(f[k]) ?? "");
+  return {
+    staff: splitEmails(f["Staff emails"]),
+    alert: s("Alert Email"),
+    hoursText: s("Escalation hours"),
+    from: hours ? hours[1].padStart(5, "0") : "09:00",
+    to: hours ? hours[2].padStart(5, "0") : "18:00",
+    paused: !!f["Mia paused"],
+    info: {
+      assistant: s("Assistant name"), languages: s("Languages spoken"), meeting: s("Meeting point"),
+      sites: s("Dive sites"), boats: s("Boat departure times"), emergency: s("Center emergency phone"),
+    },
+  };
+}
+
+async function saveSettings(request, env, center, email) {
+  const body = await readBody(request);
+  if (!body) return json({ error: "Bad request" }, 400);
+  const fields = {};
+  if (body.action === "team") {
+    const list = [...new Set(splitEmails((body.emails || []).join("\n")))];
+    const bad = list.find((e) => !EMAIL.test(e));
+    if (bad) return json({ error: `"${bad}" is not a valid email address.` }, 400);
+    if (!list.includes(email)) return json({ error: "You can't remove yourself. Ask a colleague to do that." }, 400);
+    if (list.length > 50) return json({ error: "Maximum 50 team members." }, 400);
+    fields["Staff emails"] = list.join("\n");
+  } else if (body.action === "alert") {
+    const a = String(body.email || "").trim().toLowerCase();
+    if (!EMAIL.test(a)) return json({ error: "Enter one valid email address." }, 400);
+    fields["Alert Email"] = a;
+  } else if (body.action === "hours") {
+    const a = hhmm(body.from), b = hhmm(body.to);
+    if (!a || !b) return json({ error: "Choose an opening and a closing time." }, 400);
+    for (const [suffix, fn] of Object.entries(HOURS_TEXT)) fields[`Escalation hours${suffix ? " " + suffix : ""}`] = fn(a, b);
+  } else if (body.action === "mia") {
+    fields["Mia paused"] = !!body.paused;
+  } else {
+    return json({ error: "Unknown setting." }, 400);
+  }
+  const res = await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Centers/${center.id}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ fields, typecast: true }),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    console.error("settings", res.status, t);
+    if (/UNKNOWN_FIELD_NAME/.test(t)) return json({ error: "This setting isn't available yet. Ask Jonas to finish the setup." }, 500);
+    return json({ error: "Could not save. Try again." }, 502);
+  }
+  return json({ ok: true });
+}
+
 // ---------- Pages ----------
 
 function text(t, status = 200) {
@@ -462,7 +544,7 @@ function app(center, centers, email) {
     : `<svg width="28" height="28" viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="14" fill="#F4F0E6"/><path d="M1 15a14 14 0 0 0 28 0z" fill="#E8B04B"/></svg>`;
   const cfg = {
     qs: centers.length > 1 ? `?center=${encodeURIComponent(center.slug)}` : "",
-    assistant: center.assistant, center: center.name,
+    assistant: center.assistant, center: center.name, email,
   };
 
   return `<!doctype html><html lang="en"><head>${HEAD}
@@ -575,6 +657,30 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
   #books{display:flex !important;overflow:visible}
   .btable{border-color:#999}
 }
+
+#sett{flex-direction:column;overflow-y:auto}
+.swrap{width:100%;max-width:760px;margin:0 auto;padding:18px 20px 48px;display:grid;gap:14px}
+.scard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+.scard h3{margin:0 0 4px;font-size:17px}
+.scard p.d{margin:0 0 14px;color:var(--muted);font-size:14px}
+.srow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.srow input[type=email],.srow input[type=time]{font:inherit;font-size:15px;border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--paper-2);color:var(--deep)}
+.srow input[type=email]{flex:1;min-width:220px}
+.people{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:6px}
+.people li{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--paper-2)}
+.people li span{flex:1;overflow-wrap:anywhere}
+.people li small{color:var(--muted)}
+.people button{font:inherit;font-size:13px;background:none;border:0;color:var(--warn);font-weight:700;cursor:pointer}
+.smsg{font-size:13px;margin-top:10px;color:var(--ok);font-weight:700;min-height:1em}
+.smsg.err{color:var(--warn)}
+.switch{display:flex;align-items:center;gap:14px}
+.switch b{font-size:16px}
+.pill{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px}
+.pill.on{background:var(--team)}
+.pill.off{background:#FCEBC8;color:#0A2029}
+.info{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;font-size:14px}
+.info dt{color:var(--muted)}
+.info dd{margin:0}
 :focus-visible{outline:3px solid var(--sand);outline-offset:2px}
 @media (max-width:760px){
   .list{width:100%;border-right:0}
@@ -587,7 +693,7 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 </style></head>
 <body>
 <header>${logo}<b>${esc(center.name)}</b><span class="sp"></span>${switcher}<button class="lnk" id="sound" type="button">🔔 Sound on</button><a href="/cdn-cgi/access/logout" title="${esc(email)}">Sign out</a></header>
-<nav><button class="on" data-v="convos">Conversations<span class="count" id="count" hidden></span></button><button data-v="books">Bookings</button><button data-v="dash">Dashboard</button></nav>
+<nav><button class="on" data-v="convos">Conversations<span class="count" id="count" hidden></span></button><button data-v="books">Bookings</button><button data-v="dash">Dashboard</button><button data-v="sett">Settings</button></nav>
 
 <section id="convos" class="view on">
   <div class="list">
@@ -617,6 +723,41 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
     </div>
     <div id="bcards" class="cards"></div>
     <div id="blist"><div class="bempty">Loading…</div></div>
+  </div>
+</section>
+
+<section id="sett" class="view">
+  <div class="swrap">
+    <div class="scard">
+      <h3>${esc(center.assistant)}</h3>
+      <p class="d">Pause ${esc(center.assistant)} for the whole dive center, for example during a storm or a holiday. While paused she doesn't answer anyone: your team answers every diver under <b>Conversations → Open</b>.</p>
+      <div class="switch"><span class="pill" id="miaState">…</span><button class="ghost" id="miaToggle" type="button">…</button></div>
+      <div class="smsg" id="miaMsg"></div>
+    </div>
+    <div class="scard">
+      <h3>Office hours</h3>
+      <p class="d">${esc(center.assistant)} tells divers when your team answers personally (Thai time, every day). The text is updated in all five languages.</p>
+      <div class="srow"><label>From <input type="time" id="hFrom" step="900"></label><label>to <input type="time" id="hTo" step="900"></label><button class="btn" id="hSave" type="button">Save</button></div>
+      <div class="smsg" id="hMsg"></div>
+    </div>
+    <div class="scard">
+      <h3>Alert email</h3>
+      <p class="d">Where handovers, large groups and reminders are sent. A shared inbox works best.</p>
+      <div class="srow"><input type="email" id="aEmail" placeholder="team@yourdivecenter.com"><button class="btn" id="aSave" type="button">Save</button></div>
+      <div class="smsg" id="aMsg"></div>
+    </div>
+    <div class="scard">
+      <h3>Team</h3>
+      <p class="d">Everyone here can sign in at talay.io/zone with a code sent to their email.</p>
+      <ul class="people" id="team"></ul>
+      <div class="srow"><input type="email" id="tEmail" placeholder="colleague@email.com"><button class="btn" id="tAdd" type="button">Add</button></div>
+      <div class="smsg" id="tMsg"></div>
+    </div>
+    <div class="scard">
+      <h3>What ${esc(center.assistant)} knows about you</h3>
+      <p class="d">To change any of this, message Jonas at <a href="mailto:jonas@talay.io">jonas@talay.io</a>.</p>
+      <dl class="info" id="info"></dl>
+    </div>
   </div>
 </section>
 
@@ -692,6 +833,7 @@ function zoneClient(cfg) {
       document.querySelectorAll(".view").forEach(function (v) { v.classList.toggle("on", v.id === b.dataset.v); });
       if (b.dataset.v === "dash") { var f = $("#dash iframe"); if (!f.src) f.src = f.dataset.src; }
       if (b.dataset.v === "books") loadBookings();
+      if (b.dataset.v === "sett") loadSettings();
     };
   });
 
@@ -930,6 +1072,52 @@ function zoneClient(cfg) {
     });
   }
   setInterval(function () { if (!document.hidden && $("#books").classList.contains("on")) loadBookings(); }, 60000);
+
+  // ---- settings
+  var sdata = null, ME = cfg.email;
+  function say(id, text, err) { var el = $(id); el.textContent = text; el.className = "smsg" + (err ? " err" : ""); if (!err && text) setTimeout(function () { if (el.textContent === text) el.textContent = ""; }, 4000); }
+  function save(body, msgId, okText, btn) {
+    if (btn) btn.disabled = true;
+    return post("settings", body).then(function () { say(msgId, okText); return loadSettings(); })
+      .catch(function (e) { say(msgId, e.message, true); })
+      .finally(function () { if (btn) btn.disabled = false; });
+  }
+  function loadSettings() {
+    return api("settings").then(function (d) {
+      sdata = d;
+      $("#miaState").textContent = d.paused ? "Paused" : "Answering divers";
+      $("#miaState").className = "pill " + (d.paused ? "off" : "on");
+      $("#miaToggle").textContent = d.paused ? "Turn " + cfg.assistant + " back on" : "Pause " + cfg.assistant;
+      $("#hFrom").value = d.from; $("#hTo").value = d.to;
+      if (document.activeElement !== $("#aEmail")) $("#aEmail").value = d.alert;
+      $("#team").innerHTML = d.staff.map(function (e) {
+        return "<li><span>" + esc(e) + (e === ME ? " <small>(you)</small>" : "") + "</span>" +
+          (e === ME ? "" : '<button type="button" data-rm="' + esc(e) + '">Remove</button>') + "</li>";
+      }).join("");
+      $("#team").querySelectorAll("[data-rm]").forEach(function (b) {
+        b.onclick = function () {
+          if (!confirm("Remove " + b.dataset.rm + "? They can no longer sign in.")) return;
+          save({ action: "team", emails: sdata.staff.filter(function (x) { return x !== b.dataset.rm; }) }, "#tMsg", "Removed.");
+        };
+      });
+      var I = d.info, rows = [["Assistant", I.assistant], ["Languages", I.languages], ["Meeting point", I.meeting], ["Dive sites", I.sites], ["Boat times", I.boats], ["Emergency phone", I.emergency]];
+      $("#info").innerHTML = rows.filter(function (r) { return r[1]; }).map(function (r) { return "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>"; }).join("");
+    }).catch(function (e) { if (e.message !== "auth") say("#miaMsg", e.message, true); });
+  }
+  $("#miaToggle").onclick = function () {
+    if (!sdata) return;
+    var pause = !sdata.paused;
+    if (pause && !confirm("Pause " + cfg.assistant + " for every diver? Your team then answers all messages.")) return;
+    save({ action: "mia", paused: pause }, "#miaMsg", pause ? cfg.assistant + " is paused." : cfg.assistant + " is answering again.", this);
+  };
+  $("#hSave").onclick = function () { save({ action: "hours", from: $("#hFrom").value, to: $("#hTo").value }, "#hMsg", "Saved in all five languages.", this); };
+  $("#aSave").onclick = function () { save({ action: "alert", email: $("#aEmail").value }, "#aMsg", "Saved.", this); };
+  $("#tAdd").onclick = function () {
+    var e = ($("#tEmail").value || "").trim().toLowerCase(); if (!e || !sdata) return;
+    if (sdata.staff.indexOf(e) > -1) { say("#tMsg", "Already in the team.", true); return; }
+    var btn = this;
+    save({ action: "team", emails: sdata.staff.concat([e]) }, "#tMsg", e + " can now sign in.", btn).then(function () { $("#tEmail").value = ""; });
+  };
   loadList();
   setInterval(function () { if (document.hidden) return; loadList(); loadChat(false); }, 10000);
   // Keep counting Needs you while the "All" or "Booked" view is open.
