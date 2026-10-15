@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="nl">
 <head>
@@ -209,7 +208,7 @@ const PREP = {
     ["gelezen","Regels gelezen","De vier regels hieronder. Vooral: niet terugantwoorden."]
   ]
 };
-const TYPES=["Mens","Automatisch welkomstbericht","Chatbot of AI","Geen antwoord na 48u"];
+const TYPES=["Mens","Chatbot of AI","Geen antwoord na 48u"];
 const LINKS=["Boekingslink met online betaling","Boekingsformulier zonder betaling","Bankoverschrijving, PayPal of Wise","Kom langs in de shop","Niets"];
 
 /* ---------- opslag: gedeeld (db) of lokaal ---------- */
@@ -357,20 +356,32 @@ function leadCard(l){
     stampRow("Verstuurd om",s.sent,v=>set({sent:v}))
   ]));
 
-  // 2 antwoord
-  const typ=el("select",{"aria-label":"Soort antwoord"},el("option",{value:""},"Kies…"),...TYPES.map(t=>el("option",{value:t},t)));
+  // 2 automatisch bericht
+  const autoKids=[
+    yn("Kwam er eerst een automatisch bericht?",s.auto,v=>set({auto:v})),
+    el("p",{class:"muted"},"Automatisch = een vaste tekst zoals 'Thanks for your message, we'll get back to you soon', meestal binnen enkele seconden. Het beantwoordt je vraag niet.")
+  ];
+  if(s.auto===true){
+    autoKids.push(stampRow("Automatisch bericht om",s.autoAt,v=>set({autoAt:v})));
+    if(s.sent&&s.autoAt) autoKids.push(el("p",{},"Automatisch bericht na ",el("span",{class:"stamp"},fmtH(hours(s.sent,s.autoAt)))));
+  }
+  b.append(step(2,s.auto===false||(s.auto===true&&!!s.autoAt),"Automatisch bericht",autoKids));
+
+  // 3 echt antwoord
+  const typ=el("select",{"aria-label":"Wie antwoordde"},el("option",{value:""},"Kies…"),...TYPES.map(t=>el("option",{value:t},t)));
   typ.value=s.type||""; typ.addEventListener("change",()=>set({type:typ.value}));
-  b.append(step(2,!!(s.reply||s.type==="Geen antwoord na 48u"),"Eerste echt antwoord",[
-    stampRow("Antwoord om",s.reply,v=>set({reply:v})),
+  b.append(step(3,!!(s.reply||s.type==="Geen antwoord na 48u"),"Eerste echt antwoord",[
+    stampRow("Echt antwoord om",s.reply,v=>set({reply:v})),
     s.sent&&s.reply?el("p",{},"Antwoordtijd: ",el("span",{class:"stamp"},fmtH(hours(s.sent,s.reply)))):null,
-    el("div",{class:"row"},el("span",{class:"muted"},"Soort antwoord"),typ),
-    el("p",{class:"muted"},"Eerst alleen een automatisch welkomstbericht? Kies dat, en noteer het uur van het eerste echte antwoord dat daarna komt. Bot-tekenen: antwoord binnen een minuut 's nachts, knoppen, 'virtual assistant', 'powered by'.")
+    s.auto===true&&s.autoAt&&s.reply?el("p",{},"Tussen automatisch en echt antwoord: ",el("span",{class:"stamp"},fmtH(hours(s.autoAt,s.reply)))):null,
+    el("div",{class:"row"},el("span",{class:"muted"},"Wie antwoordde?"),typ),
+    el("p",{class:"muted"},"Echt antwoord = een antwoord op je vraag, van een mens of een bot. Bot-tekenen: antwoord binnen een minuut 's nachts, knoppen, 'virtual assistant', 'powered by'. Na 48 uur niets: kies 'Geen antwoord na 48u'.")
   ]));
 
   // 3 inhoud
   const lk=el("select",{"aria-label":"Boekingslink of betaalwijze"},el("option",{value:""},"Kies…"),...LINKS.map(t=>el("option",{value:t},t)));
   lk.value=s.link||""; lk.addEventListener("change",()=>set({link:lk.value}));
-  b.append(step(3,!!(s.link&&s.price!=null),"Wat stuurden ze?",[
+  b.append(step(4,!!(s.link&&s.price!=null),"Wat stuurden ze?",[
     yn("Prijs gegeven?",s.price,v=>set({price:v})),
     yn("Beschikbaarheid bevestigd?",s.avail,v=>set({avail:v})),
     el("div",{class:"row"},el("span",{class:"muted"},"Boekingslink of betaalwijze"),lk)
@@ -385,7 +396,7 @@ function leadCard(l){
     i.addEventListener("change",()=>set({checks:{...(s.checks||{}),[c.t]:i.checked}}));
     ck.append(el("label",{class:"chk"},i,`Gecheckt na ${c.lab}`));
   }
-  b.append(step(4,!!(s.checks&&s.checks[72]),"Opvolging: antwoord niet terug",[
+  b.append(step(5,!!(s.checks&&s.checks[72]),"Opvolging: antwoord niet terug",[
     el("p",{class:"muted"},"Kijk na 24, 48 en 72 uur of ze zelf terugkomen. Rood = nu te checken."),
     s.sent?pills:el("p",{class:"muted"},"Start zodra het bericht verstuurd is."),
     s.sent?ck:null,
@@ -399,7 +410,7 @@ function leadCard(l){
   const cl=el("input",{type:"checkbox"}); cl.checked=!!s.closed; cl.addEventListener("change",()=>set({closed:cl.checked}));
   const notes=el("textarea",{placeholder:"Wat viel op? Toon, fouten, naam van een tool…"}); notes.value=s.notes||"";
   let tN; notes.addEventListener("input",()=>{clearTimeout(tN);tN=setTimeout(()=>{state.leads[l.id]={...L(l.id),notes:notes.value};persist("leads/"+l.id,state.leads[l.id]);},900);});
-  b.append(step(5,!!s.closed,"Dag 7: afsluiten",[
+  b.append(step(6,!!s.closed,"Dag 7: afsluiten",[
     el("div",{class:"msg"},cm),
     el("div",{class:"row"},cb2),
     el("label",{class:"chk"},shots,"Alle screenshots staan in de map"),
@@ -428,8 +439,11 @@ function yn(label,val,onset){
 function results(){
   const all=LEADS.map(l=>({l,s:L(l.id)}));
   const sent=all.filter(x=>x.s.sent);
+  const medOf=a=>{a=a.slice().sort((x,y)=>x-y);return a.length?(a.length%2?a[(a.length-1)/2]:(a[a.length/2-1]+a[a.length/2])/2):null;};
   const rt=sent.filter(x=>x.s.reply).map(x=>hours(x.s.sent,x.s.reply)).sort((a,b)=>a-b);
-  const med=rt.length?(rt.length%2?rt[(rt.length-1)/2]:(rt[rt.length/2-1]+rt[rt.length/2])/2):null;
+  const med=medOf(rt);
+  const autoX=sent.filter(x=>x.s.auto===true);
+  const gap=autoX.filter(x=>x.s.autoAt&&x.s.reply).map(x=>hours(x.s.autoAt,x.s.reply));
   const c=(f)=>all.filter(f).length;
   const tiles=[
     [sent.length,"verstuurd van 30"],
@@ -440,19 +454,22 @@ function results(){
     [c(x=>x.s.price===true),"gaven een prijs"],
     [c(x=>x.s.link==="Boekingslink met online betaling"),"stuurden een boekingslink met betaling"],
     [c(x=>x.s.fu1),"volgden zelf op"],
-    [c(x=>x.s.type==="Chatbot of AI"),"chatbot of AI"]
+    [c(x=>x.s.type==="Chatbot of AI"),"chatbot of AI"],
+    [autoX.length,"kregen eerst een automatisch bericht"],
+    [fmtH(medOf(gap)),"mediane tijd tussen automatisch en echt antwoord"]
   ];
   const r=document.getElementById("res"); r.innerHTML="";
   for(const [v,t] of tiles) r.append(el("div",{},el("b",{},String(v)),el("span",{},t)));
   const tb=document.getElementById("tbl"); tb.innerHTML="";
-  tb.append(el("tr",{},...["Center","Wie","Antwoordtijd","Soort","Prijs","Link","Follow-up"].map(h=>el("th",{},h))));
+  tb.append(el("tr",{},...["Center","Wie","Automatisch","Echt antwoord","Wie antwoordde","Prijs","Link","Follow-up"].map(h=>el("th",{},h))));
   for(const {l,s} of all){
     if(!s.sent) continue;
     tb.append(el("tr",{},el("td",{},l.name),el("td",{},l.who==="jonas"?"Jonas":"Guillaume"),
+      el("td",{},s.auto===true?(s.autoAt&&s.sent?"na "+fmtH(hours(s.sent,s.autoAt)):"ja"):s.auto===false?"nee":"–"),
       el("td",{},s.reply?fmtH(hours(s.sent,s.reply)):(s.type==="Geen antwoord na 48u"?"geen":"wacht")),
       el("td",{},s.type||"–"),el("td",{},s.price===true?"ja":s.price===false?"nee":"–"),el("td",{},s.link||"–"),el("td",{},s.fu2?"2×":s.fu1?"1×":"–")));
   }
-  if(!sent.length) tb.append(el("tr",{},el("td",{colspan:"7",class:"muted"},"Nog niets verstuurd. Begin vrijdag 16 oktober om 20:30 Thaise tijd.")));
+  if(!sent.length) tb.append(el("tr",{},el("td",{colspan:"8",class:"muted"},"Nog niets verstuurd. Begin vrijdag 16 oktober om 20:30 Thaise tijd.")));
 }
 
 document.querySelectorAll(".who button").forEach(b=>b.addEventListener("click",()=>{me=b.dataset.who;try{localStorage.setItem("ms-who",me);}catch(e){}render();}));
