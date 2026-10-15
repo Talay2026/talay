@@ -75,6 +75,7 @@ export async function handleZone(request, env, ctx) {
     }
     if (p === "/zone/api/arriving") return json(await cached(env, `arr/${center.slug}`, 300, () => arriving(env, center), fresh));
     if (p === "/zone/api/milestones") return json(await cached(env, `ms/${center.slug}`, 600, () => milestones(env, center), fresh));
+    if (p === "/zone/api/daystats") return json(await cached(env, `day/${center.slug}`, 60, () => dayStats(env, center), fresh));
     if (p === "/zone/api/overnight") return json(await cached(env, `night/${center.slug}`, 120, () => overnight(env, center), fresh));
     if (p === "/zone/api/unfinished") return json(await cached(env, `unf/${center.slug}`, 180, () => unfinished(env, center), fresh));
     if (p === "/zone/api/tickets") return json(await cached(env, `tick/${center.slug}`, 30, () => tickets(env, center), fresh));
@@ -1089,6 +1090,41 @@ ${tips.length ? `<tr><td style="padding:18px 4px 0;font-size:14px;line-height:21
 <tr><td style="padding:22px 4px 0"><a href="https://talay.io/zone" style="display:inline-block;background:#DCA44A;color:#09262F;font-size:14px;font-weight:bold;text-decoration:none;padding:11px 20px;border-radius:12px">Open your customer zone</a></td></tr>
 <tr><td style="padding:26px 4px 0;font-size:12px;line-height:18px;color:#8A9BA0">Sent every Monday by Talay. Questions? Reply to this e-mail.</td></tr>
 </table></td></tr></table></body></html>`;
+}
+
+// ---------- Today so far ----------
+// Conversations, replies and bookings since midnight (Koh Tao time), and how many bookings came in
+// outside office hours (Centers → Escalation hours).
+async function dayStats(env, center) {
+  const f = await centerRecord(env, center);
+  const hm = String(first(f["Escalation hours"]) || "").match(/(\d{1,2}):(\d{2}).*?(\d{1,2}):(\d{2})/);
+  let open = hm ? (+hm[1]) * 60 + (+hm[2]) : 9 * 60, close = hm ? (+hm[3]) * 60 + (+hm[4]) : 18 * 60;
+  if (close <= open) { open = 9 * 60; close = 18 * 60; }
+  const TZ = 7 * 3600 * 1000, now = Date.now(), t = new Date(now + TZ);
+  const start = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) - TZ;
+  const iso = (ms) => new Date(ms).toISOString();
+  const win = (field) => `IS_AFTER(${field}, DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE(${field}, DATETIME_PARSE('${iso(now + 60000)}'))`;
+  const [msgs, leads, books] = await Promise.all([
+    at(env, "Chat", { formula: `AND({Center} = '${q(center.slug)}', ${win("{Sent at}")})`, fields: ["Direction", "Contact ID"], max: 3000 }),
+    at(env, "Leads", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${win("CREATED_TIME()")})`, fields: ["Handed over", "Handover at"], max: 2000 }),
+    at(env, "Bookings", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${win("CREATED_TIME()")})`, fields: ["Group size", "Total value THB", "Status"], max: 1000 }),
+  ]);
+  const n = (v) => Number(first(v)) || 0;
+  const people = new Set(msgs.filter((m) => m.fields["Direction"] === "Customer").map((m) => String(m.fields["Contact ID"] || "")));
+  people.delete("");
+  const live = books.filter((b) => !/cancel|refund/i.test(String(first(b.fields["Status"]) || "")));
+  const outside = live.filter((b) => { const d = new Date(Date.parse(b.createdTime) + TZ); const m = d.getUTCHours() * 60 + d.getUTCMinutes(); return m < open || m >= close; });
+  return {
+    date: iso(start),
+    conversations: people.size,
+    replies: msgs.filter((m) => m.fields["Direction"] === "Mia").length,
+    bookings: live.length,
+    divers: live.reduce((a, b) => a + (n(b.fields["Group size"]) || 1), 0),
+    revenue: live.reduce((a, b) => a + n(b.fields["Total value THB"]), 0),
+    outsideBookings: outside.length,
+    outsideRevenue: outside.reduce((a, b) => a + n(b.fields["Total value THB"]), 0),
+    handedOver: leads.filter((l) => n(l.fields["Handed over"]) || first(l.fields["Handover at"])).length,
+  };
 }
 
 // ---------- While you were diving ----------
@@ -2987,7 +3023,7 @@ function zoneClient(cfg) {
   function loadToday() {
     $("#tGreet").textContent = greet();
     $("#tDate").textContent = new Date().toLocaleDateString([], { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Bangkok" }) + " · " + cfg.center;
-    loadNight();
+    loadDay();
     api("conversations?view=open").then(function (d) {
       var need = d.conversations.filter(function (c) { return c.needsYou; });
       var open = d.conversations.length;
@@ -3084,6 +3120,32 @@ function zoneClient(cfg) {
   }
   loadMilestones(); setInterval(function () { if (!document.hidden) loadMilestones(); }, 1800000);
 
+  // ---- Today so far (card on the Today page)
+  function dayHtml(d) {
+    var sun = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+    var stat = function (v, l) { return "<div><b>" + v + "</b><span>" + l + "</span></div>"; };
+    var thbs = function (v) { return Math.round(v).toLocaleString("en-US") + " THB"; };
+    var parts = [];
+    if (!d.conversations && !d.bookings) parts.push("A quiet day so far. " + esc(cfg.assistant) + " is ready for the next diver.");
+    else {
+      parts.push(esc(cfg.assistant) + " sent " + d.replies + " " + (d.replies === 1 ? "reply" : "replies") + ".");
+      if (d.outsideBookings) parts.push(d.outsideBookings + " " + (d.outsideBookings === 1 ? "booking" : "bookings") + " (" + thbs(d.outsideRevenue) + ") came in outside office hours.");
+      if (d.handedOver) parts.push(d.handedOver + " " + (d.handedOver === 1 ? "conversation needs" : "conversations need") + " your team.");
+    }
+    var when = new Date(d.date).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Bangkok" }) + " · since 00:00";
+    return '<div class="nh">' + sun + "<b>Today so far</b><small>" + esc(when) + "</small></div>" +
+      '<div class="nstats">' + stat(d.conversations, d.conversations === 1 ? "conversation" : "conversations") +
+      stat(d.bookings, (d.bookings === 1 ? "booking" : "bookings") + (d.divers ? " · " + d.divers + (d.divers === 1 ? " diver" : " divers") : "")) +
+      stat(Math.round(d.revenue).toLocaleString("en-US"), "THB booked today") + "</div>" +
+      '<p class="nline">' + parts.join(" ") + "</p>";
+  }
+  function loadDay() {
+    return api("daystats").then(function (d) {
+      if (!d || d.error) return;
+      var el = $("#nightToday"); if (el) { el.innerHTML = dayHtml(d); el.hidden = false; }
+    }).catch(function () { var el = $("#nightToday"); if (el) el.hidden = true; });
+  }
+
   // ---- While you were diving
   function nightHtml(d) {
     var when = d.live ? "Tonight so far · since " + d.closeAt : "Last night · " + d.closeAt + "–" + d.openAt;
@@ -3106,7 +3168,7 @@ function zoneClient(cfg) {
     return api("overnight" + (fresh ? "?fresh=1" : "")).then(function (d) {
       if (!d || d.error) return;
       var h = nightHtml(d);
-      ["#nightToday"].forEach(function (s) { var el = $(s); if (el) { el.innerHTML = h; el.hidden = false; } });
+      [].forEach(function (s) { var el = $(s); if (el) { el.innerHTML = h; el.hidden = false; } });
     }).catch(function () {});
   }
 
@@ -3403,7 +3465,6 @@ function zoneClient(cfg) {
   // Polling is kept light on purpose (Airtable limits): the list every 30 s while the page
   // is visible; the open conversation only when the list shows something new in it.
   setInterval(function () { if (!document.hidden) loadList(); }, 30000);
-  loadNight(); setInterval(function () { if (!document.hidden) loadNight(); }, 600000);
   setInterval(function () { if (!document.hidden && filter !== "open" && filter !== "need") api("conversations?view=open").then(function (d) { badge(d.conversations); }).catch(function () {}); }, 60000);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) { lastList = ""; loadList(); } });
 }
