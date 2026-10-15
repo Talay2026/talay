@@ -54,7 +54,7 @@ button,select,input,textarea{font:inherit;color:inherit}
 
 /* Wie */
 .who{display:flex;gap:8px;margin:22px 0 4px;flex-wrap:wrap}
-.who button{flex:1 1 160px;padding:12px 14px;border-radius:10px;border:2px solid var(--line);background:var(--card);cursor:pointer;text-align:left}
+.who button{flex:1 1 140px;padding:12px 14px;border-radius:10px;border:2px solid var(--line);background:var(--card);cursor:pointer;text-align:left}
 .who button[aria-pressed="true"]{border-color:var(--teal);background:var(--teal-soft)}
 .who .nm{font-family:var(--cond);font-size:1.35rem;font-weight:600;display:block}
 .who .pg{color:var(--muted);font-size:.9rem}
@@ -85,7 +85,10 @@ button,select,input,textarea{font:inherit;color:inherit}
 .lead>summary::-webkit-details-marker{display:none}
 .lead .ln{font-weight:600;font-size:1.05rem}
 .lead .meta{color:var(--muted);font-size:.9rem;grid-column:1}
-.state{grid-row:1/3;grid-column:2;font-size:.85rem;font-weight:600;padding:4px 10px;border-radius:99px;background:var(--line);color:var(--ink);white-space:nowrap}
+.lead .contact{grid-column:1;font-size:1rem;user-select:text;-webkit-user-select:text}
+.lead .contact b{font-family:var(--cond);font-size:1.15rem;font-weight:600;letter-spacing:.02em;color:var(--teal)}
+.search{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:1rem;margin:4px 0 6px}
+.state{grid-row:1/4;grid-column:2;font-size:.85rem;font-weight:600;padding:4px 10px;border-radius:99px;background:var(--line);color:var(--ink);white-space:nowrap}
 .state.s1{background:var(--warn-soft);color:var(--warn)}
 .state.s2{background:var(--teal-soft);color:var(--teal)}
 .state.s3{background:var(--ok-soft);color:var(--ok)}
@@ -131,7 +134,7 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem}
     <div class="flag" aria-hidden="true"></div>
     <div>
       <h1>Mystery shop Koh Tao</h1>
-      <p class="sub">30 duikcentra, 2 testers. We meten wie snel antwoordt, wie zelf opvolgt en wie een boekingslink stuurt.</p>
+      <p class="sub">45 duikcentra, 3 testers. We meten wie snel antwoordt, wie zelf opvolgt en wie een boekingslink stuurt.</p>
     </div>
   </header>
 
@@ -140,6 +143,7 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem}
   <nav class="who" aria-label="Wie ben jij?">
     <button type="button" data-who="jonas" aria-pressed="true"><span class="nm">Jonas</span><span class="pg" data-pg="jonas"></span><div class="bar"><i data-bar="jonas"></i></div></button>
     <button type="button" data-who="guillaume" aria-pressed="false"><span class="nm">Guillaume</span><span class="pg" data-pg="guillaume"></span><div class="bar"><i data-bar="guillaume"></i></div></button>
+    <button type="button" data-who="lars" aria-pressed="false"><span class="nm">Lars</span><span class="pg" data-pg="lars"></span><div class="bar"><i data-bar="lars"></i></div></button>
   </nav>
   <div id="banner" class="banner" hidden></div>
 
@@ -161,6 +165,7 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem}
   <section>
     <h2 id="leadsTitle">Jouw centra</h2>
     <p class="muted">Tik op een center om de stappen te zien. Alle uren zijn Thaise tijd.</p>
+    <input id="q" class="search" type="search" placeholder="Zoek op naam, nummer of Instagram-account" aria-label="Zoek een center" autocomplete="off">
     <div id="leads"></div>
   </section>
 
@@ -174,7 +179,7 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem}
 </div>
 
 <script>
-const LEADS = [{"id": "impian-divers", "who": "jonas", "night": 1, "prio": 1, "name": "Impian Divers", "area": "Mae Haad", "lang": "NL", "channel": "ig", "contact": "instagram.com/impiandivers", "wa": ""}, {"id": "below-zero-divers", "who": "jonas", "night": 1, "prio": 1, "name": "Below Zero Divers", "area": "Chalok", "lang": "NL", "channel": "wa", "contact": "+66 90 984 6090", "wa": "66909846090"}, {"id": "rainbow-fish-divers", "who": "jonas", "night": 1, "prio": 1, "name": "Rainbow Fish Divers", "area": "Sairee", "lang": "DE", "channel": "wa", "contact": "+491601606226", "wa": "491601606226"}, {"id": "dive-point", "who": "jonas", "night": 1, "prio": 1, "name": "Dive Point", "area": "Mae Haad", "lang": "DE", "channel": "ig", "contact": "instagram.com/divepoint_kohtao", "wa": ""}, {"id": "calypso-diving", "who": "jonas", "night": 1, "prio": 1, "name": "Calypso Diving", "area": "Oostkust", "lang": "DE", "channel": "wa", "contact": "+66 90 328 5990", "wa": "66903285990"}, {"id": "nitro-dive-center", "who": "jonas", "night": 1, "prio": 1, "name": "Nitro Dive Center", "area": "Mae Haad", "lang": "ES", "channel": "wa", "contact": "+66927800592", "wa": "66927800592"}, {"id": "isla-tortuga-divers", "who": "jonas", "night": 1, "prio": 1, "name": "Isla Tortuga Divers", "area": "Mae Haad", "lang": "ES", "channel": "wa", "contact": "+66 63 039 3082", "wa": "66630393082"}, {"id": "scuba-club-latino", "who": "jonas", "night": 1, "prio": 1, "name": "Scuba Club Latino", "area": "Mae Haad", "lang": "ES", "channel": "wa", "contact": "+66 83 898 6271", "wa": "66838986271"}, {"id": "ihasia-diving", "who": "jonas", "night": 1, "prio": 1, "name": "Ihasia Diving", "area": "Chalok", "lang": "ES", "channel": "wa", "contact": "+66 85 790 9811", "wa": "66857909811"}, {"id": "master-divers", "who": "jonas", "night": 1, "prio": 1, "name": "Master Divers", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66926185637", "wa": "66926185637"}, {"id": "chalok-reef-divers", "who": "jonas", "night": 1, "prio": 1, "name": "Chalok Reef Divers", "area": "Chalok", "lang": "EN", "channel": "wa", "contact": "+66957262429", "wa": "66957262429"}, {"id": "onyx-divers", "who": "jonas", "night": 1, "prio": 1, "name": "ONYX Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66837732024", "wa": "66837732024"}, {"id": "roctopus-dive", "who": "jonas", "night": 1, "prio": 2, "name": "Roctopus Dive", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 99 470 4566", "wa": "66994704566"}, {"id": "simple-life-divers", "who": "jonas", "night": 1, "prio": 2, "name": "Simple Life Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66863630132", "wa": "66863630132"}, {"id": "hang-loose-divers", "who": "jonas", "night": 1, "prio": 2, "name": "Hang Loose Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66971543171", "wa": "66971543171"}, {"id": "frenchteam", "who": "guillaume", "night": 1, "prio": 1, "name": "FrenchTeam", "area": "Sairee", "lang": "FR", "channel": "wa", "contact": "+66625507729", "wa": "66625507729"}, {"id": "aquatao", "who": "guillaume", "night": 1, "prio": 1, "name": "AquaTao", "area": "Mae Haad", "lang": "FR", "channel": "wa", "contact": "+66930318828", "wa": "66930318828"}, {"id": "french-kiss-divers", "who": "guillaume", "night": 1, "prio": 1, "name": "French Kiss Divers", "area": "Mae Haad", "lang": "FR", "channel": "wa", "contact": "+66641276082", "wa": "66641276082"}, {"id": "the-diver-s-boat", "who": "guillaume", "night": 1, "prio": 1, "name": "The Diver's Boat", "area": "Mae Haad", "lang": "FR", "channel": "wa", "contact": "+66 82 814 9282", "wa": "66828149282"}, {"id": "fifty-six-dive", "who": "guillaume", "night": 1, "prio": 2, "name": "Fifty Six Dive", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 92 780 0730", "wa": "66927800730"}, {"id": "scuba-shack", "who": "guillaume", "night": 1, "prio": 2, "name": "Scuba Shack", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 84 344 7846", "wa": "66843447846"}, {"id": "finsanity-dive-centre", "who": "guillaume", "night": 1, "prio": 2, "name": "Finsanity Dive Centre", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 87 659 8282", "wa": "66876598282"}, {"id": "mojo-divers", "who": "guillaume", "night": 1, "prio": 2, "name": "Mojo Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66885629978", "wa": "66885629978"}, {"id": "seashell-divers", "who": "guillaume", "night": 1, "prio": 2, "name": "Seashell Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66635355585", "wa": "66635355585"}, {"id": "scuba-birds", "who": "guillaume", "night": 1, "prio": 2, "name": "Scuba Birds", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66990307571", "wa": "66990307571"}, {"id": "go-diving-koh-tao", "who": "guillaume", "night": 1, "prio": 2, "name": "Go Diving Koh Tao", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66986711670", "wa": "66986711670"}, {"id": "assava-dive-resort", "who": "guillaume", "night": 1, "prio": 2, "name": "Assava Dive Resort", "area": "Chalok", "lang": "EN", "channel": "wa", "contact": "+66801731136", "wa": "66801731136"}, {"id": "turtle-divers", "who": "guillaume", "night": 1, "prio": 2, "name": "Turtle Divers", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66841988476", "wa": "66841988476"}, {"id": "big-bubble-diving", "who": "guillaume", "night": 1, "prio": 2, "name": "Big Bubble Diving", "area": "Chalok", "lang": "EN", "channel": "wa", "contact": "+66612645941", "wa": "66612645941"}, {"id": "carabao-dive-resort", "who": "guillaume", "night": 1, "prio": 2, "name": "Carabao Dive Resort", "area": "Chalok", "lang": "EN", "channel": "wa", "contact": "+66950319536", "wa": "66950319536"}];
+const LEADS = [{"id": "impian-divers", "who": "jonas", "night": 1, "prio": 1, "name": "Impian Divers", "area": "Mae Haad", "lang": "NL", "channel": "ig", "contact": "instagram.com/impiandivers", "wa": ""}, {"id": "below-zero-divers", "who": "jonas", "night": 1, "prio": 1, "name": "Below Zero Divers", "area": "Chalok", "lang": "NL", "channel": "wa", "contact": "+66 90 984 6090", "wa": "66909846090"}, {"id": "rainbow-fish-divers", "who": "jonas", "night": 1, "prio": 1, "name": "Rainbow Fish Divers", "area": "Sairee", "lang": "DE", "channel": "wa", "contact": "+491601606226", "wa": "491601606226"}, {"id": "dive-point", "who": "jonas", "night": 1, "prio": 1, "name": "Dive Point", "area": "Mae Haad", "lang": "DE", "channel": "ig", "contact": "instagram.com/divepoint_kohtao", "wa": ""}, {"id": "calypso-diving", "who": "jonas", "night": 1, "prio": 1, "name": "Calypso Diving", "area": "Oostkust", "lang": "DE", "channel": "wa", "contact": "+66 90 328 5990", "wa": "66903285990"}, {"id": "nitro-dive-center", "who": "jonas", "night": 1, "prio": 1, "name": "Nitro Dive Center", "area": "Mae Haad", "lang": "ES", "channel": "wa", "contact": "+66927800592", "wa": "66927800592"}, {"id": "isla-tortuga-divers", "who": "jonas", "night": 1, "prio": 1, "name": "Isla Tortuga Divers", "area": "Mae Haad", "lang": "ES", "channel": "wa", "contact": "+66 63 039 3082", "wa": "66630393082"}, {"id": "scuba-club-latino", "who": "jonas", "night": 1, "prio": 1, "name": "Scuba Club Latino", "area": "Mae Haad", "lang": "ES", "channel": "wa", "contact": "+66 83 898 6271", "wa": "66838986271"}, {"id": "ihasia-diving", "who": "jonas", "night": 1, "prio": 1, "name": "Ihasia Diving", "area": "Chalok", "lang": "ES", "channel": "wa", "contact": "+66 85 790 9811", "wa": "66857909811"}, {"id": "master-divers", "who": "jonas", "night": 1, "prio": 1, "name": "Master Divers", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66926185637", "wa": "66926185637"}, {"id": "chalok-reef-divers", "who": "jonas", "night": 1, "prio": 1, "name": "Chalok Reef Divers", "area": "Chalok", "lang": "EN", "channel": "wa", "contact": "+66957262429", "wa": "66957262429"}, {"id": "onyx-divers", "who": "jonas", "night": 1, "prio": 1, "name": "ONYX Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66837732024", "wa": "66837732024"}, {"id": "roctopus-dive", "who": "jonas", "night": 1, "prio": 2, "name": "Roctopus Dive", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 99 470 4566", "wa": "66994704566"}, {"id": "simple-life-divers", "who": "jonas", "night": 1, "prio": 2, "name": "Simple Life Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66863630132", "wa": "66863630132"}, {"id": "hang-loose-divers", "who": "jonas", "night": 1, "prio": 2, "name": "Hang Loose Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66971543171", "wa": "66971543171"}, {"id": "frenchteam", "who": "guillaume", "night": 1, "prio": 1, "name": "FrenchTeam", "area": "Sairee", "lang": "FR", "channel": "wa", "contact": "+66625507729", "wa": "66625507729"}, {"id": "aquatao", "who": "guillaume", "night": 1, "prio": 1, "name": "AquaTao", "area": "Mae Haad", "lang": "FR", "channel": "wa", "contact": "+66930318828", "wa": "66930318828"}, {"id": "french-kiss-divers", "who": "guillaume", "night": 1, "prio": 1, "name": "French Kiss Divers", "area": "Mae Haad", "lang": "FR", "channel": "wa", "contact": "+66641276082", "wa": "66641276082"}, {"id": "the-diver-s-boat", "who": "guillaume", "night": 1, "prio": 1, "name": "The Diver's Boat", "area": "Mae Haad", "lang": "FR", "channel": "wa", "contact": "+66 82 814 9282", "wa": "66828149282"}, {"id": "fifty-six-dive", "who": "guillaume", "night": 1, "prio": 2, "name": "Fifty Six Dive", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 92 780 0730", "wa": "66927800730"}, {"id": "scuba-shack", "who": "guillaume", "night": 1, "prio": 2, "name": "Scuba Shack", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 84 344 7846", "wa": "66843447846"}, {"id": "finsanity-dive-centre", "who": "guillaume", "night": 1, "prio": 2, "name": "Finsanity Dive Centre", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 87 659 8282", "wa": "66876598282"}, {"id": "mojo-divers", "who": "guillaume", "night": 1, "prio": 2, "name": "Mojo Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66885629978", "wa": "66885629978"}, {"id": "seashell-divers", "who": "guillaume", "night": 1, "prio": 2, "name": "Seashell Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66635355585", "wa": "66635355585"}, {"id": "scuba-birds", "who": "guillaume", "night": 1, "prio": 2, "name": "Scuba Birds", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66990307571", "wa": "66990307571"}, {"id": "go-diving-koh-tao", "who": "guillaume", "night": 1, "prio": 2, "name": "Go Diving Koh Tao", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66986711670", "wa": "66986711670"}, {"id": "assava-dive-resort", "who": "guillaume", "night": 1, "prio": 2, "name": "Assava Dive Resort", "area": "Chalok", "lang": "EN", "channel": "wa", "contact": "+66801731136", "wa": "66801731136"}, {"id": "turtle-divers", "who": "guillaume", "night": 1, "prio": 2, "name": "Turtle Divers", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66841988476", "wa": "66841988476"}, {"id": "big-bubble-diving", "who": "guillaume", "night": 1, "prio": 2, "name": "Big Bubble Diving", "area": "Chalok", "lang": "EN", "channel": "wa", "contact": "+66612645941", "wa": "66612645941"}, {"id": "carabao-dive-resort", "who": "guillaume", "night": 1, "prio": 2, "name": "Carabao Dive Resort", "area": "Chalok", "lang": "EN", "channel": "wa", "contact": "+66950319536", "wa": "66950319536"}, {"id": "koh-tao-divers-ktd", "who": "lars", "night": 1, "prio": 2, "name": "Koh Tao Divers (KTD)", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 86 069 9244", "wa": "66860699244"}, {"id": "koh-tao-local-divers", "who": "lars", "night": 2, "prio": 2, "name": "Koh Tao Local Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 84 183 0531", "wa": "66841830531"}, {"id": "new-way-diving", "who": "lars", "night": 1, "prio": 2, "name": "New Way Diving", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 99 501 6425", "wa": "66995016425"}, {"id": "flow-divers", "who": "lars", "night": 2, "prio": 2, "name": "Flow Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 82 679 2382", "wa": "66826792382"}, {"id": "family-diving-koh-tao", "who": "lars", "night": 1, "prio": 2, "name": "Family Diving Koh Tao", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 63 013 4297", "wa": "66630134297"}, {"id": "sea-krait-divers", "who": "lars", "night": 2, "prio": 2, "name": "Sea Krait Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66838545884", "wa": "66838545884"}, {"id": "duck-n-dive", "who": "lars", "night": 1, "prio": 2, "name": "Duck 'n Dive", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 90 914 0415", "wa": "66909140415"}, {"id": "duiken-koh-tao", "who": "lars", "night": 2, "prio": 2, "name": "Duiken Koh Tao", "area": "Sairee", "lang": "NL", "channel": "wa", "contact": "+66 87 265 0859", "wa": "66872650859"}, {"id": "deep-dive-center-koh-tao-montra", "who": "lars", "night": 1, "prio": 2, "name": "Deep Dive Center (Koh Tao Montra)", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66611780298", "wa": "66611780298"}, {"id": "deep-blue-divers", "who": "lars", "night": 2, "prio": 2, "name": "Deep Blue Divers", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66987231362", "wa": "66987231362"}, {"id": "scuba-square", "who": "lars", "night": 1, "prio": 2, "name": "Scuba Square", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66 83 216 7434", "wa": "66832167434"}, {"id": "hellodiver", "who": "lars", "night": 2, "prio": 2, "name": "Hellodiver", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66 61 487 4376", "wa": "66614874376"}, {"id": "jamahkiri-diving-club", "who": "lars", "night": 1, "prio": 2, "name": "Jamahkiri Diving Club", "area": "Zuidoost", "lang": "EN", "channel": "wa", "contact": "+66954081992", "wa": "66954081992"}, {"id": "diverholics", "who": "lars", "night": 2, "prio": 2, "name": "Diverholics", "area": "Chalok", "lang": "EN", "channel": "wa", "contact": "+66937505543", "wa": "66937505543"}, {"id": "hydronauts-diving", "who": "lars", "night": 1, "prio": 2, "name": "Hydronauts Diving", "area": "Chalok", "lang": "EN", "channel": "wa", "contact": "+66 80 065 8782", "wa": "66800658782"}];
 const MSG = {
   A:{
     EN:"Hi! I'm arriving on Koh Tao around 5 November and I'd love to do my Open Water course. How much is it, and do you have space that week? Is accommodation included, or can you help with that?",
@@ -185,6 +190,10 @@ const MSG = {
   B:{
     EN:"Hello! My girlfriend and I arrive on Koh Tao on 6 November for about a week. I already have my Open Water, she has never dived. What would you recommend for us, and what would it cost? Do you have space?",
     FR:"Bonjour ! Ma copine et moi arrivons à Koh Tao le 6 novembre pour environ une semaine. J'ai déjà mon Open Water, elle n'a jamais plongé. Qu'est-ce que vous nous conseillez, et combien ça coûterait ? Vous avez de la place ?"
+  },
+  C:{
+    EN:"Hi! I'm Advanced certified and I'll be on Koh Tao from 8 November for about 4 days. I'd like to do some fun dives. What do they cost, how often do the boats go out, and do you have space?",
+    NL:"Hoi! Ik heb mijn Advanced en ben vanaf 8 november zo'n 4 dagen op Koh Tao. Ik wil graag wat fun dives doen. Wat kost dat, hoe vaak varen jullie uit, en hebben jullie plaats?"
   },
   close:{
     EN:"Thanks a lot for your help and the info! We've changed our plans for now, so we won't book this time. Really appreciated your reply!",
@@ -206,8 +215,15 @@ const PREP = {
     ["profiel","WhatsApp-profiel neutraal","Alleen je voornaam, geen bedrijf, geen Talay."],
     ["map","Toegang tot de gedeelde screenshotmap","Naam per screenshot: Center_1-vraag, Center_2-antwoord, Center_3-followup."],
     ["gelezen","Regels gelezen","De vier regels hieronder. Vooral: niet terugantwoorden."]
+  ],
+  lars:[
+    ["nummer","Nummer gekozen","Ga je later mee verkopen aan deze centra? Gebruik dan een tweede nummer (eSIM). Zo niet, dan mag je eigen nummer."],
+    ["profiel","WhatsApp-profiel neutraal","Alleen je voornaam, geen bedrijf, geen Talay."],
+    ["map","Toegang tot de gedeelde screenshotmap","Naam per screenshot: Center_1-vraag, Center_2-antwoord, Center_3-followup."],
+    ["gelezen","Regels gelezen","De vier regels hieronder. Vooral: niet terugantwoorden."]
   ]
 };
+const NAMES={jonas:"Jonas",guillaume:"Guillaume",lars:"Lars"};
 const TYPES=["Mens","Chatbot of AI","Geen antwoord na 48u"];
 const LINKS=["Boekingslink met online betaling","Boekingsformulier zonder betaling","Bankoverschrijving, PayPal of Wise","Kom langs in de shop","Niets"];
 
@@ -271,9 +287,11 @@ function clock(){
 /* ---------- helpers ---------- */
 let me=localStorage.getItem("ms-who")||"jonas";
 function L(id){return state.leads[id]||(state.leads[id]={});}
-function scen(l){return l.who==="jonas"?"A":"B";}
+function scen(l){return {jonas:"A",guillaume:"B",lars:"C"}[l.who];}
 function message(l){return MSG[scen(l)][l.lang]||MSG[scen(l)].EN;}
 function closeMsg(l){return MSG.close[l.lang]||MSG.close.EN;}
+function fmtPhone(d){ if(d.startsWith("66")&&d.length===11) return "+66 "+d.slice(2,4)+" "+d.slice(4,7)+" "+d.slice(7); if(d.startsWith("49")) return "+49 "+d.slice(2,5)+" "+d.slice(5); return "+"+d; }
+function handle(l){ if(l.channel==="ig"){const m=String(l.contact).match(/instagram\.com\/([^/?#]+)/);return m?"@"+m[1]:l.contact;} return l.wa?fmtPhone(l.wa):l.contact; }
 function stage(l){
   const s=L(l.id);
   if(s.closed||s.type==="Geen antwoord na 48u") return [3,"Klaar"];
@@ -301,7 +319,7 @@ function safeRender(){ if(typing()){pendingRender=true;return;} render(); }
 document.addEventListener('focusout',()=>{setTimeout(()=>{if(pendingRender&&!typing()){pendingRender=false;render();}},0);});
 function render(){
   document.querySelectorAll(".who button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.who===me?"true":"false"));
-  for(const w of ["jonas","guillaume"]){
+  for(const w of ["jonas","guillaume","lars"]){
     const mine=LEADS.filter(l=>l.who===w); const done=mine.filter(l=>stage(l)[0]>=1).length;
     document.querySelector(`[data-pg="${w}"]`).textContent=`${done} van ${mine.length} verstuurd`;
     document.querySelector(`[data-bar="${w}"]`).style.width=(done/mine.length*100)+"%";
@@ -315,9 +333,14 @@ function render(){
     prep.append(el("li",{},el("label",{},cb,el("span",{},el("b",{},t),el("small",{},s)))));
   }
   // leads
-  document.getElementById("leadsTitle").textContent= me==="jonas"?"Centra van Jonas":"Centra van Guillaume";
+  document.getElementById("leadsTitle").textContent="Centra van "+NAMES[me];
   const box=document.getElementById("leads"); box.innerHTML="";
-  for(const n of [1,2]){
+  const q=(document.getElementById("q").value||"").trim().toLowerCase(); const qd=q.replace(/\D/g,"");
+  if(q){
+    const hits=LEADS.filter(l=>l.name.toLowerCase().includes(q)||handle(l).toLowerCase().includes(q)||(qd.length>=3&&String(l.contact).replace(/\D/g,"").includes(qd)));
+    box.append(el("div",{class:"night"},hits.length?(hits.length===1?"1 gevonden":hits.length+" gevonden"):"Niets gevonden. Zoek op naam, nummer of Instagram-account."));
+    for(const l of hits) box.append(leadCard(l));
+  } else for(const n of [1,2]){
     const list=LEADS.filter(l=>l.who===me&&l.night===n);
     box.append(el("div",{class:"night"},n===1?"Avond 1: vrijdag 16 oktober":"Avond 2: zaterdag 17 oktober"));
     for(const l of list) box.append(leadCard(l));
@@ -334,7 +357,8 @@ function leadCard(l){
   d.append(el("summary",{},
     el("span",{class:"ln"},l.name),
     el("span",{class:`state s${st}${due?" due":""}`},due?"Nu checken":lab),
-    el("span",{class:"meta"},`${l.area||""} · ${l.lang} · ${chan}${s.sent&&s.reply?" · "+fmtH(hours(s.sent,s.reply)):""}`)
+    el("span",{class:"contact"},chan+" ",el("b",{},handle(l))),
+    el("span",{class:"meta"},`${l.area||""} · ${l.lang}${l.who!==me?" · van "+NAMES[l.who]:""}${s.sent&&s.reply?" · antwoord na "+fmtH(hours(s.sent,s.reply)):""}`)
   ));
   const b=el("div",{class:"body"});
   const set=(patch)=>{state.leads[l.id]={...L(l.id),...patch};persist("leads/"+l.id,state.leads[l.id]);render();};
@@ -446,7 +470,7 @@ function results(){
   const gap=autoX.filter(x=>x.s.autoAt&&x.s.reply).map(x=>hours(x.s.autoAt,x.s.reply));
   const c=(f)=>all.filter(f).length;
   const tiles=[
-    [sent.length,"verstuurd van 30"],
+    [sent.length,"verstuurd van "+LEADS.length],
     [rt.filter(h=>h<=0.25).length,"antwoord binnen 15 min"],
     [rt.filter(h=>h<=1).length,"antwoord binnen 1 uur"],
     [c(x=>x.s.type==="Geen antwoord na 48u"),"geen antwoord na 48 u"],
@@ -464,7 +488,7 @@ function results(){
   tb.append(el("tr",{},...["Center","Wie","Automatisch","Echt antwoord","Wie antwoordde","Prijs","Link","Follow-up"].map(h=>el("th",{},h))));
   for(const {l,s} of all){
     if(!s.sent) continue;
-    tb.append(el("tr",{},el("td",{},l.name),el("td",{},l.who==="jonas"?"Jonas":"Guillaume"),
+    tb.append(el("tr",{},el("td",{},l.name),el("td",{},NAMES[l.who]),
       el("td",{},s.auto===true?(s.autoAt&&s.sent?"na "+fmtH(hours(s.sent,s.autoAt)):"ja"):s.auto===false?"nee":"–"),
       el("td",{},s.reply?fmtH(hours(s.sent,s.reply)):(s.type==="Geen antwoord na 48u"?"geen":"wacht")),
       el("td",{},s.type||"–"),el("td",{},s.price===true?"ja":s.price===false?"nee":"–"),el("td",{},s.link||"–"),el("td",{},s.fu2?"2×":s.fu1?"1×":"–")));
@@ -473,6 +497,7 @@ function results(){
 }
 
 document.querySelectorAll(".who button").forEach(b=>b.addEventListener("click",()=>{me=b.dataset.who;try{localStorage.setItem("ms-who",me);}catch(e){}render();}));
+document.getElementById("q").addEventListener("input",()=>render());
 clock(); setInterval(clock,30000); setInterval(safeRender,5*60000);
 render();
 
