@@ -71,7 +71,7 @@ export async function handleZone(request, env, ctx) {
     if (p === "/zone/api/bookings") return json(await cached(env, `book/${center.slug}`, 60, () => bookings(env, center), fresh));
     if (p === "/zone/api/dashboard") {
       const per = /^\d{4}-\d{2}$/.test(url.searchParams.get("period") || "") ? url.searchParams.get("period") : "";
-      return json(await cached(env, `dash/${center.slug}/${per || "30d"}`, 300, () => dashboard(env, center, per), fresh));
+      return json(await cached(env, `dash/v2/${center.slug}/${per || "30d"}`, 120, () => dashboard(env, center, per), fresh));
     }
     if (p === "/zone/api/unfinished") return json(await cached(env, `unf/${center.slug}`, 180, () => unfinished(env, center), fresh));
     if (p === "/zone/api/tickets") return json(await cached(env, `tick/${center.slug}`, 30, () => tickets(env, center), fresh));
@@ -1247,7 +1247,6 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 #install{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:50;display:flex;align-items:center;gap:10px;background:#0A2029;color:#F4F0E6;border-radius:14px;padding:10px 12px;box-shadow:0 10px 30px rgba(0,0,0,.25);font-size:14px;max-width:560px;margin:0 auto}
 #install span{flex:1}
 #install .btn{padding:8px 14px}
-@media (display-mode: standalone){body{bottom:calc(0px - env(safe-area-inset-top,0px))}}
 #install .lnk2{background:none;border:0;color:#C9D4D7;font-size:16px;cursor:pointer}
 :focus-visible{outline:3px solid var(--sand);outline-offset:2px}
 @media (max-width:760px){
@@ -2039,6 +2038,23 @@ function zoneClient(cfg) {
     $("#instX").onclick = function () { try { localStorage.setItem("talay-install-hide", "1"); } catch (e) {} bar.remove(); };
   }
   setTimeout(showInstall, 1500);
+
+  // ---- full screen height on iPhone home-screen apps
+  // iOS sometimes reports a viewport that is shorter than the screen (by the height of the
+  // status bar) for apps started from the home screen. Measure and use the real screen.
+  (function fitScreen() {
+    var standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+    if (!standalone) return;
+    var probe = document.createElement("div");
+    probe.style.cssText = "position:fixed;top:0;height:env(safe-area-inset-top,0px);visibility:hidden;pointer-events:none";
+    document.body.appendChild(probe);
+    function apply() {
+      var top = probe.getBoundingClientRect().height;
+      var gap = screen.height - window.innerHeight;
+      document.body.style.bottom = (top > 0 && gap > 4 && gap <= top + 4) ? (-gap) + "px" : "";
+    }
+    apply(); window.addEventListener("resize", apply); window.addEventListener("orientationchange", function () { setTimeout(apply, 300); });
+  })();
   loadList();
   // Polling is kept light on purpose (Airtable limits): the list every 30 s while the page
   // is visible; the open conversation only when the list shows something new in it.
