@@ -2169,6 +2169,42 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .tag.ret{background:rgba(220,164,74,.18);color:#8A5E14}
 @media (prefers-color-scheme:dark){.bki,.bkw{color:#6FCF9B}.tag.ret{color:var(--sand)}}
 @media (max-width:760px){.pane .head > .tag.ret{display:none}.bkwrap{padding:0 12px 10px}.bkc{flex-wrap:wrap}.bkb{flex-basis:calc(100% - 46px)}.bkw{margin-left:46px}.bkm{margin-left:auto}}
+
+/* Dashboard layout v2 */
+.dsec{display:flex;align-items:baseline;gap:12px;margin:26px 0 12px}
+.dsec:first-child{margin-top:4px}
+.dsec h3{margin:0;font-size:18px;letter-spacing:-.015em}
+.dsec p{margin:0;font-size:13px;color:var(--muted)}
+.kpis.main{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:12px}
+.minis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.mini{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 16px}
+.mini small{flex-basis:100%;font-size:12.5px;color:var(--muted)}
+.mini b{font-size:19px;letter-spacing:-.02em}
+.mini span{font-size:12px;color:var(--muted)}
+.mini em.trend{display:inline-block;font-style:normal;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
+.mini em.trend.up{background:rgba(35,133,90,.12);color:#1E7A52}.mini em.trend.down{background:rgba(180,86,27,.12);color:#A34E19}.mini em.trend.flat{background:var(--paper);color:var(--muted)}
+.dgrid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px;align-items:start}
+.dmain,.dside{display:grid;gap:14px;min-width:0}
+.dmain .funnel{margin:0}
+.dside .ms{margin:0}
+.dside .ms .msprog{max-width:none}
+.dgrid3{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+.dgrid3 .barrow .lb.lbw{width:120px}
+.prow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.prow:first-of-type{border-top:0}
+.prow div{display:flex;flex-direction:column;min-width:0}
+.prow b{font-size:14px}
+.prow small{font-size:12px;color:var(--muted)}
+.prow span{font-weight:700;font-size:14px;white-space:nowrap}
+details.stmt{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+details.stmt summary{cursor:pointer;list-style:none;padding:14px 20px;font-weight:600;font-size:14px;display:flex;align-items:center;gap:10px}
+details.stmt summary::-webkit-details-marker{display:none}
+details.stmt summary::before{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s}
+details.stmt[open] summary::before{transform:rotate(45deg)}
+details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none}
+@media (max-width:1100px){.kpis.main{grid-template-columns:repeat(2,minmax(0,1fr))}.dgrid,.dgrid3{grid-template-columns:1fr}}
+@media (max-width:760px){.minis{grid-template-columns:1fr}.dsec{flex-direction:column;gap:2px}.kpis.main{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media print{details.stmt{border:0;box-shadow:none}details.stmt summary{display:none}body.print-statement .minis,body.print-statement .dgrid,body.print-statement .dgrid3,body.print-statement .dsec,body.print-statement #start,body.print-statement #ms{display:none !important}}
 </style></head>
 <body>
 <header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>Customer zone</small></span></div><span class="sp"></span>${switcher}<div class="htools"><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">Sign out</span></a></div></header>
@@ -2294,7 +2330,6 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
       <button class="ghost" id="stPrint" type="button">Print statement</button>
       <button class="ghost" id="stCsv" type="button">Download CSV</button>
     </div>
-    <div class="night big" id="nightDash" hidden></div>
     <div class="start" id="start" hidden></div>
     <div class="ms" id="ms" hidden></div>
     <div id="dbody"><div class="skel"><i></i><i></i><i></i></div></div>
@@ -3052,7 +3087,7 @@ function zoneClient(cfg) {
     return api("overnight" + (fresh ? "?fresh=1" : "")).then(function (d) {
       if (!d || d.error) return;
       var h = nightHtml(d);
-      ["#nightDash", "#nightToday"].forEach(function (s) { var el = $(s); if (el) { el.innerHTML = h; el.hidden = false; } });
+      ["#nightToday"].forEach(function (s) { var el = $(s); if (el) { el.innerHTML = h; el.hidden = false; } });
     }).catch(function () {});
   }
 
@@ -3119,8 +3154,8 @@ function zoneClient(cfg) {
     return '<div class="panel funnel"><h4>From question to booking</h4><div class="fsteps">' + html + '</div><p class="hnote">' + tip + "</p></div>";
   }
   function flag(cc) { return String(cc || "").toUpperCase().replace(/./g, function (c) { return String.fromCodePoint(127397 + c.charCodeAt(0)); }); }
-  function heatAndCountries(d) {
-    if (!d.heat) return "";
+  function heatParts(d) {
+    if (!d.heat) return { heat: "", ctry: "" };
     var days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], max = 1, total = 0;
     d.heat.forEach(function (r) { r.forEach(function (v) { max = Math.max(max, v); total += v; }); });
     var best = null;
@@ -3137,8 +3172,10 @@ function zoneClient(cfg) {
     var ctry = d.countries.length ? d.countries.map(function (c) {
       return '<div class="barrow"><span class="lb lbw"><span class="flag">' + flag(c[0]) + "</span> " + esc(c[1]) + '</span><span class="bar" style="width:' + (c[2] / cmax * 60) + '%"></span><span>' + c[2] + "</span></div>";
     }).join("") : '<div class="bempty">No phone numbers yet.</div>';
-    return '<div class="grid2"><div class="panel"><h4>When new divers write</h4><div class="heat">' + hours + cells + '</div><p class="hnote">' + note + "</p></div>" +
-      '<div class="panel"><h4>Where your divers come from</h4>' + ctry + '<p class="hnote">Based on the country code of their phone number.</p></div></div>';
+    return {
+      heat: '<div class="panel"><h4>When new divers write</h4><div class="heat">' + hours + cells + '</div><p class="hnote">' + note + "</p></div>",
+      ctry: '<div class="panel"><h4>Where they come from</h4>' + ctry + '<p class="hnote">From the country code of their phone number.</p></div>',
+    };
   }
   function renderDash() {
     var d = ddata, k = d.kpi;
@@ -3163,24 +3200,20 @@ function zoneClient(cfg) {
     }).join("");
     var labels = d.weeks.map(function (w) { return '<span style="flex:1;text-align:center">' + new Date(w.week + "T12:00:00Z").toLocaleDateString([], { day: "numeric", month: "short" }) + "</span>"; }).join("");
     var langMax = Math.max(1, d.languages.length ? d.languages[0][1] : 1);
-    var html =
-      '<div class="kpis">' +
-        kp("Revenue via " + esc(cfg.assistant), thb(k.revenue), k.bookings + " bookings · " + k.divers + " divers", true, "revenue") +
-        kp("Conversations", k.conversations, k.outsideHours + " outside office hours (" + pct(k.outsideHours, k.conversations) + ")", false, "conversations") +
-        kp("Booking conversion", k.conversion + "%", k.afterFollowUp + " booked after a follow-up", false, "conversion") +
-        kp(esc(cfg.assistant) + "'s response time", fmtSec(k.avgResponse), "average first reply", false, "avgResponse", true) +
-        kp("Handed over to your team", k.handedOver, pct(k.handedOver, k.conversations) + " of conversations") +
-        kp("Collected at your shop", thb(k.atShop), "balance paid on arrival", false, "atShop") +
-      "</div>" + funnelHtml(d.funnel) +
-      '<div class="grid2"><div class="panel"><h4>Per week</h4><div class="legend"><span><i style="background:#4E7480"></i>Conversations</span><span><i style="background:#DCA44A"></i>Bookings</span></div>' +
+    var sec = function (title, sub) { return '<div class="dsec"><h3>' + title + "</h3>" + (sub ? "<p>" + sub + "</p>" : "") + "</div>"; };
+    var mini = function (label, val, sub, key, lowerBetter) { return '<div class="mini"><small>' + label + "</small><b>" + val + "</b>" + (key ? tr(key, lowerBetter) : "") + (sub ? "<span>" + sub + "</span>" : "") + "</div>"; };
+    var hp = heatParts(d);
+    var weekPanel = '<div class="panel"><h4>Per week</h4><div class="legend"><span><i style="background:#4E7480"></i>Conversations</span><span><i style="background:#DCA44A"></i>Bookings</span></div>' +
         '<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:160px;display:block">' + bars + "</svg>" +
-        '<div style="display:flex;font-size:11px;color:var(--muted);margin-top:4px">' + labels + "</div></div>" +
-        '<div class="panel"><h4>Languages</h4>' + (d.languages.length ? d.languages.map(function (l) {
-          return '<div class="barrow"><span class="lb">' + esc(l[0]) + '</span><span class="bar" style="width:' + (l[1] / langMax * 70) + '%"></span><span>' + l[1] + "</span></div>"; }).join("") : '<div class="bempty">No conversations yet.</div>') + "</div></div>" +
-      heatAndCountries(d) +
-      (d.products.length ? '<div class="panel" style="margin-bottom:14px"><h4>Bookings per product</h4><div class="bscroll"><table class="btable"><thead><tr><th>Product</th><th class="num">Bookings</th><th class="num">Divers</th><th class="num">Value</th></tr></thead><tbody>' +
-        d.products.map(function (p) { return "<tr><td>" + esc(p[0]) + '</td><td class="num">' + p[1].bookings + '</td><td class="num">' + p[1].divers + '</td><td class="num">' + thb(p[1].value) + "</td></tr>"; }).join("") + "</tbody></table></div></div>" : "") +
-      '<div class="panel"><div class="st-head"><h2 style="margin:0">Talay statement · ' + esc(d.center) + "</h2><p>" + esc(d.label) + "</p></div>" +
+        '<div style="display:flex;font-size:11px;color:var(--muted);margin-top:4px">' + labels + "</div></div>";
+    var langPanel = '<div class="panel"><h4>Languages</h4>' + (d.languages.length ? d.languages.map(function (l) {
+          return '<div class="barrow"><span class="lb">' + esc(l[0]) + '</span><span class="bar" style="width:' + (l[1] / langMax * 70) + '%"></span><span>' + l[1] + "</span></div>"; }).join("") : '<div class="bempty">No conversations yet.</div>') + "</div>";
+    var prodPanel =       (d.products.length ? '<div class="panel"><h4>Bookings per product</h4><div class="bscroll"><table class="btable"><thead><tr><th>Product</th><th class="num">Bookings</th><th class="num">Divers</th><th class="num">Value</th></tr></thead><tbody>' +
+        d.products.map(function (p) { return "<tr><td>" + esc(p[0]) + '</td><td class="num">' + p[1].bookings + '</td><td class="num">' + p[1].divers + '</td><td class="num">' + thb(p[1].value) + "</td></tr>"; }).join("") + "</tbody></table></div></div>" : "");
+    prodPanel = d.products.length ? '<div class="panel"><h4>Top products</h4>' + d.products.slice(0, 6).map(function (p) {
+      return '<div class="prow"><div><b>' + esc(p[0]) + "</b><small>" + p[1].bookings + (p[1].bookings === 1 ? " booking" : " bookings") + " · " + p[1].divers + (p[1].divers === 1 ? " diver" : " divers") + "</small></div><span>" + thb(p[1].value) + "</span></div>";
+    }).join("") + "</div>" : "";
+    var stmtPanel =       '<div class="panel"><div class="st-head"><h2 style="margin:0">Talay statement · ' + esc(d.center) + "</h2><p>" + esc(d.label) + "</p></div>" +
         "<h4>Statement · " + esc(d.label) + "</h4>" +
         '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">Talay\'s commission is the online deposit the diver pays when booking; your team collects the rest at the shop. Nothing to transfer: this is your overview.</p>' +
         (d.statement.length ? '<div class="bscroll"><table class="btable"><thead><tr><th>Booked</th><th>Ref</th><th>Diver</th><th>Product</th><th>Dive date</th><th class="num">Divers</th><th class="num">Value</th><th class="num">Commission</th><th>Status</th></tr></thead><tbody>' +
@@ -3190,9 +3223,29 @@ function zoneClient(cfg) {
           }).join("") +
           '<tr><td colspan="6"><b>Total</b></td><td class="num"><b>' + thb(k.revenue) + '</b></td><td class="num"><b>' + thb(k.commission - k.refunded) + "</b></td><td>" + (k.refunded ? "after " + thb(k.refunded) + " refunded" : "") + "</td></tr>" +
           "</tbody></table></div>" : '<div class="bempty">No bookings in this period.</div>') + "</div>";
+    var html =
+      sec("Results", esc(d.label) + " · compared with the period before") +
+      '<div class="kpis main">' +
+        kp("Revenue via " + esc(cfg.assistant), thb(k.revenue), k.divers + " divers", true, "revenue") +
+        kp("Bookings", k.bookings, k.afterFollowUp + " after a follow-up", false, "bookings") +
+        kp("Conversations", k.conversations, k.outsideHours + " outside office hours (" + pct(k.outsideHours, k.conversations) + ")", false, "conversations") +
+        kp("Booking conversion", k.conversion + "%", "of conversations booked", false, "conversion") +
+      "</div>" +
+      '<div class="minis">' +
+        mini(esc(cfg.assistant) + "'s first reply", fmtSec(k.avgResponse), "on average", "avgResponse", true) +
+        mini("Handed to your team", k.handedOver, pct(k.handedOver, k.conversations) + " of conversations") +
+        mini("Collected at your shop", thb(k.atShop), "balance paid on arrival", "atShop") +
+      "</div>" +
+      '<div class="dgrid"><div class="dmain">' + funnelHtml(d.funnel) + weekPanel + '</div><div class="dside"><div id="msSlot"></div>' + prodPanel + "</div></div>" +
+      sec("Your divers", "When they write, where they come from and the languages they speak") +
+      '<div class="dgrid3">' + hp.heat + hp.ctry + langPanel + "</div>" +
+      sec("Statement", "Every booking through Talay in this period, with the commission") +
+      '<details class="stmt"><summary>Show ' + d.statement.length + (d.statement.length === 1 ? " booking" : " bookings") + " · " + thb(k.revenue) + "</summary>" + stmtPanel + "</details>";
     $("#dbody").innerHTML = html;
+    var ms = $("#ms"), slot = $("#msSlot"); if (ms && slot) slot.appendChild(ms);
   }
   $("#stPrint").onclick = function () {
+    var st = document.querySelector("details.stmt"); if (st) st.open = true;
     document.body.classList.add("print-statement"); window.print();
     setTimeout(function () { document.body.classList.remove("print-statement"); }, 500);
   };
