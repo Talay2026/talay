@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mystery shop Koh Tao</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --surface:#F3F7F7; --card:#FFFFFF; --ink:#12262B; --muted:#56696D; --line:#D3DFE0;
+  --red:#C8202F; --red-soft:#FBE7E9; --teal:#0F5E68; --teal-soft:#E1EFF0; --ok:#1E7A46; --ok-soft:#E3F3E9; --warn:#9A5B00; --warn-soft:#FFF1D6;
+  --sans:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --cond:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --surface:#0C181B; --card:#132428; --ink:#E4EEEF; --muted:#9AB0B4; --line:#25393E;
+    --red:#EF4A55; --red-soft:#3A1A1E; --teal:#62B6C0; --teal-soft:#16343A; --ok:#5CC98A; --ok-soft:#163323; --warn:#F0B44C; --warn-soft:#3A2C12;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --surface:#0C181B; --card:#132428; --ink:#E4EEEF; --muted:#9AB0B4; --line:#25393E;
+  --red:#EF4A55; --red-soft:#3A1A1E; --teal:#62B6C0; --teal-soft:#16343A; --ok:#5CC98A; --ok-soft:#163323; --warn:#F0B44C; --warn-soft:#3A2C12;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--surface);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5}
+.wrap{max-width:920px;margin:0 auto;padding:20px 16px 64px}
+h1,h2,h3{font-family:var(--cond);line-height:1.1;margin:0}
+h1{font-size:clamp(2rem,6vw,3rem);font-weight:700;letter-spacing:.01em}
+h2{font-size:1.6rem;font-weight:600;margin:40px 0 12px}
+h3{font-size:1.2rem;font-weight:600}
+p{margin:0 0 10px}
+button,select,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+
+/* Kop met duikvlag */
+.hero{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center;margin-bottom:8px}
+.flag{width:74px;height:52px;border-radius:4px;background:var(--red);position:relative;overflow:hidden;flex:none}
+.flag::after{content:"";position:absolute;left:-20%;top:42%;width:140%;height:16%;background:#fff;transform:rotate(-35deg)}
+.sub{color:var(--muted);margin-top:6px}
+.clock{margin-top:18px;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline}
+.clock strong{font-family:var(--cond);font-size:1.5rem}
+.clock.go{border-color:var(--ok);background:var(--ok-soft)}
+.clock .hint{color:var(--muted)}
+.clock.go .hint{color:var(--ok);font-weight:600}
+
+/* Wie */
+.who{display:flex;gap:8px;margin:22px 0 4px;flex-wrap:wrap}
+.who button{flex:1 1 140px;padding:12px 14px;border-radius:10px;border:2px solid var(--line);background:var(--card);cursor:pointer;text-align:left}
+.who button[aria-pressed="true"]{border-color:var(--teal);background:var(--teal-soft)}
+.who .nm{font-family:var(--cond);font-size:1.35rem;font-weight:600;display:block}
+.who .pg{color:var(--muted);font-size:.9rem}
+.bar{height:6px;border-radius:3px;background:var(--line);margin-top:8px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--teal);width:0;transition:width .3s}
+
+.banner{margin:14px 0;padding:10px 14px;border-radius:8px;background:var(--warn-soft);color:var(--warn);font-size:.95rem}
+.banner.ok{background:var(--ok-soft);color:var(--ok)}
+
+/* Checklist */
+.check{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.check li{border-top:1px solid var(--line)}
+.check li:first-child{border-top:0}
+.check label{display:grid;grid-template-columns:28px 1fr;gap:10px;padding:12px 14px;cursor:pointer;align-items:start}
+.check input[type=checkbox]{width:22px;height:22px;margin:1px 0 0;accent-color:var(--teal)}
+.check small{display:block;color:var(--muted)}
+.check input:checked + span{color:var(--muted)}
+.check input:checked + span b{text-decoration:line-through}
+
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:10px}
+.rule{padding:12px 14px;border-left:4px solid var(--red);background:var(--card);border-radius:0 8px 8px 0}
+.rule b{display:block;font-family:var(--cond);font-size:1.15rem;font-weight:600}
+
+/* Leads */
+.night{font-family:var(--cond);font-size:1.15rem;font-weight:600;color:var(--muted);margin:22px 0 8px}
+.lead{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:10px}
+.lead>summary{list-style:none;cursor:pointer;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center}
+.lead>summary::-webkit-details-marker{display:none}
+.lead .ln{font-weight:600;font-size:1.05rem}
+.lead .meta{color:var(--muted);font-size:.9rem;grid-column:1}
+.lead .contact{grid-column:1;font-size:1rem;user-select:text;-webkit-user-select:text}
+.lead .contact b{font-family:var(--cond);font-size:1.15rem;font-weight:600;letter-spacing:.02em;color:var(--teal)}
+.search{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:1rem;margin:4px 0 6px}
+.state{grid-row:1/4;grid-column:2;font-size:.85rem;font-weight:600;padding:4px 10px;border-radius:99px;background:var(--line);color:var(--ink);white-space:nowrap}
+.state.s1{background:var(--warn-soft);color:var(--warn)}
+.state.s2{background:var(--teal-soft);color:var(--teal)}
+.state.s3{background:var(--ok-soft);color:var(--ok)}
+.state.due{background:var(--red-soft);color:var(--red)}
+.lead[open]>summary{border-bottom:1px solid var(--line)}
+.body{padding:6px 14px 16px}
+.step{display:grid;grid-template-columns:30px 1fr;gap:10px;padding:12px 0;border-top:1px dashed var(--line)}
+.step:first-child{border-top:0}
+.num{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-family:var(--cond);font-weight:700;font-size:.95rem;color:var(--muted)}
+.step.done .num{background:var(--teal);border-color:var(--teal);color:#fff}
+.step h4{margin:2px 0 6px;font-size:1rem}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-weight:500}
+.btn.primary{background:var(--teal);border-color:var(--teal);color:#fff}
+.btn:hover{filter:brightness(.97)}
+.stamp{font-weight:600}
+.muted{color:var(--muted);font-size:.9rem}
+input[type=datetime-local],select,textarea{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);max-width:100%}
+textarea{width:100%;min-height:60px;resize:vertical}
+.msg{background:var(--surface);border-radius:8px;padding:10px 12px;margin:6px 0 8px;font-size:.95rem;white-space:pre-wrap}
+.pill{display:inline-block;font-size:.8rem;padding:2px 8px;border-radius:99px;background:var(--surface);border:1px solid var(--line);margin-right:4px}
+.pill.late{background:var(--red-soft);border-color:transparent;color:var(--red);font-weight:600}
+.pill.okp{background:var(--ok-soft);border-color:transparent;color:var(--ok)}
+.chk{display:flex;gap:8px;align-items:center;margin:4px 0;cursor:pointer}
+.chk input{width:20px;height:20px;accent-color:var(--teal)}
+
+/* Resultaten */
+.res{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.res div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.res b{display:block;font-family:var(--cond);font-size:1.9rem;font-weight:700;line-height:1}
+.res span{color:var(--muted);font-size:.9rem}
+.tablewrap{overflow-x:auto;margin-top:12px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:.92rem}
+th,td{text-align:left;padding:8px 10px;border-top:1px solid var(--line);white-space:nowrap}
+th{border-top:0;color:var(--muted);font-weight:600}
+footer{margin-top:40px;color:var(--muted);font-size:.85rem}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="flag" aria-hidden="true"></div>
+    <div>
+      <h1>Mystery shop Koh Tao</h1>
+      <p class="sub">45 duikcentra, 3 testers. We meten wie snel antwoordt, wie zelf opvolgt en wie een boekingslink stuurt.</p>
+    </div>
+  </header>
+
+  <div class="clock" id="clock" aria-live="polite"></div>
+
+  <nav class="who" aria-label="Wie ben jij?">
+    <button type="button" data-who="jonas" aria-pressed="true"><span class="nm">Jonas</span><span class="pg" data-pg="jonas"></span><div class="bar"><i data-bar="jonas"></i></div></button>
+    <button type="button" data-who="guillaume" aria-pressed="false"><span class="nm">Guillaume</span><span class="pg" data-pg="guillaume"></span><div class="bar"><i data-bar="guillaume"></i></div></button>
+    <button type="button" data-who="lars" aria-pressed="false"><span class="nm">Lars</span><span class="pg" data-pg="lars"></span><div class="bar"><i data-bar="lars"></i></div></button>
+  </nav>
+  <div id="banner" class="banner" hidden></div>
+
+  <section>
+    <h2>Voor je begint</h2>
+    <ul class="check" id="prep"></ul>
+  </section>
+
+  <section>
+    <h2>De vier regels</h2>
+    <div class="rules">
+      <div class="rule"><b>Stuur 's avonds</b>Tussen 20:30 en 22:30 in Koh Tao. De klok bovenaan zegt wanneer het goed is.</div>
+      <div class="rule"><b>Antwoord niet terug</b>Alleen zo zie je of ze zelf opvolgen. Eén kort antwoord mag als ze iets vragen zonder prijs te geven.</div>
+      <div class="rule"><b>Screenshot alles</b>Met het uur zichtbaar: je vraag, hun antwoord, elke follow-up.</div>
+      <div class="rule"><b>Nooit boeken</b>Niet betalen, geen gegevens behalve je voornaam. Op dag 7 sluit je vriendelijk af.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2 id="leadsTitle">Jouw centra</h2>
+    <p class="muted">Tik op een center om de stappen te zien. Alle uren zijn Thaise tijd.</p>
+    <input id="q" class="search" type="search" placeholder="Zoek op naam, nummer of Instagram-account" aria-label="Zoek een center" autocomplete="off">
+    <div id="leads"></div>
+  </section>
+
+  <section>
+    <h2>Resultaten tot nu</h2>
+    <div class="res" id="res"></div>
+    <div class="tablewrap"><table id="tbl"></table></div>
+  </section>
+
+  <footer>Wijzigingen worden bewaard zodra je iets aantikt. Uren worden opgeslagen in Thaise tijd (UTC+7).</footer>
+</div>
+
+<script>
+const LEADS = [{"id": "impian-divers", "who": "jonas", "night": 1, "prio": 1, "name": "Impian Divers", "area": "Mae Haad", "lang": "NL", "channel": "ig", "contact": "instagram.com/impiandivers", "wa": ""}, {"id": "below-zero-divers", "who": "jonas", "night": 1, "prio": 1, "name": "Below Zero Divers", "area": "Chalok", "lang": "NL", "channel": "wa", "contact": "+66 90 984 6090", "wa": "66909846090"}, {"id": "rainbow-fish-divers", "who": "jonas", "night": 1, "prio": 1, "name": "Rainbow Fish Divers", "area": "Sairee", "lang": "DE", "channel": "wa", "contact": "+491601606226", "wa": "491601606226"}, {"id": "dive-point", "who": "jonas", "night": 1, "prio": 1, "name": "Dive Point", "area": "Mae Haad", "lang": "DE", "channel": "ig", "contact": "instagram.com/divepoint_kohtao", "wa": ""}, {"id": "calypso-diving", "who": "jonas", "night": 1, "prio": 1, "name": "Calypso Diving", "area": "Oostkust", "lang": "DE", "channel": "wa", "contact": "+66 90 328 5990", "wa": "66903285990"}, {"id": "nitro-dive-center", "who": "jonas", "night": 1, "prio": 1, "name": "Nitro Dive Center", "area": "Mae Haad", "lang": "ES", "channel": "wa", "contact": "+66927800592", "wa": "66927800592"}, {"id": "isla-tortuga-divers", "who": "jonas", "night": 1, "prio": 1, "name": "Isla Tortuga Divers", "area": "Mae Haad", "lang": "ES", "channel": "wa", "contact": "+66 63 039 3082", "wa": "66630393082"}, {"id": "scuba-club-latino", "who": "jonas", "night": 1, "prio": 1, "name": "Scuba Club Latino", "area": "Mae Haad", "lang": "ES", "channel": "wa", "contact": "+66 83 898 6271", "wa": "66838986271"}, {"id": "ihasia-diving", "who": "jonas", "night": 1, "prio": 1, "name": "Ihasia Diving", "area": "Chalok", "lang": "ES", "channel": "wa", "contact": "+66 85 790 9811", "wa": "66857909811"}, {"id": "master-divers", "who": "jonas", "night": 1, "prio": 1, "name": "Master Divers", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66926185637", "wa": "66926185637"}, {"id": "chalok-reef-divers", "who": "jonas", "night": 1, "prio": 1, "name": "Chalok Reef Divers", "area": "Chalok", "lang": "EN", "channel": "wa", "contact": "+66957262429", "wa": "66957262429"}, {"id": "onyx-divers", "who": "jonas", "night": 1, "prio": 1, "name": "ONYX Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66837732024", "wa": "66837732024"}, {"id": "roctopus-dive", "who": "jonas", "night": 1, "prio": 2, "name": "Roctopus Dive", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 99 470 4566", "wa": "66994704566"}, {"id": "simple-life-divers", "who": "jonas", "night": 1, "prio": 2, "name": "Simple Life Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66863630132", "wa": "66863630132"}, {"id": "hang-loose-divers", "who": "jonas", "night": 1, "prio": 2, "name": "Hang Loose Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66971543171", "wa": "66971543171"}, {"id": "frenchteam", "who": "guillaume", "night": 1, "prio": 1, "name": "FrenchTeam", "area": "Sairee", "lang": "FR", "channel": "wa", "contact": "+66625507729", "wa": "66625507729"}, {"id": "aquatao", "who": "guillaume", "night": 1, "prio": 1, "name": "AquaTao", "area": "Mae Haad", "lang": "FR", "channel": "wa", "contact": "+66930318828", "wa": "66930318828"}, {"id": "french-kiss-divers", "who": "guillaume", "night": 1, "prio": 1, "name": "French Kiss Divers", "area": "Mae Haad", "lang": "FR", "channel": "wa", "contact": "+66641276082", "wa": "66641276082"}, {"id": "the-diver-s-boat", "who": "guillaume", "night": 1, "prio": 1, "name": "The Diver's Boat", "area": "Mae Haad", "lang": "FR", "channel": "wa", "contact": "+66 82 814 9282", "wa": "66828149282"}, {"id": "fifty-six-dive", "who": "guillaume", "night": 1, "prio": 2, "name": "Fifty Six Dive", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 92 780 0730", "wa": "66927800730"}, {"id": "scuba-shack", "who": "guillaume", "night": 1, "prio": 2, "name": "Scuba Shack", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 84 344 7846", "wa": "66843447846"}, {"id": "finsanity-dive-centre", "who": "guillaume", "night": 1, "prio": 2, "name": "Finsanity Dive Centre", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 87 659 8282", "wa": "66876598282"}, {"id": "mojo-divers", "who": "guillaume", "night": 1, "prio": 2, "name": "Mojo Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66885629978", "wa": "66885629978"}, {"id": "seashell-divers", "who": "guillaume", "night": 1, "prio": 2, "name": "Seashell Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66635355585", "wa": "66635355585"}, {"id": "scuba-birds", "who": "guillaume", "night": 1, "prio": 2, "name": "Scuba Birds", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66990307571", "wa": "66990307571"}, {"id": "go-diving-koh-tao", "who": "guillaume", "night": 1, "prio": 2, "name": "Go Diving Koh Tao", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66986711670", "wa": "66986711670"}, {"id": "assava-dive-resort", "who": "guillaume", "night": 1, "prio": 2, "name": "Assava Dive Resort", "area": "Chalok", "lang": "EN", "channel": "wa", "contact": "+66801731136", "wa": "66801731136"}, {"id": "turtle-divers", "who": "guillaume", "night": 1, "prio": 2, "name": "Turtle Divers", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66841988476", "wa": "66841988476"}, {"id": "big-bubble-diving", "who": "guillaume", "night": 1, "prio": 2, "name": "Big Bubble Diving", "area": "Chalok", "lang": "EN", "channel": "wa", "contact": "+66612645941", "wa": "66612645941"}, {"id": "carabao-dive-resort", "who": "guillaume", "night": 1, "prio": 2, "name": "Carabao Dive Resort", "area": "Chalok", "lang": "EN", "channel": "wa", "contact": "+66950319536", "wa": "66950319536"}, {"id": "koh-tao-divers-ktd", "who": "lars", "night": 1, "prio": 2, "name": "Koh Tao Divers (KTD)", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 86 069 9244", "wa": "66860699244"}, {"id": "koh-tao-local-divers", "who": "lars", "night": 2, "prio": 2, "name": "Koh Tao Local Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 84 183 0531", "wa": "66841830531"}, {"id": "new-way-diving", "who": "lars", "night": 1, "prio": 2, "name": "New Way Diving", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 99 501 6425", "wa": "66995016425"}, {"id": "flow-divers", "who": "lars", "night": 2, "prio": 2, "name": "Flow Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 82 679 2382", "wa": "66826792382"}, {"id": "family-diving-koh-tao", "who": "lars", "night": 1, "prio": 2, "name": "Family Diving Koh Tao", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 63 013 4297", "wa": "66630134297"}, {"id": "sea-krait-divers", "who": "lars", "night": 2, "prio": 2, "name": "Sea Krait Divers", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66838545884", "wa": "66838545884"}, {"id": "duck-n-dive", "who": "lars", "night": 1, "prio": 2, "name": "Duck 'n Dive", "area": "Sairee", "lang": "EN", "channel": "wa", "contact": "+66 90 914 0415", "wa": "66909140415"}, {"id": "duiken-koh-tao", "who": "lars", "night": 2, "prio": 2, "name": "Duiken Koh Tao", "area": "Sairee", "lang": "NL", "channel": "wa", "contact": "+66 87 265 0859", "wa": "66872650859"}, {"id": "deep-dive-center-koh-tao-montra", "who": "lars", "night": 1, "prio": 2, "name": "Deep Dive Center (Koh Tao Montra)", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66611780298", "wa": "66611780298"}, {"id": "deep-blue-divers", "who": "lars", "night": 2, "prio": 2, "name": "Deep Blue Divers", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66987231362", "wa": "66987231362"}, {"id": "scuba-square", "who": "lars", "night": 1, "prio": 2, "name": "Scuba Square", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66 83 216 7434", "wa": "66832167434"}, {"id": "hellodiver", "who": "lars", "night": 2, "prio": 2, "name": "Hellodiver", "area": "Mae Haad", "lang": "EN", "channel": "wa", "contact": "+66 61 487 4376", "wa": "66614874376"}, {"id": "jamahkiri-diving-club", "who": "lars", "night": 1, "prio": 2, "name": "Jamahkiri Diving Club", "area": "Zuidoost", "lang": "EN", "channel": "wa", "contact": "+66954081992", "wa": "66954081992"}, {"id": "diverholics", "who": "lars", "night": 2, "prio": 2, "name": "Diverholics", "area": "Chalok", "lang": "EN", "channel": "wa", "contact": "+66937505543", "wa": "66937505543"}, {"id": "hydronauts-diving", "who": "lars", "night": 1, "prio": 2, "name": "Hydronauts Diving", "area": "Chalok", "lang": "EN", "channel": "wa", "contact": "+66 80 065 8782", "wa": "66800658782"}];
+const MSG = {
+  A:{
+    EN:"Hi! I'm arriving on Koh Tao around 5 November and I'd love to do my Open Water course. How much is it, and do you have space that week? Is accommodation included, or can you help with that?",
+    NL:"Hoi! Ik kom rond 5 november aan op Koh Tao en zou graag mijn Open Water doen. Hoeveel kost dat, en hebben jullie die week nog plaats? Is overnachting inbegrepen, of kunnen jullie daarbij helpen?",
+    DE:"Hallo! Ich komme um den 5. November auf Koh Tao an und würde gerne meinen Open Water machen. Was kostet der Kurs, und habt ihr in der Woche noch Platz? Ist eine Unterkunft dabei, oder könnt ihr da helfen?",
+    ES:"¡Hola! Llego a Koh Tao sobre el 5 de noviembre y me gustaría hacer el Open Water. ¿Cuánto cuesta y tenéis plazas esa semana? ¿Incluye alojamiento o me podéis ayudar con eso?"
+  },
+  B:{
+    EN:"Hello! My girlfriend and I arrive on Koh Tao on 6 November for about a week. I already have my Open Water, she has never dived. What would you recommend for us, and what would it cost? Do you have space?",
+    FR:"Bonjour ! Ma copine et moi arrivons à Koh Tao le 6 novembre pour environ une semaine. J'ai déjà mon Open Water, elle n'a jamais plongé. Qu'est-ce que vous nous conseillez, et combien ça coûterait ? Vous avez de la place ?"
+  },
+  C:{
+    EN:"Hi! I'm Advanced certified and I'll be on Koh Tao from 8 November for about 4 days. I'd like to do some fun dives. What do they cost, how often do the boats go out, and do you have space?",
+    NL:"Hoi! Ik heb mijn Advanced en ben vanaf 8 november zo'n 4 dagen op Koh Tao. Ik wil graag wat fun dives doen. Wat kost dat, hoe vaak varen jullie uit, en hebben jullie plaats?"
+  },
+  close:{
+    EN:"Thanks a lot for your help and the info! We've changed our plans for now, so we won't book this time. Really appreciated your reply!",
+    NL:"Heel erg bedankt voor de info! Onze plannen zijn veranderd, dus we boeken deze keer niet. Bedankt voor je antwoord!",
+    DE:"Vielen Dank für die Infos! Unsere Pläne haben sich geändert, deshalb buchen wir diesmal nicht. Danke für eure Antwort!",
+    ES:"¡Muchas gracias por la información! Hemos cambiado de planes, así que esta vez no reservaremos. ¡Gracias por responder!",
+    FR:"Merci beaucoup pour les infos ! Nos plans ont changé, donc on ne réservera pas cette fois-ci. Merci pour votre réponse !"
+  }
+};
+const PREP = {
+  jonas:[
+    ["nummer","Tweede nummer met WhatsApp","Een eSIM of tweede simkaart. Niet je eigen nummer: je contacteert deze centra later als verkoper."],
+    ["profiel","WhatsApp-profiel neutraal","Alleen je voornaam, geen bedrijf, geen Talay, een gewone profielfoto."],
+    ["map","Gedeelde map voor screenshots","Naam per screenshot: Center_1-vraag, Center_2-antwoord, Center_3-followup."],
+    ["gelezen","Regels gelezen","De vier regels hieronder. Vooral: niet terugantwoorden."]
+  ],
+  guillaume:[
+    ["nummer","WhatsApp klaar op je eigen nummer","Je eigen nummer is prima: jij verkoopt later niet aan deze centra."],
+    ["profiel","WhatsApp-profiel neutraal","Alleen je voornaam, geen bedrijf, geen Talay."],
+    ["map","Toegang tot de gedeelde screenshotmap","Naam per screenshot: Center_1-vraag, Center_2-antwoord, Center_3-followup."],
+    ["gelezen","Regels gelezen","De vier regels hieronder. Vooral: niet terugantwoorden."]
+  ],
+  lars:[
+    ["nummer","Nummer gekozen","Ga je later mee verkopen aan deze centra? Gebruik dan een tweede nummer (eSIM). Zo niet, dan mag je eigen nummer."],
+    ["profiel","WhatsApp-profiel neutraal","Alleen je voornaam, geen bedrijf, geen Talay."],
+    ["map","Toegang tot de gedeelde screenshotmap","Naam per screenshot: Center_1-vraag, Center_2-antwoord, Center_3-followup."],
+    ["gelezen","Regels gelezen","De vier regels hieronder. Vooral: niet terugantwoorden."]
+  ]
+};
+const NAMES={jonas:"Jonas",guillaume:"Guillaume",lars:"Lars"};
+const TYPES=["Mens","Chatbot of AI","Geen antwoord na 48u"];
+const LINKS=["Boekingslink met online betaling","Boekingsformulier zonder betaling","Bankoverschrijving, PayPal of Wise","Kom langs in de shop","Niets"];
+
+/* ---------- opslag: gedeeld (db) of lokaal ---------- */
+let state={leads:{},prep:{}};
+let db=null, shared=false, readOnly=false;
+const LSKEY="ms-kohtao-v1";
+function loadLocal(){try{const s=JSON.parse(localStorage.getItem(LSKEY)||"null");if(s&&s.leads)state=s;}catch(e){}}
+function saveLocal(){try{localStorage.setItem(LSKEY,JSON.stringify(state));}catch(e){}}
+loadLocal();
+
+const queue={}; // per document: één write tegelijk
+function persist(path,data){
+  saveLocal();
+  if(!shared||readOnly) return;
+  const q=queue[path]||(queue[path]={busy:false,next:null});
+  q.next=data;
+  if(q.busy) return;
+  const run=async()=>{
+    q.busy=true;
+    while(q.next){const d=q.next;q.next=null;
+      try{await db.doc(path).set(d);}
+      catch(e){
+        if(e&&e.code==="invalid_argument"){readOnly=true;showBanner("Je kan deze pagina bekijken, maar niet bewerken. Vraag Jonas om je als bewerker uit te nodigen. Wat je aantikt, blijft voorlopig alleen in deze browser.");break;}
+        else if(e&&e.code==="unavailable"){await new Promise(r=>setTimeout(r,800+Math.random()*800));q.next=q.next||d;}
+        else {showBanner("Opslaan lukte niet ("+(e&&e.code||"fout")+"). Je wijzigingen staan wel in deze browser.");break;}
+      }}
+    q.busy=false;
+  };
+  run();
+}
+function showBanner(t,ok){const b=document.getElementById("banner");b.textContent=t;b.className="banner"+(ok?" ok":"");b.hidden=false;}
+
+/* ---------- tijd ---------- */
+const TZ="Asia/Bangkok";
+const fmt=new Intl.DateTimeFormat("nl-BE",{timeZone:TZ,weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+const fmtT=new Intl.DateTimeFormat("nl-BE",{timeZone:TZ,hour:"2-digit",minute:"2-digit"});
+const fmtLocal=new Intl.DateTimeFormat("nl-BE",{hour:"2-digit",minute:"2-digit"});
+function show(iso){return iso?fmt.format(new Date(iso)):"";}
+function toInput(iso){ if(!iso) return ""; const d=new Date(new Date(iso).getTime()+7*3600e3); return d.toISOString().slice(0,16); }
+function fromInput(v){ return v? new Date(v+":00+07:00").toISOString() : null; }
+function hours(a,b){return (new Date(b)-new Date(a))/3600e3;}
+function fmtH(h){ if(h==null||isNaN(h)) return "–"; if(h<1) return Math.round(h*60)+" min"; return (Math.round(h*10)/10).toString().replace(".",",")+" u"; }
+
+function clock(){
+  const now=new Date();
+  const parts=new Intl.DateTimeFormat("en-GB",{timeZone:TZ,hour:"2-digit",minute:"2-digit",hour12:false}).format(now).split(":").map(Number);
+  const m=parts[0]*60+parts[1]; const go=m>=20*60+30&&m<=22*60+30;
+  const el=document.getElementById("clock");
+  el.className="clock"+(go?" go":"");
+  el.innerHTML="";
+  const a=document.createElement("strong");a.textContent=fmtT.format(now)+" in Koh Tao";
+  const b=document.createElement("span");b.className="muted";b.textContent=fmtLocal.format(now)+" bij jou";
+  const c=document.createElement("span");c.className="hint";
+  if(go) c.textContent="Goed moment om te sturen.";
+  else if(m<20*60+30){const left=20*60+30-m;c.textContent="Sturen kan over "+Math.floor(left/60)+" u "+(left%60)+" min.";}
+  else c.textContent="Te laat voor vandaag. Morgen vanaf 20:30 Thaise tijd.";
+  el.append(a,b,c);
+}
+
+/* ---------- helpers ---------- */
+let me=localStorage.getItem("ms-who")||"jonas";
+function L(id){return state.leads[id]||(state.leads[id]={});}
+function scen(l){return {jonas:"A",guillaume:"B",lars:"C"}[l.who];}
+function message(l){return MSG[scen(l)][l.lang]||MSG[scen(l)].EN;}
+function closeMsg(l){return MSG.close[l.lang]||MSG.close.EN;}
+function fmtPhone(d){ if(d.startsWith("66")&&d.length===11) return "+66 "+d.slice(2,4)+" "+d.slice(4,7)+" "+d.slice(7); if(d.startsWith("49")) return "+49 "+d.slice(2,5)+" "+d.slice(5); return "+"+d; }
+function handle(l){ if(l.channel==="ig"){const m=String(l.contact).match(/instagram\.com\/([^/?#]+)/);return m?"@"+m[1]:l.contact;} return l.wa?fmtPhone(l.wa):l.contact; }
+function stage(l){
+  const s=L(l.id);
+  if(s.closed||s.type==="Geen antwoord na 48u") return [3,"Klaar"];
+  if(s.reply) return [2,"Antwoord binnen"];
+  if(s.sent) return [1,"Verstuurd"];
+  return [0,"Nog sturen"];
+}
+function dueChecks(l){
+  const s=L(l.id); if(!s.sent||s.closed) return [];
+  const base=s.reply||s.sent; const h=hours(base,new Date().toISOString());
+  const out=[]; const marks=[[24,"24 u"],[48,"48 u"],[72,"72 u"],[168,"dag 7"]];
+  for(const [t,lab] of marks){ out.push({lab,t,due:h>=t,done:!!(s.checks&&s.checks[t])}); }
+  return out;
+}
+function copy(text,btn){
+  navigator.clipboard.writeText(text).then(()=>{const o=btn.textContent;btn.textContent="Gekopieerd";setTimeout(()=>btn.textContent=o,1400);},()=>{});
+}
+function el(tag,attrs={},...kids){const e=document.createElement(tag);for(const[k,v] of Object.entries(attrs)){if(k==="class")e.className=v;else if(k.startsWith("on"))e.addEventListener(k.slice(2),v);else if(v!==false&&v!=null)e.setAttribute(k,v===true?"":v);}for(const k of kids.flat()){if(k==null)continue;e.append(k.nodeType?k:document.createTextNode(k));}return e;}
+
+/* ---------- renderen ---------- */
+const openSet=new Set();
+let pendingRender=false;
+function typing(){const a=document.activeElement;return a&&(a.tagName==='TEXTAREA'||(a.tagName==='INPUT'&&a.type==='datetime-local'))&&a.closest('#leads');}
+function safeRender(){ if(typing()){pendingRender=true;return;} render(); }
+document.addEventListener('focusout',()=>{setTimeout(()=>{if(pendingRender&&!typing()){pendingRender=false;render();}},0);});
+function render(){
+  document.querySelectorAll(".who button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.who===me?"true":"false"));
+  for(const w of ["jonas","guillaume","lars"]){
+    const mine=LEADS.filter(l=>l.who===w); const done=mine.filter(l=>stage(l)[0]>=1).length;
+    document.querySelector(`[data-pg="${w}"]`).textContent=`${done} van ${mine.length} verstuurd`;
+    document.querySelector(`[data-bar="${w}"]`).style.width=(done/mine.length*100)+"%";
+  }
+  // voorbereiding
+  const prep=document.getElementById("prep"); prep.innerHTML="";
+  const p=state.prep[me]||{};
+  for(const [k,t,s] of PREP[me]){
+    const cb=el("input",{type:"checkbox"}); cb.checked=!!p[k];
+    cb.addEventListener("change",()=>{state.prep[me]={...(state.prep[me]||{}),[k]:cb.checked};persist("prep/"+me,state.prep[me]);render();});
+    prep.append(el("li",{},el("label",{},cb,el("span",{},el("b",{},t),el("small",{},s)))));
+  }
+  // leads
+  document.getElementById("leadsTitle").textContent="Centra van "+NAMES[me];
+  const box=document.getElementById("leads"); box.innerHTML="";
+  const q=(document.getElementById("q").value||"").trim().toLowerCase(); const qd=q.replace(/\D/g,"");
+  if(q){
+    const hits=LEADS.filter(l=>l.name.toLowerCase().includes(q)||handle(l).toLowerCase().includes(q)||(qd.length>=3&&String(l.contact).replace(/\D/g,"").includes(qd)));
+    box.append(el("div",{class:"night"},hits.length?(hits.length===1?"1 gevonden":hits.length+" gevonden"):"Niets gevonden. Zoek op naam, nummer of Instagram-account."));
+    for(const l of hits) box.append(leadCard(l));
+  } else for(const n of [1,2]){
+    const list=LEADS.filter(l=>l.who===me&&l.night===n);
+    box.append(el("div",{class:"night"},n===1?"Avond 1: vrijdag 16 oktober":"Avond 2: zaterdag 17 oktober"));
+    for(const l of list) box.append(leadCard(l));
+  }
+  results();
+}
+function leadCard(l){
+  const s=L(l.id); const [st,lab]=stage(l);
+  const due=dueChecks(l).some(c=>c.due&&!c.done)&&st<3;
+  const d=el("details",{class:"lead"});
+  if(openSet.has(l.id)) d.open=true;
+  d.addEventListener("toggle",()=>{d.open?openSet.add(l.id):openSet.delete(l.id);});
+  const chan=l.channel==="wa"?"WhatsApp":"Instagram";
+  d.append(el("summary",{},
+    el("span",{class:"ln"},l.name),
+    el("span",{class:`state s${st}${due?" due":""}`},due?"Nu checken":lab),
+    el("span",{class:"contact"},chan+" ",el("b",{},handle(l))),
+    el("span",{class:"meta"},`${l.area||""} · ${l.lang}${l.who!==me?" · van "+NAMES[l.who]:""}${s.sent&&s.reply?" · antwoord na "+fmtH(hours(s.sent,s.reply)):""}`)
+  ));
+  const b=el("div",{class:"body"});
+  const set=(patch)=>{state.leads[l.id]={...L(l.id),...patch};persist("leads/"+l.id,state.leads[l.id]);render();};
+
+  // 1 versturen
+  const msg=message(l);
+  const act=el("div",{class:"row"});
+  if(l.channel==="wa"){
+    act.append(el("a",{class:"btn primary",href:`https://wa.me/${l.wa}?text=${encodeURIComponent(msg)}`,target:"_blank",rel:"noopener"},"Open in WhatsApp"));
+  } else {
+    const href=/^https?:/.test(l.contact)?l.contact:"https://"+l.contact;
+    act.append(el("a",{class:"btn primary",href,target:"_blank",rel:"noopener"},"Open Instagram"));
+  }
+  const cbtn=el("button",{class:"btn",type:"button"},"Kopieer bericht"); cbtn.addEventListener("click",()=>copy(msg,cbtn)); act.append(cbtn);
+  b.append(step(1,!!s.sent,"Stuur het bericht",[
+    el("div",{class:"msg"},msg),
+    el("p",{class:"muted"},l.channel==="wa"?`Nummer: ${l.contact}. Verander een woord of de begroeting, zodat niet iedereen exact dezelfde tekst krijgt.`:`Geen gsm-nummer gevonden. Stuur dit als Instagram-bericht. Lukt dat niet, gebruik het contactformulier op hun website.`),
+    act,
+    stampRow("Verstuurd om",s.sent,v=>set({sent:v}))
+  ]));
+
+  // 2 automatisch bericht
+  const autoKids=[
+    yn("Kwam er eerst een automatisch bericht?",s.auto,v=>set({auto:v})),
+    el("p",{class:"muted"},"Automatisch = een vaste tekst zoals 'Thanks for your message, we'll get back to you soon', meestal binnen enkele seconden. Het beantwoordt je vraag niet.")
+  ];
+  if(s.auto===true){
+    autoKids.push(stampRow("Automatisch bericht om",s.autoAt,v=>set({autoAt:v})));
+    if(s.sent&&s.autoAt) autoKids.push(el("p",{},"Automatisch bericht na ",el("span",{class:"stamp"},fmtH(hours(s.sent,s.autoAt)))));
+  }
+  b.append(step(2,s.auto===false||(s.auto===true&&!!s.autoAt),"Automatisch bericht",autoKids));
+
+  // 3 echt antwoord
+  const typ=el("select",{"aria-label":"Wie antwoordde"},el("option",{value:""},"Kies…"),...TYPES.map(t=>el("option",{value:t},t)));
+  typ.value=s.type||""; typ.addEventListener("change",()=>set({type:typ.value}));
+  b.append(step(3,!!(s.reply||s.type==="Geen antwoord na 48u"),"Eerste echt antwoord",[
+    stampRow("Echt antwoord om",s.reply,v=>set({reply:v})),
+    s.sent&&s.reply?el("p",{},"Antwoordtijd: ",el("span",{class:"stamp"},fmtH(hours(s.sent,s.reply)))):null,
+    s.auto===true&&s.autoAt&&s.reply?el("p",{},"Tussen automatisch en echt antwoord: ",el("span",{class:"stamp"},fmtH(hours(s.autoAt,s.reply)))):null,
+    el("div",{class:"row"},el("span",{class:"muted"},"Wie antwoordde?"),typ),
+    el("p",{class:"muted"},"Echt antwoord = een antwoord op je vraag, van een mens of een bot. Bot-tekenen: antwoord binnen een minuut 's nachts, knoppen, 'virtual assistant', 'powered by'. Na 48 uur niets: kies 'Geen antwoord na 48u'.")
+  ]));
+
+  // 3 inhoud
+  const lk=el("select",{"aria-label":"Boekingslink of betaalwijze"},el("option",{value:""},"Kies…"),...LINKS.map(t=>el("option",{value:t},t)));
+  lk.value=s.link||""; lk.addEventListener("change",()=>set({link:lk.value}));
+  b.append(step(4,!!(s.link&&s.price!=null),"Wat stuurden ze?",[
+    yn("Prijs gegeven?",s.price,v=>set({price:v})),
+    yn("Beschikbaarheid bevestigd?",s.avail,v=>set({avail:v})),
+    el("div",{class:"row"},el("span",{class:"muted"},"Boekingslink of betaalwijze"),lk)
+  ]));
+
+  // 4 follow-up
+  const checks=dueChecks(l);
+  const pills=el("p",{},...checks.map(c=>el("span",{class:"pill"+(c.done?" okp":c.due?" late":"")},(c.done?"✓ ":"")+c.lab)));
+  const ck=el("div",{});
+  for(const c of checks){
+    const i=el("input",{type:"checkbox"}); i.checked=c.done;
+    i.addEventListener("change",()=>set({checks:{...(s.checks||{}),[c.t]:i.checked}}));
+    ck.append(el("label",{class:"chk"},i,`Gecheckt na ${c.lab}`));
+  }
+  b.append(step(5,!!(s.checks&&s.checks[72]),"Opvolging: antwoord niet terug",[
+    el("p",{class:"muted"},"Kijk na 24, 48 en 72 uur of ze zelf terugkomen. Rood = nu te checken."),
+    s.sent?pills:el("p",{class:"muted"},"Start zodra het bericht verstuurd is."),
+    s.sent?ck:null,
+    stampRow("Follow-up 1 om",s.fu1,v=>set({fu1:v})),
+    stampRow("Follow-up 2 om",s.fu2,v=>set({fu2:v}))
+  ]));
+
+  // 5 afsluiten
+  const cm=closeMsg(l); const cb2=el("button",{class:"btn",type:"button"},"Kopieer afsluitbericht"); cb2.addEventListener("click",()=>copy(cm,cb2));
+  const shots=el("input",{type:"checkbox"}); shots.checked=!!s.shots; shots.addEventListener("change",()=>set({shots:shots.checked}));
+  const cl=el("input",{type:"checkbox"}); cl.checked=!!s.closed; cl.addEventListener("change",()=>set({closed:cl.checked}));
+  const notes=el("textarea",{placeholder:"Wat viel op? Toon, fouten, naam van een tool…"}); notes.value=s.notes||"";
+  let tN; notes.addEventListener("input",()=>{clearTimeout(tN);tN=setTimeout(()=>{state.leads[l.id]={...L(l.id),notes:notes.value};persist("leads/"+l.id,state.leads[l.id]);},900);});
+  b.append(step(6,!!s.closed,"Dag 7: afsluiten",[
+    el("div",{class:"msg"},cm),
+    el("div",{class:"row"},cb2),
+    el("label",{class:"chk"},shots,"Alle screenshots staan in de map"),
+    el("label",{class:"chk"},cl,"Afsluitbericht verstuurd (of geen antwoord na 48 u)"),
+    notes
+  ]));
+  d.append(b);
+  return d;
+}
+function step(n,done,title,kids){return el("div",{class:"step"+(done?" done":"")},el("div",{class:"num"},String(n)),el("div",{},el("h4",{},title),...kids));}
+function stampRow(label,iso,onset){
+  const now=el("button",{class:"btn",type:"button"},"Nu");
+  now.addEventListener("click",()=>onset(new Date().toISOString()));
+  const inp=el("input",{type:"datetime-local","aria-label":label+" (Thaise tijd)"}); inp.value=toInput(iso);
+  inp.addEventListener("change",()=>onset(fromInput(inp.value)));
+  return el("div",{class:"row"},el("span",{class:"muted"},label),now,inp,iso?el("span",{class:"stamp"},show(iso)):null);
+}
+function yn(label,val,onset){
+  const r=el("div",{class:"row"},el("span",{class:"muted"},label));
+  for(const [v,t] of [[true,"Ja"],[false,"Nee"]]){
+    const bt=el("button",{class:"btn"+(val===v?" primary":""),type:"button","aria-pressed":val===v?"true":"false"},t);
+    bt.addEventListener("click",()=>onset(val===v?null:v)); r.append(bt);
+  }
+  return r;
+}
+function results(){
+  const all=LEADS.map(l=>({l,s:L(l.id)}));
+  const sent=all.filter(x=>x.s.sent);
+  const medOf=a=>{a=a.slice().sort((x,y)=>x-y);return a.length?(a.length%2?a[(a.length-1)/2]:(a[a.length/2-1]+a[a.length/2])/2):null;};
+  const rt=sent.filter(x=>x.s.reply).map(x=>hours(x.s.sent,x.s.reply)).sort((a,b)=>a-b);
+  const med=medOf(rt);
+  const autoX=sent.filter(x=>x.s.auto===true);
+  const gap=autoX.filter(x=>x.s.autoAt&&x.s.reply).map(x=>hours(x.s.autoAt,x.s.reply));
+  const c=(f)=>all.filter(f).length;
+  const tiles=[
+    [sent.length,"verstuurd van "+LEADS.length],
+    [rt.filter(h=>h<=0.25).length,"antwoord binnen 15 min"],
+    [rt.filter(h=>h<=1).length,"antwoord binnen 1 uur"],
+    [c(x=>x.s.type==="Geen antwoord na 48u"),"geen antwoord na 48 u"],
+    [fmtH(med),"mediane antwoordtijd"],
+    [c(x=>x.s.price===true),"gaven een prijs"],
+    [c(x=>x.s.link==="Boekingslink met online betaling"),"stuurden een boekingslink met betaling"],
+    [c(x=>x.s.fu1),"volgden zelf op"],
+    [c(x=>x.s.type==="Chatbot of AI"),"chatbot of AI"],
+    [autoX.length,"kregen eerst een automatisch bericht"],
+    [fmtH(medOf(gap)),"mediane tijd tussen automatisch en echt antwoord"]
+  ];
+  const r=document.getElementById("res"); r.innerHTML="";
+  for(const [v,t] of tiles) r.append(el("div",{},el("b",{},String(v)),el("span",{},t)));
+  const tb=document.getElementById("tbl"); tb.innerHTML="";
+  tb.append(el("tr",{},...["Center","Wie","Automatisch","Echt antwoord","Wie antwoordde","Prijs","Link","Follow-up"].map(h=>el("th",{},h))));
+  for(const {l,s} of all){
+    if(!s.sent) continue;
+    tb.append(el("tr",{},el("td",{},l.name),el("td",{},NAMES[l.who]),
+      el("td",{},s.auto===true?(s.autoAt&&s.sent?"na "+fmtH(hours(s.sent,s.autoAt)):"ja"):s.auto===false?"nee":"–"),
+      el("td",{},s.reply?fmtH(hours(s.sent,s.reply)):(s.type==="Geen antwoord na 48u"?"geen":"wacht")),
+      el("td",{},s.type||"–"),el("td",{},s.price===true?"ja":s.price===false?"nee":"–"),el("td",{},s.link||"–"),el("td",{},s.fu2?"2×":s.fu1?"1×":"–")));
+  }
+  if(!sent.length) tb.append(el("tr",{},el("td",{colspan:"8",class:"muted"},"Nog niets verstuurd. Begin vrijdag 16 oktober om 20:30 Thaise tijd.")));
+}
+
+document.querySelectorAll(".who button").forEach(b=>b.addEventListener("click",()=>{me=b.dataset.who;try{localStorage.setItem("ms-who",me);}catch(e){}render();}));
+document.getElementById("q").addEventListener("input",()=>render());
+clock(); setInterval(clock,30000); setInterval(safeRender,5*60000);
+render();
+
+/* ---------- gedeelde opslag inschakelen ---------- */
+(async()=>{
+  if(!window.claude||!window.claude.use){showBanner("Je wijzigingen worden alleen in deze browser bewaard.");return;}
+  const d=await window.claude.use("db");
+  if(!d){showBanner("Je wijzigingen worden alleen in deze browser bewaard. Open de pagina via de gedeelde Claude-link om samen in één lijst te werken.");return;}
+  db=d; shared=true;
+  try{const u=await window.claude.use("user"); if(u&&u.can){const w=await u.can("data.write"); if(w===false){readOnly=true;showBanner("Je kan deze pagina bekijken, maar niet bewerken. Vraag Jonas om je als bewerker uit te nodigen.");}}}catch(e){}
+  db.collection("leads").onSnapshot(snap=>{
+    for(const doc of snap.docs){ if(doc.exists){ const q=queue["leads/"+doc.id]; if(q&&(q.busy||q.next)) continue; state.leads[doc.id]={...doc.data()}; } }
+    saveLocal(); safeRender();
+  },()=>{});
+  db.collection("prep").onSnapshot(snap=>{
+    for(const doc of snap.docs){ if(doc.exists){ const q=queue["prep/"+doc.id]; if(q&&(q.busy||q.next)) continue; state.prep[doc.id]={...doc.data()}; } }
+    saveLocal(); safeRender();
+  },()=>{});
+})();
+</script>
+</body>
+</html>
