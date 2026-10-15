@@ -811,6 +811,116 @@ async function milestones(env, center) {
   return out;
 }
 
+// ---------- Weekly summary e-mail ----------
+// GET talay.io/api/weekly?key=WEEKLY_KEY  (called by Make every Monday morning)
+// Returns one ready-made e-mail per center: { week, emails: [{ center, to, subject, html }] }.
+// Recipients: Centers → Admin emails, else Alert Email. A center with the checkbox
+// "No weekly summary" is skipped. Add &only=you@example.com to send every e-mail to one address (test).
+export async function handleWeekly(request, env, ctx) {
+  const url = new URL(request.url);
+  const reply = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+  if (!env.WEEKLY_KEY || url.searchParams.get("key") !== env.WEEKLY_KEY) return reply({ error: "forbidden" }, 403);
+  const only = String(url.searchParams.get("only") || "").trim();
+  if (only && !EMAIL.test(only)) return reply({ error: "only must be an e-mail address" }, 400);
+
+  const TZ = 7 * 3600 * 1000;
+  const t = new Date(Date.now() + TZ);
+  const todayMid = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) - TZ;
+  const dow = (t.getUTCDay() + 6) % 7; // Monday = 0
+  const end = todayMid - dow * DAY;    // this Monday 00:00 Koh Tao time
+  const start = end - 7 * DAY;         // last Monday
+  const fmt = (ms, o) => new Date(ms + TZ).toLocaleDateString("en-GB", { timeZone: "UTC", ...o });
+  const week = fmt(start, { day: "numeric", month: "short" }) + " – " + fmt(end - 1, { day: "numeric", month: "short" });
+
+  const recs = await at(env, "Centers", { formula: "{Slug} != ''" });
+  const emails = [];
+  for (const r of recs) {
+    const f = r.fields;
+    if (f["No weekly summary"]) continue;
+    const center = {
+      id: r.id, slug: String(first(f["Slug"]) || "").toLowerCase(), name: first(f["Name"]) || "Dive center",
+      assistant: first(f["Assistant name"]) || "Mia",
+    };
+    if (!/^[a-z0-9-]{1,60}$/.test(center.slug)) continue;
+    let to = splitEmails(f["Admin emails"]);
+    if (!to.length && first(f["Alert Email"])) to = splitEmails(f["Alert Email"]);
+    if (only) to = [only];
+    if (!to.length) continue;
+    const s = await weekStats(env, center, start, end).catch((e) => ({ error: String(e.message || e) }));
+    if (s.error) continue;
+    emails.push({ center: center.name, to: to.join(", "), subject: weeklySubject(center, s), html: weeklyHtml(center, s, week) });
+  }
+  return reply({ week, emails });
+}
+
+async function weekStats(env, center, start, end) {
+  const iso = (ms) => new Date(ms).toISOString();
+  const inP = `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE(CREATED_TIME(), DATETIME_PARSE('${iso(end)}'))`;
+  const [leads, books, arr] = await Promise.all([
+    at(env, "Leads", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${inP})`, max: 5000 }),
+    at(env, "Bookings", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${inP})`, max: 5000 }),
+    arriving(env, center).catch(() => ({ items: [] })),
+  ]);
+  const n = (v) => Number(first(v)) || 0;
+  const live = books.filter((b) => !/cancel|refund/i.test(String(first(b.fields["Status"]) || "")));
+  const resp = leads.map((l) => n(l.fields["Response seconds"])).filter((x) => x > 0 && x < 3600);
+  const prods = {};
+  live.forEach((b) => { const k = String(first(b.fields["P name"]) || "Other"); prods[k] = (prods[k] || 0) + (n(b.fields["Group size"]) || 1); });
+  const top = Object.entries(prods).sort((a, b) => b[1] - a[1])[0];
+  return {
+    conversations: leads.length,
+    outsideHours: leads.reduce((a, l) => a + n(l.fields["Outside hours"]), 0),
+    handedOver: leads.filter((l) => n(l.fields["Handed over"]) || first(l.fields["Handover at"])).length,
+    avgResponse: resp.length ? Math.round(resp.reduce((a, b) => a + b, 0) / resp.length) : null,
+    bookings: live.length,
+    divers: live.reduce((a, b) => a + (n(b.fields["Group size"]) || 1), 0),
+    revenue: live.reduce((a, b) => a + n(b.fields["Total value THB"]), 0),
+    atShop: live.reduce((a, b) => a + n(b.fields["Balance at shop"]), 0),
+    topProduct: top ? top[0] : "",
+    arriving: (arr.items || []).length,
+  };
+}
+
+function weeklySubject(center, s) {
+  const thb = Math.round(s.revenue).toLocaleString("en-US");
+  if (s.bookings) return `Your week with Talay: ${s.bookings} ${s.bookings === 1 ? "booking" : "bookings"}, ${thb} THB`;
+  return `Your week with Talay: ${s.conversations} ${s.conversations === 1 ? "conversation" : "conversations"}`;
+}
+
+function weeklyHtml(center, s, week) {
+  const e = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const num = (v) => Math.round(v).toLocaleString("en-US");
+  const sec = (x) => x == null ? "–" : x < 60 ? `${x} s` : `${Math.floor(x / 60)} min ${x % 60} s`;
+  const pct = (a, b) => b ? Math.round(a / b * 100) + "%" : "–";
+  const cell = (big, label, gold) => `<td width="33%" style="padding:16px 8px;text-align:left;vertical-align:top"><div style="font-size:28px;line-height:32px;font-weight:bold;color:${gold ? "#DCA44A" : "#F7F3EA"}">${big}</div><div style="font-size:12px;line-height:16px;color:#A9BDC1">${label}</div></td>`;
+  const row = (label, value) => `<tr><td style="padding:10px 0;border-bottom:1px solid #E7E0D3;font-size:14px;color:#5B6B70">${label}</td><td style="padding:10px 0;border-bottom:1px solid #E7E0D3;font-size:14px;color:#09262F;font-weight:bold;text-align:right">${value}</td></tr>`;
+  const tips = [];
+  if (s.handedOver) tips.push(`${s.handedOver} ${s.handedOver === 1 ? "conversation was" : "conversations were"} handed to your team.`);
+  if (s.arriving) tips.push(`${s.arriving} ${s.arriving === 1 ? "diver arrives" : "divers arrive"} in the next 14 days without a booking. See <b>Bookings → Arriving soon</b>.`);
+  return `<!doctype html><html><body style="margin:0;padding:0;background:#F7F3EA">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F7F3EA"><tr><td align="center" style="padding:28px 12px">
+<table width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:100%;font-family:Arial,Helvetica,sans-serif;color:#09262F">
+<tr><td style="padding:0 4px 16px;font-size:13px;color:#5B6B70">${e(center.name)} · ${e(week)}</td></tr>
+<tr><td style="background:#09262F;border-radius:16px;padding:24px 24px 12px">
+<div style="font-size:13px;color:#DCA44A;font-weight:bold">Your week with Talay</div>
+<div style="font-size:22px;line-height:28px;font-weight:bold;color:#F7F3EA;padding-top:6px">${s.bookings ? `${s.bookings} new ${s.bookings === 1 ? "booking" : "bookings"} through ${e(center.assistant)}` : `${e(center.assistant)} answered ${s.conversations} ${s.conversations === 1 ? "diver" : "divers"}`}</div>
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px"><tr>${cell(s.conversations, "conversations")}${cell(s.bookings, s.bookings === 1 ? "booking" : "bookings")}${cell(num(s.revenue), "THB booked", true)}</tr></table>
+</td></tr>
+<tr><td style="padding:20px 4px 0">
+<table width="100%" cellpadding="0" cellspacing="0" border="0">
+${row("Divers booked", s.divers)}
+${row("Collected at your shop", num(s.atShop) + " THB")}
+${row("Conversations outside office hours", `${s.outsideHours} (${pct(s.outsideHours, s.conversations)})`)}
+${row(`${e(center.assistant)}'s average first reply`, sec(s.avgResponse))}
+${s.topProduct ? row("Most booked", e(s.topProduct)) : ""}
+</table>
+</td></tr>
+${tips.length ? `<tr><td style="padding:18px 4px 0;font-size:14px;line-height:21px;color:#09262F">${tips.join("<br>")}</td></tr>` : ""}
+<tr><td style="padding:22px 4px 0"><a href="https://talay.io/zone" style="display:inline-block;background:#DCA44A;color:#09262F;font-size:14px;font-weight:bold;text-decoration:none;padding:11px 20px;border-radius:12px">Open your customer zone</a></td></tr>
+<tr><td style="padding:26px 4px 0;font-size:12px;line-height:18px;color:#8A9BA0">Sent every Monday by Talay. Questions? Reply to this e-mail.</td></tr>
+</table></td></tr></table></body></html>`;
+}
+
 // ---------- While you were diving ----------
 // What the assistant did while the team was off: from last night's closing time until this
 // morning's opening time (office hours from Centers → Escalation hours, Koh Tao time).
