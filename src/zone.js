@@ -74,6 +74,7 @@ export async function handleZone(request, env, ctx) {
       return json(await cached(env, `dash/v4/${center.slug}/${per || "30d"}`, 120, () => dashboard(env, center, per), fresh));
     }
     if (p === "/zone/api/arriving") return json(await cached(env, `arr/${center.slug}`, 300, () => arriving(env, center), fresh));
+    if (p === "/zone/api/milestones") return json(await cached(env, `ms/${center.slug}`, 600, () => milestones(env, center), fresh));
     if (p === "/zone/api/overnight") return json(await cached(env, `night/${center.slug}`, 120, () => overnight(env, center), fresh));
     if (p === "/zone/api/unfinished") return json(await cached(env, `unf/${center.slug}`, 180, () => unfinished(env, center), fresh));
     if (p === "/zone/api/tickets") return json(await cached(env, `tick/${center.slug}`, 30, () => tickets(env, center), fresh));
@@ -773,6 +774,41 @@ async function arriving(env, center) {
   }
   items.sort((a, b) => a.from.localeCompare(b.from));
   return { today, items };
+}
+
+// ---------- Milestones ----------
+// All-time totals through Talay and the milestones they crossed (with the day they were reached),
+// plus progress towards the next one.
+const MS_STEPS = {
+  divers: [10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
+  revenue: [50000, 100000, 250000, 500000, 1000000, 2500000, 5000000],
+  conversations: [100, 250, 500, 1000, 2500, 5000, 10000],
+};
+async function milestones(env, center) {
+  const [books, leads] = await Promise.all([
+    at(env, "Bookings", { formula: `FIND('${q(center.name)}', ARRAYJOIN({Center}))`, fields: ["Group size", "Total value THB", "Status"], max: 10000 }),
+    at(env, "Leads", { formula: `FIND('${q(center.name)}', ARRAYJOIN({Center}))`, fields: ["Status"], max: 20000 }),
+  ]);
+  const n = (v) => Number(first(v)) || 0;
+  const live = books.filter((b) => !/cancel|refund/i.test(String(first(b.fields["Status"]) || "")))
+    .sort((a, b) => a.createdTime.localeCompare(b.createdTime));
+  const series = {
+    divers: live.map((b) => [b.createdTime, n(b.fields["Group size"]) || 1]),
+    revenue: live.map((b) => [b.createdTime, n(b.fields["Total value THB"])]),
+    conversations: [...leads].sort((a, b) => a.createdTime.localeCompare(b.createdTime)).map((l) => [l.createdTime, 1]),
+  };
+  const out = {};
+  for (const [k, rows] of Object.entries(series)) {
+    let sum = 0, reached = null;
+    const steps = MS_STEPS[k];
+    let si = 0;
+    for (const [when, v] of rows) {
+      sum += v;
+      while (si < steps.length && sum >= steps[si]) { reached = { value: steps[si], at: when }; si++; }
+    }
+    out[k] = { total: sum, reached, next: steps[si] || null };
+  }
+  return out;
 }
 
 // ---------- While you were diving ----------
@@ -1681,6 +1717,20 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .fstep em{font-style:normal;font-size:12px;color:var(--muted)}
 .fpct{position:absolute;right:0;top:-24px;font-size:12px;font-weight:700;color:var(--muted)}
 @media (max-width:760px){.fsteps{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 14px}.fstep b{font-size:22px}}
+
+/* Milestones */
+.ms{display:flex;align-items:center;gap:16px;margin:0 0 14px;padding:16px 20px;border-radius:16px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow)}
+.ms .msicon{flex:none;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(220,164,74,.18);color:#B07F1E}
+.ms .msbody{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.ms .msbody b{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.ms .msbody small{font-size:12.5px;color:var(--muted)}
+.msprog{height:8px;border-radius:4px;background:var(--paper);overflow:hidden;margin-top:8px;max-width:420px}
+.msprog span{display:block;height:100%;background:var(--sand);border-radius:4px}
+.ms.small{margin:8px 12px 2px;padding:10px 14px;gap:12px}
+.ms.small .msicon{width:34px;height:34px}
+.ms.small .msbody b{font-size:13.5px}
+@media (prefers-color-scheme:dark){.ms .msicon{color:var(--sand)}}
+@media (max-width:760px){.ms.small{margin:8px 10px 2px}}
 </style></head>
 <body>
 <header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>Customer zone</small></span></div><span class="sp"></span>${switcher}<div class="htools"><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">Sign out</span></a></div></header>
@@ -1698,6 +1748,7 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
       </div>
     </div>
     <div class="night" id="night" hidden></div>
+    <div class="ms small" id="msChat" hidden></div>
     <div class="items" id="list"><div class="empty">Loading…</div></div>
   </div>
   <div class="pane" id="pane"><div class="placeholder">Pick a conversation.<br><br><b>Open</b> shows every diver who wrote in the last 24 hours: WhatsApp only lets you reply freely within that window. <b>Needs you</b> means ${esc(center.assistant)} handed it over to your team.</div></div>
@@ -1783,6 +1834,7 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
       <button class="ghost" id="stCsv" type="button">Download CSV</button>
     </div>
     <div class="night big" id="nightDash" hidden></div>
+    <div class="ms" id="ms" hidden></div>
     <div id="dbody"><div class="bempty">Loading…</div></div>
   </div>
 </section>
@@ -2285,6 +2337,37 @@ function zoneClient(cfg) {
   function fmtSec(s) { if (s == null) return "–"; if (s < 60) return s + " s"; return Math.floor(s / 60) + " min " + (s % 60) + " s"; }
   function pct(a, b) { return b ? Math.round(a / b * 100) + "%" : "–"; }
   $("#period").onchange = function () { loadDash(); };
+  // ---- Milestones
+  var MS_LABEL = {
+    divers: function (v) { return v.toLocaleString("en-US") + " divers booked through Talay"; },
+    revenue: function (v) { return v.toLocaleString("en-US") + " THB booked through Talay"; },
+    conversations: function (v) { return v.toLocaleString("en-US") + " conversations answered"; },
+  };
+  function ordinalDay(iso) { return new Date(iso).toLocaleDateString([], { day: "numeric", month: "long" }); }
+  function loadMilestones() {
+    return api("milestones").then(function (d) {
+      if (!d || d.error) return;
+      var latest = null;
+      ["divers", "revenue", "conversations"].forEach(function (k) {
+        var r = d[k] && d[k].reached;
+        if (r && (!latest || r.at > latest.at)) latest = { k: k, value: r.value, at: r.at };
+      });
+      var trophy = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0V4ZM8 6H5a3 3 0 0 0 3 3M16 6h3a3 3 0 0 1-3 3M12 13v4M8 21h8M9 17h6"/></svg>';
+      var dv = d.divers || { total: 0, next: 10 };
+      var goal = dv.next, have = dv.total;
+      var prog = goal ? '<div class="msprog"><span style="width:' + Math.min(100, Math.round(have / goal * 100)) + '%"></span></div><small>' + have.toLocaleString("en-US") + " of " + goal.toLocaleString("en-US") + " divers · " + (goal - have).toLocaleString("en-US") + " to go</small>" : "";
+      var head = latest ? "<b>" + esc(MS_LABEL[latest.k](latest.value)) + "</b><small>Reached on " + esc(ordinalDay(latest.at)) + "</small>" :
+        "<b>Your first milestone: 10 divers through Talay</b><small>Every booking through " + esc(cfg.assistant) + " counts.</small>";
+      var html = '<div class="msicon">' + trophy + '</div><div class="msbody">' + head + prog + "</div>";
+      var dash = $("#ms"); dash.innerHTML = html; dash.hidden = false;
+      var recent = latest && (Date.now() - Date.parse(latest.at)) < 7 * 86400000;
+      var chat = $("#msChat");
+      if (recent) { chat.innerHTML = '<div class="msicon">' + trophy + '</div><div class="msbody"><b>' + esc(MS_LABEL[latest.k](latest.value)) + "</b><small>Reached on " + esc(ordinalDay(latest.at)) + "</small></div>"; chat.hidden = false; }
+      else chat.hidden = true;
+    }).catch(function () {});
+  }
+  loadMilestones(); setInterval(function () { if (!document.hidden) loadMilestones(); }, 1800000);
+
   // ---- While you were diving
   function nightHtml(d) {
     var when = d.live ? "Tonight so far · since " + d.closeAt : "Last night · " + d.closeAt + "–" + d.openAt;
