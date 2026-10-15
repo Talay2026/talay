@@ -425,6 +425,12 @@ footer a:hover{text-decoration:underline}
  .zone-head span{display:none}
  .zc-dots button{padding:6px 8px;font-size:.72rem}
 }
+
+/* Carousel v2: stacked slides, fade */
+.zc-track{display:grid;margin:var(--s4) 0 0;overflow:visible;scroll-snap-type:none}
+.zc-slide{grid-area:1 / 1;padding:0;visibility:hidden;opacity:0;transition:opacity .35s ease,visibility 0s .35s}
+.zc-slide.on{visibility:visible;opacity:1;transition:opacity .35s ease}
+@media(prefers-reduced-motion:reduce){.zc-slide,.zc-slide.on{transition:none}}
 </style>
 </head>
 <body id="top">
@@ -841,39 +847,43 @@ const TURNSTILE_SITEKEY = "0x4AAAAAAFXZnn0VWocS_nWR";  // Cloudflare Turnstile s
     io.observe(chat);
   }
 
-  // Customer zone carousel: swipe, arrows or labels; plays on its own until someone interacts
+  // Customer zone carousel: all slides share one grid cell (no jumping, no half slides);
+  // tabs, arrows or swipe switch slides; plays on its own until someone interacts
   const zone = document.getElementById('zone');
   const track = document.getElementById('zc-track');
   const slides = [...track.children];
   const dots = [...document.querySelectorAll('#zc-dots button')];
-  let zi = 0, zuser = false, zst;
+  let zi = 0;
   function zmark(i) {
-    zi = i;
     dots.forEach((d, k) => { d.setAttribute('aria-current', k === i); d.classList.remove('run'); });
-    void dots[i].offsetWidth; dots[i].classList.add('run');
+    if (zone.classList.contains('auto')) { void dots[i].offsetWidth; dots[i].classList.add('run'); }
   }
   function zgo(i) {
-    i = (i + slides.length) % slides.length;
-    track.scrollTo({ left: slides[i].offsetLeft - track.offsetLeft, behavior: reduced.matches ? 'auto' : 'smooth' });
-    zmark(i);
+    zi = (i + slides.length) % slides.length;
+    slides.forEach((s, k) => { s.classList.toggle('on', k === zi); s.setAttribute('aria-hidden', k === zi ? 'false' : 'true'); });
+    zmark(zi);
   }
-  const stop = () => { zuser = true; zone.classList.remove('auto'); };
+  const stop = () => { zone.classList.remove('auto'); dots.forEach(d => d.classList.remove('run')); };
   document.getElementById('zc-prev').addEventListener('click', () => { stop(); zgo(zi - 1); });
   document.getElementById('zc-next').addEventListener('click', () => { stop(); zgo(zi + 1); });
   dots.forEach((d, k) => {
     d.addEventListener('click', () => { stop(); zgo(k); });
     d.addEventListener('animationend', () => { if (zone.classList.contains('auto')) zgo(zi + 1); });
   });
-  ['pointerdown', 'wheel', 'touchstart'].forEach(ev => track.addEventListener(ev, stop, { passive: true }));
-  track.addEventListener('scroll', () => {
-    clearTimeout(zst);
-    zst = setTimeout(() => { const i = Math.round(track.scrollLeft / track.clientWidth); if (i !== zi && zuser) zmark(i); }, 80);
-  });
+  let sx = null, sy = null;
+  track.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+  track.addEventListener('touchend', e => {
+    if (sx === null) return;
+    const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { stop(); zgo(zi + (dx < 0 ? 1 : -1)); }
+    sx = sy = null;
+  }, { passive: true });
   zone.addEventListener('mouseenter', () => zone.classList.add('paused'));
   zone.addEventListener('mouseleave', () => zone.classList.remove('paused'));
+  zgo(0);
   if (!reduced.matches) {
     const zio = new IntersectionObserver(entries => {
-      if (entries.some(e => e.isIntersecting) && !zuser) { zio.disconnect(); zone.classList.add('auto'); zmark(0); }
+      if (entries.some(e => e.isIntersecting)) { zio.disconnect(); zone.classList.add('auto'); zmark(zi); }
     }, { threshold: 0.35 });
     zio.observe(zone);
   }
