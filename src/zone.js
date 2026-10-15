@@ -425,12 +425,33 @@ async function chat(env, center, id) {
   const canReply = !!closesAt && Date.parse(closesAt) > Date.now();
   const lead = leadInfo(leads[id]);
   if (/^rec[A-Za-z0-9]{14}$/.test(lead.interested)) lead.interested = (await productNames(env, [lead.interested]))[lead.interested] || "";
+  const diverBookings = await (async () => {
+    const c = String(lead.contact || "").trim();
+    if (!/^\+?[0-9 ]{6,20}$/.test(c)) return [];
+    const flat = c.replace(/\s+/g, "");
+    const rows = await at(env, "Bookings", {
+      formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), OR({Payer phone} & '' = '${q(c)}', SUBSTITUTE({Payer phone} & '', ' ', '') = '${q(flat)}'))`,
+      fields: ["Ref", "Activity date", "P name", "Group size", "Deposit paid THB", "Balance at shop", "Total value THB", "Status", "Refunded THB", "Manage token"],
+      sort: [{ field: "Activity date", direction: "desc" }], max: 20,
+    }).catch(() => []);
+    const n = (v) => Number(first(v)) || 0;
+    return rows.map((r) => {
+      const f = r.fields, token = String(first(f["Manage token"]) || "");
+      return {
+        ref: first(f["Ref"]) || "", date: String(first(f["Activity date"]) || "").slice(0, 10), product: String(first(f["P name"]) || ""),
+        divers: n(f["Group size"]) || 1, deposit: n(f["Deposit paid THB"]), balance: n(f["Balance at shop"]), total: n(f["Total value THB"]),
+        refunded: n(f["Refunded THB"]), status: String(first(f["Status"]) || "Confirmed"),
+        manage: /^[0-9a-fA-F-]{20,64}$/.test(token) ? `/b/manage?t=${token}` : "",
+      };
+    });
+  })();
   const teamAt = Math.max(Date.parse(lastTeam?.at || 0) || 0, Date.parse(lead.humanAt || 0) || 0);
   const handover = Date.parse(lead.handoverAt || 0) || 0;
   return {
     id, lead, hasLead: !!leads[id], messages, closesAt, canReply,
     needsYou: canReply && handover > teamAt && !lead.optedOut,
     cc: (countryOf(lead.contact) || [""])[0],
+    bookings: diverBookings,
     _leadRec: leads[id] || null,
   };
 }
@@ -2134,6 +2155,20 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .cmeta .bt.soon{color:var(--warn);font-weight:700}
 .composer .note{background:none;padding:6px 0 0;font-size:11.5px}
 @media (max-width:760px){.composer{padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px))}.composer .pcl span,.composer .pcl{font-size:0;gap:0}.composer .pcl svg{width:16px;height:16px}.composer .note{display:none}.composer .note.err{display:block}.cbox textarea{font-size:16px}}
+
+/* Booking in the conversation */
+.bkwrap{background:var(--card);border-bottom:1px solid var(--line);padding:0 22px 12px;display:grid;gap:8px}
+.bkc{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;background:rgba(95,192,138,.12);border:1px solid rgba(95,192,138,.35)}
+.bki{flex:none;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--card);color:#1E7A52}
+.bkb{flex:1;min-width:0;display:flex;flex-direction:column}
+.bkb b{font-size:13.5px}
+.bkb small{font-size:12px;color:var(--muted)}
+.bkw{flex:none;font-size:11.5px;font-weight:700;color:#1E7A52;background:var(--card);border-radius:999px;padding:3px 9px}
+.bkm{flex:none;text-decoration:none;font-size:12px}
+.bkp{font-size:12px;color:var(--muted)}
+.tag.ret{background:rgba(220,164,74,.18);color:#8A5E14}
+@media (prefers-color-scheme:dark){.bki,.bkw{color:#6FCF9B}.tag.ret{color:var(--sand)}}
+@media (max-width:760px){.pane .head > .tag.ret{display:none}.bkwrap{padding:0 12px 10px}.bkc{flex-wrap:wrap}.bkb{flex-basis:calc(100% - 46px)}.bkw{margin-left:46px}.bkm{margin-left:auto}}
 </style></head>
 <body>
 <header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>Customer zone</small></span></div><span class="sp"></span>${switcher}<div class="htools"><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">Sign out</span></a></div></header>
@@ -2418,7 +2453,7 @@ function zoneClient(cfg) {
     api("chat?c=" + encodeURIComponent(id) + fr).then(function (d) {
       if (id !== current) return;
       if (d.messages && d.messages.length) chatSeenAt = d.messages[d.messages.length - 1].at;
-      var key = JSON.stringify([d.messages.length, d.canReply, d.needsYou, d.lead]);
+      var key = JSON.stringify([d.messages.length, d.canReply, d.needsYou, d.lead, d.bookings]);
       if (key === lastChat) return;
       var draft = $("#txt") ? $("#txt").value : "";
       var oldBox = $("#msgs"), keepTop = null;
@@ -2435,8 +2470,10 @@ function zoneClient(cfg) {
       $("#pane").innerHTML =
         '<div class="head"><button class="back" aria-label="Back">‹</button>' + avatar(L.name || L.contact, d.cc) + '<div><b>' + esc(dname(L.name, L.contact)) + "</b>" +
         (l.t ? '<div class="sub">' + esc(l.t) + "</div>" : "") + "</div>" +
-        (d.needsYou ? '<span class="tag need">Needs you</span>' : "") + '<div class="actions">' + actions + "</div></div>" +
-        (facts ? '<div class="facts">' + facts + "</div>" : "") +
+        (d.needsYou ? '<span class="tag need">Needs you</span>' : "") +
+        ((d.bookings || []).filter(function (b) { return !/cancel|refund/i.test(b.status); }).length > 1 ? '<span class="tag ret">Returning diver</span>' : "") +
+        '<div class="actions">' + actions + "</div></div>" +
+        (facts ? '<div class="facts">' + facts + "</div>" : "") + bookingCard(d.bookings) +
         '<div class="msgs" id="msgs">' + (function () {
           var prevDay = "";
           return d.messages.map(function (m, idx) {
@@ -2828,6 +2865,30 @@ function zoneClient(cfg) {
       }).then(function () { setUi(false); show("Turned off for this device."); }).catch(function (e) { show(e.message, true); });
     };
   })();
+
+  // ---- The diver's bookings, shown in the conversation
+  function bookingCard(list) {
+    list = list || [];
+    if (!list.length) return "";
+    var today = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
+    var cx = function (b) { return /cancel|refund/i.test(b.status); };
+    var up = list.filter(function (b) { return b.date >= today && !cx(b); }).sort(function (a, b) { return a.date.localeCompare(b.date); });
+    var past = list.filter(function (b) { return up.indexOf(b) < 0; });
+    var fmt = function (iso) { return new Date(iso + "T12:00:00Z").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }); };
+    var money = function (v) { return Math.round(v).toLocaleString("en-US") + " THB"; };
+    var ico = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
+    var card = function (b) {
+      var days = Math.round((Date.parse(b.date) - Date.parse(today)) / 86400000);
+      var when = days === 0 ? "Today" : days === 1 ? "Tomorrow" : "In " + days + " days";
+      return '<div class="bkc"><span class="bki">' + ico + '</span><div class="bkb"><b>' + esc(b.product) + " · " + esc(fmt(b.date)) + " · " + b.divers + (b.divers === 1 ? " diver" : " divers") +
+        '</b><small>' + money(b.deposit) + " paid online · " + money(b.balance) + " at the shop · " + esc(b.ref) + '</small></div><span class="bkw">' + when + "</span>" +
+        (b.manage ? '<a class="ghost bkm" href="' + esc(b.manage) + '" target="_blank" rel="noopener">Move / cancel</a>' : "") + "</div>";
+    };
+    var pastLine = past.length ? '<div class="bkp">' + (up.length ? "Earlier: " : "Booked before: ") + past.slice(0, 3).map(function (b) {
+      return esc(b.product) + " (" + esc(fmt(b.date)) + (cx(b) ? ", cancelled" : "") + ")";
+    }).join(" · ") + (past.length > 3 ? " · +" + (past.length - 3) + " more" : "") + "</div>" : "";
+    return '<div class="bkwrap">' + up.map(card).join("") + pastLine + "</div>";
+  }
 
   // ---- Pretty names and facts
   var isPhone = function (s) { return /^\+?[\d\s()-]{6,}$/.test(String(s || "").trim()); };
