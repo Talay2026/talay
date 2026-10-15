@@ -96,6 +96,25 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 @keyframes message-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.convo.playing .reveal{animation:none;opacity:1}}
 
+/* Chat demo: scrollable phone */
+.convo{max-width:380px}
+.screen{height:500px;overflow-y:auto;overscroll-behavior:contain;scroll-behavior:smooth;margin-right:-6px;padding-right:6px;scrollbar-width:thin;scrollbar-color:var(--ridge) transparent}
+.step.hide{display:none}
+.step:not(.hide){animation:message-in .32s ease-out both}
+@media(prefers-reduced-motion:reduce){.step:not(.hide){animation:none}}
+.note{width:fit-content;margin:var(--s1) auto var(--s2);padding:2px 10px;border-radius:999px;background:rgba(220,164,74,.14);color:var(--sand);font-size:.7rem;font-weight:600}
+.msg .btn{display:block;margin-top:var(--s2);padding:6px 12px;border-radius:6px;background:var(--deep);color:var(--shore);text-align:center;font-weight:600;font-size:.8rem}
+.typing{display:flex;gap:4px;width:fit-content;margin:0 0 var(--s3) auto;padding:10px 12px;border-radius:var(--radius);border-bottom-right-radius:var(--s1);background:var(--shore)}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--ink-soft);animation:typing 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes typing{0%,60%,100%{opacity:.3;transform:none}30%{opacity:1;transform:translateY(-3px)}}
+.alert{margin-top:var(--s2);padding:var(--s3);border-radius:10px;background:var(--sand);color:var(--deep);font-size:.8rem;line-height:1.5}
+.alert b{display:block;margin-bottom:2px}
+.alert small{display:block;margin-top:var(--s2);font-size:.72rem;font-weight:600}
+.replay{display:block;margin:var(--s3) auto 0;padding:6px 14px;border:1px solid var(--ridge);border-radius:999px;background:none;color:var(--on-deep);font:inherit;font-size:.8rem;cursor:pointer}
+.replay:hover{color:var(--shore);border-color:var(--on-deep)}
+@media(max-width:599px){.screen{height:440px}}
+
 /* Channels */
 .channels{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3) var(--s6);padding-block:var(--s6);border-top:1px solid var(--ridge)}
 .channels > p{font-size:var(--t-small);color:var(--on-deep);font-weight:500}
@@ -326,17 +345,28 @@ footer a:hover{text-decoration:underline}
       </ul>
     </div>
 
-    <figure class="convo" aria-label="Illustrative conversation between a diver and a dive centre's assistant">
+    <figure class="convo" aria-label="Example conversation between a diver and a dive centre's assistant">
       <div class="phone">
         <div class="phone-head">
           <span class="dot"><svg width="20" height="20" viewBox="0 0 100 100" aria-hidden="true"><path d="M 12 50 A 38 38 0 0 0 88 50 Z" fill="#B07F1E"/><circle cx="50" cy="50" r="38" fill="none" stroke="#0A2029" stroke-width="11"/><line x1="6" y1="50" x2="94" y2="50" stroke="#0A2029" stroke-width="11" stroke-linecap="round"/></svg></span>
           <span><b>Your dive centre</b><small>Assistant · replies in seconds</small></span>
         </div>
-        <div class="msg them reveal" style="animation-delay:.12s"><span class="sr-only">Diver: </span>Hi! How much is the Open Water course?<time>23:47</time></div>
-        <div class="msg us reveal" style="animation-delay:.52s"><span class="sr-only">Assistant: </span>Hi! The Open Water is 12,500 THB for 3 days, gear and certification included. Pick your start date and book here.<time>23:47</time></div>
-        <p class="wait reveal" style="animation-delay:1.08s">no reply · next morning</p>
-        <div class="msg us reveal" style="animation-delay:1.42s"><span class="sr-only">Assistant: </span>Still thinking about your Open Water? You can book in a minute, right here.<time>08:00</time></div>
-        <div class="msg them reveal" style="animation-delay:1.88s"><span class="sr-only">Diver: </span>Booked for two from the 15th!<time>08:06</time></div>
+        <div class="screen" id="chat" tabindex="0" aria-label="Example conversation, scrollable">
+          <p class="note step">23:47 · shop closed</p>
+          <div class="msg them step"><span class="sr-only">Diver: </span>Hi! There are two of us, never dived before. How much is the Open Water? I'm also a bit scared of deep water 😅<time>23:47</time></div>
+          <p class="note step">Replied in 8 seconds</p>
+          <div class="msg us step" data-typing="1"><span class="sr-only">Assistant: </span>Hi! I'm Mia, the dive centre's virtual assistant 🙂 If I can't help with something, just ask for a colleague.<br><br>Totally normal, lots of people feel that way before their first dive 🙂 You start in the pool at your own pace, with your instructor right next to you, and extra time costs nothing. Not sure yet? The Basic Diver is a good way to start: just one day, and afterwards you decide whether you want to continue.<br><br><b>Open Water</b>: 3 days, 12,500 THB<br>Includes all dive gear, learning materials, certification and 4 nights of A/C accommodation.<br><br>You pay 1,500 THB online to secure your spot, the rest at the shop.<br><br>Pick your start date here 👇<span class="btn">Book now</span><time>23:47</time></div>
+          <div class="msg them step"><span class="sr-only">Diver: </span>What should we bring? And can we start on the 15th?<time>23:49</time></div>
+          <div class="msg us step" data-typing="1"><span class="sr-only">Assistant: </span>Just bring swimwear, a towel and sunscreen 🙂 All dive gear and a dive computer are included.<br><br>Courses can start almost any day, and you pick your start date yourself on the booking page. Want to start tomorrow? Book a course or the Basic Diver before 16:00 (Thai time) today, because there's an orientation at 17:00 the day before your start.<time>23:49</time></div>
+          <p class="wait step">no reply · next morning</p>
+          <p class="note step">Automatic follow-up</p>
+          <div class="msg us step" data-typing="1"><span class="sr-only">Assistant: </span>Hey, just checking in 🙂 Any questions I can help with?<br><br>Your booking link is right here whenever you're ready:<span class="btn">Book now</span><time>08:00</time></div>
+          <p class="note step">Booked and paid online</p>
+          <div class="msg us step" data-typing="1"><span class="sr-only">Assistant: </span>You're booked! 🎉<br><br><b>Open Water</b><br>Date: 15 November<br>Divers: 2<br><br>Paid online: 3,000 THB<br>To pay at the shop: <b>22,000 THB</b><br><br>See you soon on Koh Tao! If anything changes, just message us here.<time>08:06</time></div>
+          <p class="note step">Your team gets</p>
+          <div class="alert step"><b>New booking via Talay ✅</b>Open Water on 15 November · Divers: 2<br>Paid online: 3,000 THB. To collect at the shop: 22,000 THB.<small>The inquiry came in at 23:47, while the shop was closed.</small></div>
+        </div>
+        <button type="button" class="replay" id="replay" hidden>↺ Replay</button>
       </div>
     </figure>
   </section>
@@ -601,16 +631,45 @@ const TURNSTILE_SITEKEY = "0x4AAAAAAFXZnn0VWocS_nWR";  // Cloudflare Turnstile s
 /* ---------------------------------------------- */
 
 (() => {
-  // Chat animation in the hero
-  const demo = document.querySelector('.convo');
+  // Chat demo in the hero: messages appear one by one and scroll inside the phone
+  const chat = document.getElementById('chat');
+  const replay = document.getElementById('replay');
+  const steps = [...chat.querySelectorAll('.step')];
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-  function play() {
-    if (reduced.matches) return;
-    demo.classList.add('playing');
-    setTimeout(() => demo.classList.remove('playing'), 2400);
+  let timers = [], run = 0, stick = true;
+  const pause = ms => new Promise(r => timers.push(setTimeout(r, ms)));
+  const toBottom = () => { if (stick) chat.scrollTop = chat.scrollHeight; };
+  chat.addEventListener('scroll', () => { stick = chat.scrollHeight - chat.scrollTop - chat.clientHeight < 40; });
+  async function playChat() {
+    const id = ++run;
+    timers.forEach(clearTimeout); timers = [];
+    chat.querySelectorAll('.typing').forEach(t => t.remove());
+    steps.forEach(s => s.classList.add('hide'));
+    replay.hidden = true; stick = true; chat.scrollTop = 0;
+    for (const s of steps) {
+      const isNote = s.classList.contains('note') || s.classList.contains('wait');
+      if (s.dataset.typing) {
+        const t = document.createElement('div');
+        t.className = 'typing'; t.setAttribute('aria-hidden', 'true'); t.innerHTML = '<i></i><i></i><i></i>';
+        s.before(t); toBottom();
+        await pause(1400); if (id !== run) return;
+        t.remove();
+      } else if (!isNote) {
+        await pause(1100); if (id !== run) return;
+      }
+      s.classList.remove('hide'); toBottom();
+      await pause(isNote ? 450 : 900); if (id !== run) return;
+    }
+    replay.hidden = false;
   }
-  const start = () => (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => requestAnimationFrame(play));
-  if (document.readyState === 'complete') start(); else addEventListener('load', start, { once: true });
+  replay.addEventListener('click', playChat);
+  if (!reduced.matches) {
+    steps.forEach(s => s.classList.add('hide'));
+    const io = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) { io.disconnect(); playChat(); }
+    }, { threshold: 0.4 });
+    io.observe(chat);
+  }
 
   // Demo form
   const form = document.getElementById('demo-form');
