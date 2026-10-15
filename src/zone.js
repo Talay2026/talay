@@ -1041,7 +1041,7 @@ function app(center, centers, email) {
 <meta name="theme-color" content="#0A2029">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="${esc(center.name.split(" ")[0])}">
 <style>
 :root{--deep:#0A2029;--paper:#F4F0E6;--paper-2:#FBF8F1;--card:#fff;--muted:#55646A;--line:#E2DACB;--in:#fff;--mia:#E6F0F2;--team:#D9FDD3;--ok:#1F7A55;--warn:#B4561B;--sand:#E8B04B;color-scheme:light}
@@ -1268,7 +1268,7 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
   .items,.bwrap,.swrap{padding-bottom:16px}
   input,select,textarea{font-size:16px !important}
   body.inchat header{display:none}
-  .pane .head{padding:8px 12px;gap:6px 8px;flex-wrap:nowrap}
+  .pane .head{padding:calc(8px + env(safe-area-inset-top,0px)) 12px 8px;gap:6px 8px;flex-wrap:nowrap}
   .pane .head b{font-size:16px}
   .pane .head .actions{margin-left:auto;width:auto;flex-wrap:nowrap}
   .pane .head .ghost{font-size:12px;padding:5px 9px;white-space:nowrap}
