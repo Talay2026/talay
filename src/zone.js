@@ -396,6 +396,16 @@ async function conversations(env, center, view) {
   return { conversations: list, needsCount: list.filter((c) => c.needsYou).length };
 }
 
+// Linked "Interested in" values come back as record ids (recXXXXXXXXXXXXXX): look up the product names.
+async function productNames(env, ids) {
+  const want = [...new Set(ids.filter((x) => /^rec[A-Za-z0-9]{14}$/.test(String(x || ""))))].slice(0, 50);
+  if (!want.length) return {};
+  const rows = await at(env, "Products", { formula: `OR(${want.map((id) => `RECORD_ID() = '${id}'`).join(",")})`, fields: ["Name"], max: 50 }).catch(() => []);
+  const out = {};
+  rows.forEach((r) => { out[r.id] = String(first(r.fields["Name"]) || ""); });
+  return out;
+}
+
 async function chat(env, center, id) {
   if (!okId(id)) return { error: "Unknown conversation" };
   const rows = await at(env, "Chat", {
@@ -414,6 +424,7 @@ async function chat(env, center, id) {
   const closesAt = lastCustomer ? new Date(Date.parse(lastCustomer.at) + DAY).toISOString() : null;
   const canReply = !!closesAt && Date.parse(closesAt) > Date.now();
   const lead = leadInfo(leads[id]);
+  if (/^rec[A-Za-z0-9]{14}$/.test(lead.interested)) lead.interested = (await productNames(env, [lead.interested]))[lead.interested] || "";
   const teamAt = Math.max(Date.parse(lastTeam?.at || 0) || 0, Date.parse(lead.humanAt || 0) || 0);
   const handover = Date.parse(lead.handoverAt || 0) || 0;
   return {
@@ -832,6 +843,8 @@ async function arriving(env, center) {
       chat: okId(chat) ? chat : "", canMessage: last > 0 && Date.now() - last < DAY,
     });
   }
+  const names = await productNames(env, items.map((i) => i.interested));
+  items.forEach((i) => { if (names[i.interested] !== undefined) i.interested = names[i.interested]; else if (/^rec[A-Za-z0-9]{14}$/.test(i.interested)) i.interested = ""; });
   items.sort((a, b) => a.from.localeCompare(b.from));
   return { today, items };
 }
@@ -2085,6 +2098,42 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .cnone{color:var(--line);font-size:13px}
 @media (max-width:760px){.cal{grid-template-columns:repeat(2,minmax(0,1fr))}.cday{min-height:0}}
 @media print{#today{display:none !important}}
+
+/* Chat v3: cleaner header facts, quieter bubbles, modern composer */
+.av.anon{background:var(--paper)!important;color:var(--muted);border:1px solid var(--line)}
+.pane .head .sub{font-size:12.5px}
+.facts span{font-size:12px;padding:3px 10px}
+.m .who{text-transform:none;letter-spacing:0;font-size:11.5px;font-weight:700;color:#9A6B1F;margin-bottom:2px}
+.m.Team .who{color:#DCA44A}
+@media (prefers-color-scheme:dark){.m .who{color:var(--sand)}}
+.m{line-height:1.5}
+.m small{display:flex;justify-content:flex-end;align-items:center;gap:8px}
+.rep{margin-left:0;text-decoration:none;font-weight:600;border-radius:6px;padding:1px 6px}
+.rep:hover{background:rgba(9,38,47,.06);color:var(--deep)}
+@media (hover:hover){.rep{opacity:0;transition:opacity .15s}.m:hover .rep{opacity:1}}
+.composer{border-top:1px solid var(--line);background:var(--card);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))}
+.composer .pchips{padding:0 0 10px;background:none;flex-wrap:nowrap;gap:10px}
+.composer .pcl{display:inline-flex;align-items:center;gap:6px;flex:none;font-size:12px;font-weight:600;color:var(--muted);margin:0}
+.pscroll{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 92%,transparent);mask-image:linear-gradient(90deg,#000 92%,transparent);padding-right:24px}
+.pscroll::-webkit-scrollbar{display:none}
+.composer .pchip{flex:none;font-size:12px;padding:4px 10px;background:var(--card)}
+.cbox{display:flex;align-items:flex-end;gap:8px;background:var(--paper-2);border:1px solid var(--line);border-radius:18px;padding:6px 6px 6px 14px;transition:border-color .15s,box-shadow .15s}
+.cbox:focus-within{border-color:var(--sand);box-shadow:0 0 0 3px rgba(220,164,74,.18)}
+.cbox textarea{flex:1;border:0;background:none;resize:none;font:inherit;font-size:15px;line-height:1.45;color:var(--deep);padding:7px 0;min-height:22px;max-height:180px;outline:none;box-shadow:none}
+.cbox textarea:focus{outline:none;box-shadow:none}
+.send{flex:none;width:40px;height:40px;border:0;border-radius:50%;background:var(--sand);color:#09262F;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:filter .15s,transform .1s}
+.send:hover{filter:brightness(1.05)}.send:active{transform:scale(.95)}
+.send[disabled]{opacity:.6;cursor:progress}
+.send.busy svg{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cmeta{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12px;color:var(--muted)}
+.cmeta .sig{display:inline-flex;align-items:center;gap:6px}
+.cmeta .sig input{font:inherit;font-size:12px;font-weight:600;color:var(--deep);border:0;border-bottom:1px dashed var(--line);background:none;padding:2px 0;width:110px;outline:none}
+.cmeta .sig input:focus{border-bottom-color:var(--sand)}
+.cmeta .sp{flex:1}
+.cmeta .bt.soon{color:var(--warn);font-weight:700}
+.composer .note{background:none;padding:6px 0 0;font-size:11.5px}
+@media (max-width:760px){.composer{padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px))}.composer .pcl span,.composer .pcl{font-size:0;gap:0}.composer .pcl svg{width:16px;height:16px}.composer .note{display:none}.composer .note.err{display:block}.cbox textarea{font-size:16px}}
 </style></head>
 <body>
 <header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>Customer zone</small></span></div><span class="sp"></span>${switcher}<div class="htools"><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">Sign out</span></a></div></header>
@@ -2333,13 +2382,13 @@ function zoneClient(cfg) {
       var who = c.previewDir === "Customer" ? "" : (c.previewDir === "Team" ? "You: " : cfg.assistant + ": ");
       return '<button class="item' + (c.id === current ? " on" : "") + '" data-id="' + esc(c.id) + '" data-close="' + esc(c.closesAt || "") + '">' +
         avatar(c.name, c.cc) + '<div class="ib">' +
-        '<div class="top"><span class="nm">' + esc(c.name || "Diver") + "</span>" +
+        '<div class="top"><span class="nm">' + esc(dname(c.name)) + "</span>" +
         '<span class="tm">' + ago(c.lastAt) + "</span></div>" +
         ((c.needsYou || c.teamActive || /booked/i.test(c.status) || c.language) ? '<div class="tags">' +
         (c.needsYou ? '<span class="tag need">Needs you</span>' : "") +
         (c.teamActive ? '<span class="tag team">Team</span>' : "") +
         (/booked/i.test(c.status) ? '<span class="tag st">Booked</span>' : "") +
-        (c.language ? '<span class="tag lang">' + esc(c.language) + "</span>" : "") + "</div>" : "") +
+        (c.language ? '<span class="tag lang">' + esc(langName(c.language)) + "</span>" : "") + "</div>" : "") +
         '<div class="pv">' + esc(who + c.preview) + "</div>" +
         (l.t ? '<div class="left' + (l.soon ? " soon" : "") + '">' + l.t + "</div>" : "") + "</div></button>";
     }).join("");
@@ -2379,12 +2428,12 @@ function zoneClient(cfg) {
       var actions = "";
       if (d.hasLead && L.human) actions += '<button class="ghost" id="handback">Let ' + esc(cfg.assistant) + " take over</button>";
       if (d.hasLead && d.needsYou && !L.human) actions += '<button class="ghost" id="handled">Mark as handled</button>';
-      var facts = fact("Language", L.language && L.language.toUpperCase()) + fact("Level", L.cert) + fact("Dates", L.dates) +
-        fact("Group", L.group) + fact("Interested in", L.interested) + fact("Status", L.status) + fact("WhatsApp", L.contact !== L.name ? L.contact : "") +
+      var facts = fact("Language", L.language && langName(L.language)) + fact("Level", human(L.cert)) + fact("On the island", prettyDates(L.dates)) +
+        fact("Group", L.group) + fact("Interested in", /^rec[A-Za-z0-9]{14}$/.test(L.interested) ? "" : L.interested) + fact("Status", human(L.status)) + fact("WhatsApp", L.contact && L.name && L.contact !== L.name ? prettyPhone(L.contact) : "") +
         (L.human ? "<span><b>Team is handling this.</b> " + esc(cfg.assistant) + " is paused for this diver.</span>" : "");
 
       $("#pane").innerHTML =
-        '<div class="head"><button class="back" aria-label="Back">‹</button>' + avatar(L.name || L.contact, d.cc) + '<div><b>' + esc(L.name || L.contact || "Diver") + "</b>" +
+        '<div class="head"><button class="back" aria-label="Back">‹</button>' + avatar(L.name || L.contact, d.cc) + '<div><b>' + esc(dname(L.name, L.contact)) + "</b>" +
         (l.t ? '<div class="sub">' + esc(l.t) + "</div>" : "") + "</div>" +
         (d.needsYou ? '<span class="tag need">Needs you</span>' : "") + '<div class="actions">' + actions + "</div></div>" +
         (facts ? '<div class="facts">' + facts + "</div>" : "") +
@@ -2400,12 +2449,14 @@ function zoneClient(cfg) {
           }).join("");
         })() + "</div>" +
         (d.canReply
-          ? '<div class="bar2"><span>Sign as</span><input id="sig" maxlength="30" placeholder="your name">' +
-            '<select id="prod" aria-label="Booking link"><option value="">+ Booking link…</option></select>' +
-            '<span class="sp"></span><span class="bt ' + (l.soon ? "left soon" : "") + '">' + esc(l.t) + "</span></div>" +
+          ? '<div class="composer">' +
             '<div class="pchips" id="pchips" hidden></div>' +
-            '<div class="compose"><textarea id="txt" placeholder="Reply on WhatsApp…" rows="2"></textarea><button class="btn" id="send">Send</button></div>' +
-            '<div class="note" id="note">Ctrl/⌘ + Enter sends. A reply pauses ' + esc(cfg.assistant) + " for this diver until you let her take over (or 4 hours after your last message).</div>"
+            '<div class="cbox"><textarea id="txt" placeholder="Reply on WhatsApp…" rows="1"></textarea>' +
+            '<button class="send" id="send" aria-label="Send"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>' +
+            '<div class="cmeta"><label class="sig">Signed as <input id="sig" maxlength="30" placeholder="your name"></label>' +
+            '<select id="prod" aria-label="Booking link" hidden><option value="">+ Booking link…</option></select>' +
+            '<span class="sp"></span><span class="bt' + (l.soon ? " soon" : "") + '">' + esc(l.t) + "</span></div>" +
+            '<div class="note" id="note">⌘/Ctrl + Enter sends · replying pauses ' + esc(cfg.assistant) + " for this diver for 4 hours.</div></div>"
           : '<div class="closed">More than 24 hours since the diver\'s last message, so WhatsApp no longer allows a free reply. Read only.</div>');
 
       document.querySelectorAll("[data-rep]").forEach(function (b) {
@@ -2434,6 +2485,8 @@ function zoneClient(cfg) {
         if (!s.value && cfg.email) { var nm = String(cfg.email).split("@")[0].split(/[._-]/)[0]; if (nm && !/^(info|team|hello|contact|admin|dive|office)$/i.test(nm)) s.value = nm.charAt(0).toUpperCase() + nm.slice(1); }
         s.oninput = function () { try { localStorage.setItem("talay-sig", s.value); } catch (e) {} };
         t.onkeydown = function (e) { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send(); };
+        var grow = function () { t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 180) + "px"; };
+        t.addEventListener("input", grow); setTimeout(grow, 0);
         $("#send").onclick = send;
         loadProducts(id);
       }
@@ -2453,7 +2506,7 @@ function zoneClient(cfg) {
       };
       var pc = $("#pchips");
       if (pc && d.products.length) {
-        pc.innerHTML = '<span class="pcl">Booking link</span>' + d.products.slice(0, 6).map(function (x, i) { return '<button type="button" class="pchip" data-pi="' + i + '">' + esc(x.name) + "</button>"; }).join("");
+        pc.innerHTML = '<span class="pcl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Send a booking link</span><div class="pscroll">' + d.products.map(function (x, i) { return '<button type="button" class="pchip" data-pi="' + i + '">' + esc(x.name) + "</button>"; }).join("") + "</div>";
         pc.hidden = false;
         pc.querySelectorAll("[data-pi]").forEach(function (b) {
           b.onclick = function () { var x = d.products[Number(b.dataset.pi)]; var t = $("#txt"); t.value = (t.value.trim() ? t.value.trim() + "\n\n" : "") + x.text; t.focus(); };
@@ -2472,11 +2525,11 @@ function zoneClient(cfg) {
     var t = $("#txt"), b = $("#send"), n = $("#note"), v = t.value.trim();
     if (!v || b.disabled) return;
     var sig = ($("#sig").value || "").trim(); if (sig) v += "\n– " + sig;
-    b.disabled = true; b.textContent = "Sending…";
+    b.disabled = true; b.classList.add("busy");
     post("reply", { c: current, text: v }).then(function () {
       t.value = ""; lastChat = ""; lastList = ""; freshNext = true; freshList = true; loadChat(true); loadList();
     }).catch(function (e) { n.textContent = e.message; n.className = "note err"; })
-      .finally(function () { b.disabled = false; b.textContent = "Send"; });
+      .finally(function () { b.disabled = false; b.classList.remove("busy"); });
   }
 
 
@@ -2776,10 +2829,28 @@ function zoneClient(cfg) {
     };
   })();
 
+  // ---- Pretty names and facts
+  var isPhone = function (s) { return /^\+?[\d\s()-]{6,}$/.test(String(s || "").trim()); };
+  function prettyPhone(s) {
+    var d = String(s || "").replace(/[^\d]/g, "");
+    if (!d) return String(s || "");
+    var cc = d.length > 10 ? d.slice(0, d.length - 9) : "", rest = cc ? d.slice(cc.length) : d;
+    return (cc ? "+" + cc + " " : "") + rest.replace(/(\d{3})(?=\d)/g, "$1 ").trim();
+  }
+  function dname(name, contact) { var n = name || contact || "Diver"; return isPhone(n) ? prettyPhone(n) : n; }
+  var LANGN = { en: "English", nl: "Dutch", fr: "French", de: "German", es: "Spanish", it: "Italian", pt: "Portuguese", th: "Thai" };
+  function langName(v) { var s = String(v || "").trim(); return LANGN[s.toLowerCase()] || (s.length <= 3 ? s.toUpperCase() : s.charAt(0).toUpperCase() + s.slice(1)); }
+  function human(v) { var s = String(v || "").replace(/_/g, " ").trim(); return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""; }
+  function prettyDates(v) {
+    var s = String(v || "");
+    return s.replace(/(\d{4})-(\d{2})-(\d{2})/g, function (m) { return new Date(m + "T12:00:00Z").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }); });
+  }
+
   // ---- Avatars
   var AVC = ["#163741", "#4E7480", "#9A6B1F", "#2F6B5A", "#7A4E3A", "#5A5A7A"];
   function avatar(name, cc) {
     var s = String(name || "?").trim(), parts = s.split(/\s+/).filter(Boolean);
+    if (isPhone(s)) return '<span class="av anon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>' + (cc ? '<span class="avf">' + flag(cc) + "</span>" : "") + "</span>";
     var ini = parts.length > 1 && /[A-Za-zÀ-ÿ]/.test(parts[1][0]) ? parts[0][0] + parts[1][0] : s.replace(/^\+/, "").slice(0, 2);
     var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
     return '<span class="av" style="background:' + AVC[h % AVC.length] + '">' + esc(ini.toUpperCase()) + (cc ? '<span class="avf">' + flag(cc) + "</span>" : "") + "</span>";
@@ -2809,7 +2880,7 @@ function zoneClient(cfg) {
       var open = d.conversations.length;
       $("#tNeed").innerHTML = '<div class="th"><b>Needs your team</b>' + (need.length ? '<span class="tag need">' + need.length + "</span>" : "") + '<a href="#" class="tlink" id="tAllChats">All chats (' + open + ")</a></div>" +
         (need.length ? need.slice(0, 5).map(function (c) {
-          return '<button class="trow" data-chat="' + esc(c.id) + '">' + avatar(c.name, c.cc) + '<span class="tr-b"><b>' + esc(c.name || "Diver") + "</b><small>" + esc(String(c.preview || "").slice(0, 90)) + '</small></span><span class="tr-t">' + ago(c.lastAt) + "</span></button>";
+          return '<button class="trow" data-chat="' + esc(c.id) + '">' + avatar(c.name, c.cc) + '<span class="tr-b"><b>' + esc(dname(c.name)) + "</b><small>" + esc(String(c.preview || "").slice(0, 90)) + '</small></span><span class="tr-t">' + ago(c.lastAt) + "</span></button>";
         }).join("") : '<p class="tok"><span class="okdot"></span>Nothing waiting. ' + esc(cfg.assistant) + " is handling every conversation.</p>");
       $("#tNeed").querySelectorAll("[data-chat]").forEach(function (b) { b.onclick = function () { goChat(b.dataset.chat); }; });
       $("#tAllChats").onclick = function (e) { e.preventDefault(); document.querySelector('nav button[data-v="convos"]').click(); };
