@@ -344,7 +344,7 @@ async function conversations(env, center, view) {
     const teamAt = Math.max(Date.parse(c.lastTeam || 0) || 0, Date.parse(lead.humanAt || 0) || 0);
     const handover = Date.parse(lead.handoverAt || 0) || 0;
     return {
-      id: c.id, name: lead.name, language: lead.language, status: lead.status,
+      id: c.id, name: lead.name || lead.contact, language: lead.language, status: lead.status,
       needsYou: open && handover > teamAt && !lead.optedOut,
       teamActive: lead.human, open,
       preview: String(c.last.text).slice(0, 140), previewDir: c.last.dir, lastAt: c.last.at,
@@ -1047,8 +1047,9 @@ function app(center, centers, email) {
 :root{--deep:#0A2029;--paper:#F4F0E6;--paper-2:#FBF8F1;--card:#fff;--muted:#55646A;--line:#E2DACB;--in:#fff;--mia:#E6F0F2;--team:#D9FDD3;--ok:#1F7A55;--warn:#B4561B;--sand:#E8B04B;color-scheme:light}
 @media (prefers-color-scheme:dark){:root{--deep:#F4F0E6;--paper:#0B1A20;--paper-2:#10252D;--card:#122A33;--muted:#9FB2B8;--line:#1F3D48;--in:#173540;--mia:#1B3B45;--team:#1E4A35;--ok:#3FB37F;--warn:#E69A5B;color-scheme:dark}}
 *{box-sizing:border-box}
-html,body{height:100%;height:100dvh;overflow:hidden}
-body{margin:0;display:flex;flex-direction:column;background:var(--paper);color:var(--deep);font-family:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased}
+html{height:100%;background:var(--paper)}
+html,body{overflow:hidden}
+body{position:fixed;inset:0;margin:0;display:flex;flex-direction:column;background:var(--paper);color:var(--deep);font-family:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased}
 header{display:flex;align-items:center;gap:12px;padding:calc(10px + env(safe-area-inset-top,0px)) 18px 10px;background:#0A2029;color:#F4F0E6;flex:none}
 header .logo{width:30px;height:30px;border-radius:50%;object-fit:cover;background:#F4F0E6}
 header b{font-size:17px}
