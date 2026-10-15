@@ -2118,7 +2118,6 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
         <button class="chip" data-f="all">All (30 days)</button>
       </div>
     </div>
-    <div class="night" id="night" hidden></div>
     <div class="ms small" id="msChat" hidden></div>
     <div class="items" id="list"><div class="skel list"><i></i><i></i><i></i><i></i></div></div>
   </div>
@@ -2921,7 +2920,7 @@ function zoneClient(cfg) {
     return api("overnight" + (fresh ? "?fresh=1" : "")).then(function (d) {
       if (!d || d.error) return;
       var h = nightHtml(d);
-      ["#night", "#nightDash", "#nightToday"].forEach(function (s) { var el = $(s); if (el) { el.innerHTML = h; el.hidden = false; } });
+      ["#nightDash", "#nightToday"].forEach(function (s) { var el = $(s); if (el) { el.innerHTML = h; el.hidden = false; } });
     }).catch(function () {});
   }
 
