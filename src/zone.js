@@ -73,6 +73,7 @@ export async function handleZone(request, env, ctx) {
       const per = /^\d{4}-\d{2}$/.test(url.searchParams.get("period") || "") ? url.searchParams.get("period") : "";
       return json(await cached(env, `dash/v2/${center.slug}/${per || "30d"}`, 120, () => dashboard(env, center, per), fresh));
     }
+    if (p === "/zone/api/overnight") return json(await cached(env, `night/${center.slug}`, 120, () => overnight(env, center), fresh));
     if (p === "/zone/api/unfinished") return json(await cached(env, `unf/${center.slug}`, 180, () => unfinished(env, center), fresh));
     if (p === "/zone/api/tickets") return json(await cached(env, `tick/${center.slug}`, 30, () => tickets(env, center), fresh));
     if (p === "/zone/api/ticket" && request.method === "GET") return json(await ticketDetail(env, center, url.searchParams.get("id")));
@@ -631,6 +632,50 @@ async function dashboard(env, center, period) {
     products: Object.entries(prods).sort((a, b) => b[1].value - a[1].value),
     weeks: Object.values(weeks),
     statement,
+  };
+}
+
+// ---------- While you were diving ----------
+// What the assistant did while the team was off: from last night's closing time until this
+// morning's opening time (office hours from Centers → Escalation hours, Koh Tao time).
+// After closing time (and before opening) it shows "tonight so far".
+async function overnight(env, center) {
+  const f = await centerRecord(env, center);
+  const hm = String(first(f["Escalation hours"]) || "").match(/(\d{1,2}):(\d{2}).*?(\d{1,2}):(\d{2})/);
+  let open = hm ? (+hm[1]) * 60 + (+hm[2]) : 9 * 60;
+  let close = hm ? (+hm[3]) * 60 + (+hm[4]) : 18 * 60;
+  if (close <= open) { open = 9 * 60; close = 18 * 60; }
+  const TZ = 7 * 3600 * 1000, MIN = 60000, now = Date.now();
+  const t = new Date(now + TZ);
+  const minNow = t.getUTCHours() * 60 + t.getUTCMinutes();
+  const midnight = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) - TZ;
+  let start, end, live = false;
+  if (minNow >= close) { start = midnight + close * MIN; end = now; live = true; }
+  else if (minNow < open) { start = midnight - DAY + close * MIN; end = now; live = true; }
+  else { start = midnight - DAY + close * MIN; end = midnight + open * MIN; }
+  const iso = (ms) => new Date(ms).toISOString();
+  const win = (field) => `IS_AFTER(${field}, DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE(${field}, DATETIME_PARSE('${iso(end)}'))`;
+  const [msgs, leads, books] = await Promise.all([
+    at(env, "Chat", { formula: `AND({Center} = '${q(center.slug)}', ${win("{Sent at}")})`, fields: ["Direction", "Contact ID"], max: 3000 }),
+    at(env, "Leads", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${win("CREATED_TIME()")})`, max: 2000 }),
+    at(env, "Bookings", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${win("CREATED_TIME()")})`, max: 1000 }),
+  ]);
+  const n = (v) => Number(first(v)) || 0;
+  const people = new Set(msgs.filter((m) => m.fields["Direction"] === "Customer").map((m) => String(m.fields["Contact ID"] || "")));
+  people.delete("");
+  const live2 = books.filter((b) => !/cancel|refund/i.test(String(first(b.fields["Status"]) || "")));
+  const resp = leads.map((l) => n(l.fields["Response seconds"])).filter((x) => x > 0 && x < 3600);
+  const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+  return {
+    live, from: iso(start), to: iso(end), closeAt: hhmm(close), openAt: hhmm(open),
+    conversations: people.size,
+    newDivers: leads.length,
+    replies: msgs.filter((m) => m.fields["Direction"] === "Mia").length,
+    bookings: live2.length,
+    divers: live2.reduce((a, b) => a + (n(b.fields["Group size"]) || 1), 0),
+    revenue: live2.reduce((a, b) => a + n(b.fields["Total value THB"]), 0),
+    handedOver: leads.filter((l) => n(l.fields["Handed over"]) || first(l.fields["Handover at"])).length,
+    avgResponse: resp.length ? Math.round(resp.reduce((a, b) => a + b, 0) / resp.length) : null,
   };
 }
 
@@ -1450,6 +1495,26 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
  .bwrap,.swrap{padding-top:16px}
  .cards,.kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 }
+
+/* While you were diving */
+.night{margin:12px 12px 4px;padding:14px 16px;border-radius:16px;background:var(--side);color:#F7F3EA;box-shadow:var(--shadow)}
+.night .nh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.night .nh svg{color:var(--sand);flex:none}
+.night .nh b{font-size:14px;font-weight:700;letter-spacing:-.01em}
+.night .nh small{margin-left:auto;font-size:11.5px;color:#93A9AE}
+.night .nstats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.night .nstats b{display:block;font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
+.night .nstats div:last-child b{color:var(--sand)}
+.night .nstats span{font-size:11.5px;color:#A9BDC1}
+.night .nline{margin:10px 0 0;font-size:12.5px;line-height:1.5;color:#C9D6D9}
+.night.big{margin:0 0 14px;padding:22px 24px;border-radius:18px}
+.night.big .nh b{font-size:17px}
+.night.big .nh small{font-size:13px}
+.night.big .nstats{margin-top:16px;gap:16px}
+.night.big .nstats b{font-size:34px}
+.night.big .nstats span{font-size:13px}
+.night.big .nline{font-size:14px;margin-top:14px}
+@media (max-width:760px){.night{margin:10px 10px 2px}.night.big{margin:0 0 12px;padding:18px}.night.big .nstats b{font-size:26px}}
 </style></head>
 <body>
 <header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>Customer zone</small></span></div><span class="sp"></span>${switcher}<div class="htools"><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">Sign out</span></a></div></header>
@@ -1466,6 +1531,7 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
         <button class="chip" data-f="all">All (30 days)</button>
       </div>
     </div>
+    <div class="night" id="night" hidden></div>
     <div class="items" id="list"><div class="empty">Loading…</div></div>
   </div>
   <div class="pane" id="pane"><div class="placeholder">Pick a conversation.<br><br><b>Open</b> shows every diver who wrote in the last 24 hours: WhatsApp only lets you reply freely within that window. <b>Needs you</b> means ${esc(center.assistant)} handed it over to your team.</div></div>
@@ -1549,6 +1615,7 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
       <button class="ghost" id="stPrint" type="button">Print statement</button>
       <button class="ghost" id="stCsv" type="button">Download CSV</button>
     </div>
+    <div class="night big" id="nightDash" hidden></div>
     <div id="dbody"><div class="bempty">Loading…</div></div>
   </div>
 </section>
@@ -1998,6 +2065,32 @@ function zoneClient(cfg) {
   function fmtSec(s) { if (s == null) return "–"; if (s < 60) return s + " s"; return Math.floor(s / 60) + " min " + (s % 60) + " s"; }
   function pct(a, b) { return b ? Math.round(a / b * 100) + "%" : "–"; }
   $("#period").onchange = function () { loadDash(); };
+  // ---- While you were diving
+  function nightHtml(d) {
+    var when = d.live ? "Tonight so far · since " + d.closeAt : "Last night · " + d.closeAt + "–" + d.openAt;
+    var moon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></svg>';
+    var stat = function (v, l) { return '<div><b>' + v + '</b><span>' + l + '</span></div>'; };
+    var line;
+    if (!d.conversations && !d.bookings) line = "A quiet night: no new messages. " + esc(cfg.assistant) + " is ready for the next diver.";
+    else {
+      line = esc(cfg.assistant) + " sent " + d.replies + " " + (d.replies === 1 ? "reply" : "replies") +
+        (d.avgResponse != null ? ", first answer in " + fmtSec(d.avgResponse) + " on average" : "") + ".";
+      if (d.handedOver) line += " " + d.handedOver + " " + (d.handedOver === 1 ? "conversation needs" : "conversations need") + " your team.";
+    }
+    return '<div class="nh">' + moon + '<b>While you were diving</b><small>' + esc(when) + '</small></div>' +
+      '<div class="nstats">' + stat(d.conversations, d.conversations === 1 ? "conversation" : "conversations") +
+      stat(d.bookings, d.bookings === 1 ? "booking" : "bookings") +
+      stat(Math.round(d.revenue).toLocaleString("en-US"), "THB booked") + '</div>' +
+      '<p class="nline">' + line + '</p>';
+  }
+  function loadNight(fresh) {
+    return api("overnight" + (fresh ? "?fresh=1" : "")).then(function (d) {
+      if (!d || d.error) return;
+      var h = nightHtml(d);
+      ["#night", "#nightDash"].forEach(function (s) { var el = $(s); if (el) { el.innerHTML = h; el.hidden = false; } });
+    }).catch(function () {});
+  }
+
   function loadDash() {
     var p = $("#period").value || "";
     $("#dbody").style.opacity = ".5";
@@ -2188,6 +2281,7 @@ function zoneClient(cfg) {
   // Polling is kept light on purpose (Airtable limits): the list every 30 s while the page
   // is visible; the open conversation only when the list shows something new in it.
   setInterval(function () { if (!document.hidden) loadList(); }, 30000);
+  loadNight(); setInterval(function () { if (!document.hidden) loadNight(); }, 600000);
   setInterval(function () { if (!document.hidden && filter !== "open" && filter !== "need") api("conversations?view=open").then(function (d) { badge(d.conversations); }).catch(function () {}); }, 60000);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) { lastList = ""; loadList(); } });
 }
