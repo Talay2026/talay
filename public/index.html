@@ -96,6 +96,25 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 @keyframes message-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.convo.playing .reveal{animation:none;opacity:1}}
 
+/* Chat demo: scrollable phone */
+.convo{max-width:380px}
+.screen{height:500px;overflow-y:auto;overscroll-behavior:contain;scroll-behavior:smooth;margin-right:-6px;padding-right:6px;scrollbar-width:thin;scrollbar-color:var(--ridge) transparent}
+.step.hide{display:none}
+.step:not(.hide){animation:message-in .32s ease-out both}
+@media(prefers-reduced-motion:reduce){.step:not(.hide){animation:none}}
+.note{width:fit-content;margin:var(--s1) auto var(--s2);padding:2px 10px;border-radius:999px;background:rgba(220,164,74,.14);color:var(--sand);font-size:.7rem;font-weight:600}
+.msg .btn{display:block;margin-top:var(--s2);padding:6px 12px;border-radius:6px;background:var(--deep);color:var(--shore);text-align:center;font-weight:600;font-size:.8rem}
+.typing{display:flex;gap:4px;width:fit-content;margin:0 0 var(--s3) auto;padding:10px 12px;border-radius:var(--radius);border-bottom-right-radius:var(--s1);background:var(--shore)}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--ink-soft);animation:typing 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes typing{0%,60%,100%{opacity:.3;transform:none}30%{opacity:1;transform:translateY(-3px)}}
+.alert{margin-top:var(--s2);padding:var(--s3);border-radius:10px;background:var(--sand);color:var(--deep);font-size:.8rem;line-height:1.5}
+.alert b{display:block;margin-bottom:2px}
+.alert small{display:block;margin-top:var(--s2);font-size:.72rem;font-weight:600}
+.replay{display:block;margin:var(--s3) auto 0;padding:6px 14px;border:1px solid var(--ridge);border-radius:999px;background:none;color:var(--on-deep);font:inherit;font-size:.8rem;cursor:pointer}
+.replay:hover{color:var(--shore);border-color:var(--on-deep)}
+@media(max-width:599px){.screen{height:440px}}
+
 /* Channels */
 .channels{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3) var(--s6);padding-block:var(--s6);border-top:1px solid var(--ridge)}
 .channels > p{font-size:var(--t-small);color:var(--on-deep);font-weight:500}
@@ -164,6 +183,95 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 .zone-foot{display:flex;flex-wrap:wrap;gap:var(--s2);margin-top:var(--s3)}
 .zone-foot span{padding:4px 10px;border-radius:6px;background:var(--shelf);font-size:.72rem;color:var(--on-deep)}
 .caption{margin-top:var(--s3);font-size:var(--t-small);color:var(--ink-soft)}
+
+/* Customer zone carousel */
+.zone-nav{display:flex;gap:var(--s1);margin-top:var(--s3);padding:3px;border-radius:10px;background:var(--shelf);overflow-x:auto;scrollbar-width:none}
+.zone-nav::-webkit-scrollbar{display:none}
+.zone-nav button{position:relative;flex:1 0 auto;padding:7px 12px;border:0;border-radius:8px;background:none;color:var(--on-deep);font:inherit;font-size:.8rem;font-weight:600;cursor:pointer;overflow:hidden}
+.zone-nav button:hover{color:var(--shore)}
+.zone-nav button[aria-selected="true"]{background:var(--deep);color:var(--shore)}
+.zone-nav button::after{content:"";position:absolute;left:10px;right:10px;bottom:3px;height:2px;border-radius:2px;background:var(--sand);transform:scaleX(0);transform-origin:left}
+.zone.auto .zone-nav button.run::after{animation:zprog 5.5s linear forwards}
+.zone.auto.paused .zone-nav button.run::after{animation-play-state:paused}
+@keyframes zprog{to{transform:scaleX(1)}}
+.zone-panels{margin-top:var(--s4);min-height:330px}
+.zp{animation:message-in .35s ease-out both}
+@media(prefers-reduced-motion:reduce){.zp{animation:none}}
+.zp h4{margin:0 0 var(--s2);font-size:.75rem;font-weight:600;color:var(--on-deep)}
+.zp-grid{display:grid;gap:var(--s4)}
+.lead{padding:var(--s3);border-radius:10px;background:var(--shelf);font-size:.78rem;line-height:1.45}
+.lead-top{display:flex;justify-content:space-between;align-items:center;gap:var(--s2);margin-bottom:var(--s2)}
+.lead-top b{font-size:.85rem}
+.lead dl{display:grid;grid-template-columns:auto 1fr;gap:2px var(--s3);margin:0 0 var(--s3);color:var(--on-deep)}
+.lead dt{color:#8FA5AA}.lead dd{margin:0;color:var(--shore)}
+.bub{width:fit-content;max-width:94%;margin-bottom:var(--s2);padding:6px 10px;border-radius:8px;font-size:.76rem;line-height:1.45}
+.bub.c{background:var(--ridge);border-bottom-left-radius:2px}
+.bub.m{margin-left:auto;background:var(--shore);color:var(--deep);border-bottom-right-radius:2px}
+.bub small{display:block;margin-top:2px;font-size:.66rem;opacity:.7}
+.reply{display:flex;gap:var(--s2);margin-top:var(--s3)}
+.reply span{flex:1;padding:6px 10px;border:1px solid var(--ridge);border-radius:8px;color:#8FA5AA;font-size:.74rem}
+.pill{display:inline-flex;align-items:center;padding:5px 10px;border-radius:8px;background:var(--sand);color:var(--deep);font-size:.72rem;font-weight:600;white-space:nowrap}
+.pill.ghost{background:none;border:1px solid var(--ridge);color:var(--on-deep)}
+.bk{width:100%;border-collapse:collapse;font-size:.76rem;font-variant-numeric:tabular-nums}
+.bk th{padding:0 0 var(--s2);text-align:left;font-size:.68rem;font-weight:600;color:#8FA5AA}
+.bk td{padding:7px 0;border-top:1px solid var(--ridge);color:var(--on-deep)}
+.bk td:first-child{color:var(--shore);font-weight:600}
+.bk th:not(:first-child),.bk td:not(:first-child){text-align:right;padding-left:var(--s2)}
+.bk-wrap{overflow-x:auto}
+.unpaid{display:flex;justify-content:space-between;align-items:center;gap:var(--s3);margin-top:var(--s3);padding:var(--s2) var(--s3);border-radius:8px;background:var(--shelf);font-size:.76rem}
+.unpaid b{color:var(--shore)}.unpaid small{display:block;color:var(--on-deep);font-size:.7rem}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s2)}
+.kpi{padding:var(--s3);border-radius:10px;background:var(--shelf)}
+.kpi small{display:block;font-size:.68rem;color:#8FA5AA}
+.kpi b{display:block;margin-top:2px;font-size:1.15rem;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi span{display:block;font-size:.68rem;color:var(--on-deep)}
+.kpi.gold b{color:var(--sand)}
+.bars{display:flex;align-items:flex-end;gap:6px;height:96px;padding:var(--s2) var(--s3) 0;border-radius:10px;background:var(--shelf)}
+.bars i{flex:1;border-radius:4px 4px 0 0;background:var(--ridge)}
+.bars i:last-child{background:var(--sand)}
+.bars-cap{display:flex;justify-content:space-between;margin-top:6px;font-size:.66rem;color:#8FA5AA}
+.set{display:flex;justify-content:space-between;align-items:center;gap:var(--s3);padding:8px 0;border-top:1px solid var(--ridge);font-size:.78rem}
+.set:first-of-type{border-top:0}
+.set small{display:block;color:var(--on-deep);font-size:.7rem}
+.set .v{color:var(--on-deep);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tg{position:relative;flex:0 0 30px;width:30px;height:17px;border-radius:999px;background:var(--live)}
+.tg::after{content:"";position:absolute;top:2px;right:2px;width:13px;height:13px;border-radius:50%;background:var(--shore)}
+.tg.off{background:var(--ridge)}.tg.off::after{right:auto;left:2px}
+.mia{display:flex;align-items:center;gap:var(--s3);padding:var(--s3);margin-bottom:var(--s2);border-radius:10px;background:var(--shelf);font-size:.78rem}
+.mia b{display:block}.mia small{color:var(--on-deep);font-size:.7rem}
+.mia .tg{margin-left:auto}
+.reply span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.reply .pill{flex:0 0 auto}
+.set{justify-content:flex-start}
+.set > div{flex:1;min-width:0}
+@media(max-width:599px){
+ .zone-panels{min-height:470px}
+ .zp-grid .row:nth-of-type(n+4),.lead dl{display:none}
+}
+@media(min-width:600px){
+ .zp-grid{grid-template-columns:1fr 1fr}
+ .kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+
+/* Customer zone: swipeable carousel */
+.zc-track{display:flex;align-items:flex-start;margin:var(--s4) calc(var(--s4) * -1) 0;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain}
+.zc-track::-webkit-scrollbar{display:none}
+.zc-slide{flex:0 0 100%;min-width:0;padding:0 var(--s4);scroll-snap-align:start}
+.zc-cap{margin-bottom:var(--s4)}
+.zc-cap em{display:inline-block;margin-bottom:var(--s1);color:var(--sand);font-style:normal;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.zc-cap h3{color:var(--shore);font-size:1.15rem;line-height:1.25}
+.zc-cap p{margin-top:var(--s1);color:var(--on-deep);font-size:.84rem;line-height:1.5;max-width:52ch}
+.zc-slide h4{margin:0 0 var(--s2);font-size:.75rem;font-weight:600;color:var(--on-deep)}
+.zc-ctrl{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);margin-top:var(--s4);padding-top:var(--s3);border-top:1px solid var(--ridge)}
+.zc-arrow{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--ridge);border-radius:50%;background:none;color:var(--shore);cursor:pointer}
+.zc-arrow:hover{background:var(--shelf)}
+.zc-dots{display:flex;gap:var(--s2)}
+.zc-dots button{position:relative;display:flex;align-items:center;gap:6px;padding:6px 10px;border:0;border-radius:999px;background:var(--shelf);color:var(--on-deep);font:inherit;font-size:.74rem;font-weight:600;cursor:pointer;overflow:hidden}
+.zc-dots button[aria-current="true"]{background:var(--shore);color:var(--deep)}
+.zc-dots button::after{content:"";position:absolute;left:0;bottom:0;height:3px;width:100%;background:var(--sand);transform:scaleX(0);transform-origin:left}
+.zone.auto .zc-dots button.run::after{animation:zprog 4s linear forwards}
+.zone.auto.paused .zc-dots button.run::after{animation-play-state:paused}
+@media(max-width:599px){.zc-dots button span{display:none}.zc-dots button{width:10px;height:10px;padding:0}.zc-dots button[aria-current="true"]{width:28px;background:var(--sand)}}
 
 /* Your way (dark band) */
 .yours{padding-block:var(--section);background:var(--deep);color:var(--shore)}
@@ -326,17 +434,28 @@ footer a:hover{text-decoration:underline}
       </ul>
     </div>
 
-    <figure class="convo" aria-label="Illustrative conversation between a diver and a dive centre's assistant">
+    <figure class="convo" aria-label="Example conversation between a diver and a dive centre's assistant">
       <div class="phone">
         <div class="phone-head">
           <span class="dot"><svg width="20" height="20" viewBox="0 0 100 100" aria-hidden="true"><path d="M 12 50 A 38 38 0 0 0 88 50 Z" fill="#B07F1E"/><circle cx="50" cy="50" r="38" fill="none" stroke="#0A2029" stroke-width="11"/><line x1="6" y1="50" x2="94" y2="50" stroke="#0A2029" stroke-width="11" stroke-linecap="round"/></svg></span>
           <span><b>Your dive centre</b><small>Assistant · replies in seconds</small></span>
         </div>
-        <div class="msg them reveal" style="animation-delay:.12s"><span class="sr-only">Diver: </span>Hi! How much is the Open Water course?<time>23:47</time></div>
-        <div class="msg us reveal" style="animation-delay:.52s"><span class="sr-only">Assistant: </span>Hi! The Open Water is 12,500 THB for 3 days, gear and certification included. Pick your start date and book here.<time>23:47</time></div>
-        <p class="wait reveal" style="animation-delay:1.08s">no reply · next morning</p>
-        <div class="msg us reveal" style="animation-delay:1.42s"><span class="sr-only">Assistant: </span>Still thinking about your Open Water? You can book in a minute, right here.<time>08:00</time></div>
-        <div class="msg them reveal" style="animation-delay:1.88s"><span class="sr-only">Diver: </span>Booked for two from the 15th!<time>08:06</time></div>
+        <div class="screen" id="chat" tabindex="0" aria-label="Example conversation, scrollable">
+          <p class="note step">23:47 · shop closed</p>
+          <div class="msg them step"><span class="sr-only">Diver: </span>Hi! There are two of us, never dived before. How much is the Open Water? I'm also a bit scared of deep water 😅<time>23:47</time></div>
+          <p class="note step">Replied in 8 seconds</p>
+          <div class="msg us step" data-typing="1"><span class="sr-only">Assistant: </span>Hi! I'm Mia, the dive centre's virtual assistant 🙂 If I can't help with something, just ask for a colleague.<br><br>Totally normal, lots of people feel that way before their first dive 🙂 You start in the pool at your own pace, with your instructor right next to you, and extra time costs nothing. Not sure yet? The Basic Diver is a good way to start: just one day, and afterwards you decide whether you want to continue.<br><br><b>Open Water</b>: 3 days, 12,500 THB<br>Includes all dive gear, learning materials, certification and 4 nights of A/C accommodation.<br><br>You pay 1,500 THB online to secure your spot, the rest at the shop.<br><br>Pick your start date here 👇<span class="btn">Book now</span><time>23:47</time></div>
+          <div class="msg them step"><span class="sr-only">Diver: </span>What should we bring? And can we start on the 15th?<time>23:49</time></div>
+          <div class="msg us step" data-typing="1"><span class="sr-only">Assistant: </span>Just bring swimwear, a towel and sunscreen 🙂 All dive gear and a dive computer are included.<br><br>Courses can start almost any day, and you pick your start date yourself on the booking page. Want to start tomorrow? Book a course or the Basic Diver before 16:00 (Thai time) today, because there's an orientation at 17:00 the day before your start.<time>23:49</time></div>
+          <p class="wait step">no reply · next morning</p>
+          <p class="note step">Automatic follow-up</p>
+          <div class="msg us step" data-typing="1"><span class="sr-only">Assistant: </span>Hey, just checking in 🙂 Any questions I can help with?<br><br>Your booking link is right here whenever you're ready:<span class="btn">Book now</span><time>08:00</time></div>
+          <p class="note step">Booked and paid online</p>
+          <div class="msg us step" data-typing="1"><span class="sr-only">Assistant: </span>You're booked! 🎉<br><br><b>Open Water</b><br>Date: 15 November<br>Divers: 2<br><br>Paid online: 3,000 THB<br>To pay at the shop: <b>22,000 THB</b><br><br>See you soon on Koh Tao! If anything changes, just message us here.<time>08:06</time></div>
+          <p class="note step">Your team gets</p>
+          <div class="alert step"><b>New booking via Talay ✅</b>Open Water on 15 November · Divers: 2<br>Paid online: 3,000 THB. To collect at the shop: 22,000 THB.<small>The inquiry came in at 23:47, while the shop was closed.</small></div>
+        </div>
+        <button type="button" class="replay" id="replay" hidden>↺ Replay</button>
       </div>
     </figure>
   </section>
@@ -432,32 +551,77 @@ footer a:hover{text-decoration:underline}
             <li><h3>Divers reach out</h3><p>With a question about a course, a price or a date.</p></li>
             <li><h3>Talay answers within seconds</h3><p>In their language: it recommends, answers questions and follows up.</p></li>
             <li><h3>The diver books online</h3><p>With a deposit. Or walks in, or your team takes over.</p></li>
-            <li><h3>Everything lands in one place</h3><p>Every conversation and booking, in your customer zone.</p></li>
+            <li><h3>Everything lands in one place</h3><p>Chats, bookings, results and settings, in your customer zone.</p></li>
           </ol>
         </div>
         <figure>
-          <div class="zone" role="img" aria-label="Illustration of the Talay customer zone with conversations and today's bookings">
-            <div class="zone-head"><b>Your dive centre</b><span>Customer zone</span></div>
-            <div class="zone-grid">
-              <div class="zone-col">
-                <h4>Chats</h4>
-                <div class="tabs"><span>Open</span><span>Needs you</span><span>Booked</span></div>
-                <div class="row"><b>Lena</b><small>Open Water · 2 divers</small><span class="tag booked">Booked</span></div>
-                <div class="row"><b>Tom</b><small>Question about a medical form</small><span class="tag need">Needs you</span></div>
-                <div class="row"><b>Sofia</b><small>Basic Diver · asking about dates</small><span class="tag open">Open</span></div>
-                <div class="row"><b>Mark</b><small>Fun dives · 4 divers</small><span class="tag booked">Booked</span></div>
+          <div class="zone" id="zone" role="region" aria-roledescription="carousel" aria-label="The Talay customer zone">
+            <div class="zone-head"><b>Your dive centre</b><span>Customer zone · computer or phone</span></div>
+            <div class="zc-track" id="zc-track">
+              <div class="zc-slide" id="zs-0" role="group" aria-roledescription="slide" aria-label="1 of 4: Chats">
+                <div class="zc-cap"><em>Chats</em><h3>Every conversation, one inbox</h3><p>See at a glance who booked and who needs your team. Reply yourself, or let the assistant carry on.</p></div>
+                <div class="zp-grid">
+                  <div>
+                    <div class="tabs"><span>Open</span><span>Needs you · 1</span><span>Booked</span></div>
+                    <div class="row"><b>Lena</b><small>Open Water · 2 divers</small><span class="tag booked">Booked</span></div>
+                    <div class="row"><b>Tom</b><small>Asks about asthma</small><span class="tag need">Needs you</span></div>
+                    <div class="row"><b>Sofia</b><small>Basic Diver · asking about dates</small><span class="tag open">Open</span></div>
+                    <div class="row"><b>Marc</b><small>Fun dives · 4 divers · in French</small><span class="tag booked">Booked</span></div>
+                  </div>
+                  <div class="lead">
+                    <div class="lead-top"><b>Tom</b><span class="tag need" style="grid-row:auto">Needs you</span></div>
+                    <dl><dt>Language</dt><dd>English</dd><dt>Level</dt><dd>Never dived</dd><dt>Dates</dt><dd>18 – 24 Nov</dd><dt>Interested in</dt><dd>Open Water</dd></dl>
+                    <div class="bub c">I have mild asthma. Can I still do the course?<small>21:14</small></div>
+                    <div class="bub m">I've passed your question to the team, they'll reply here. Meanwhile I'm happy to help with anything else.<small>Assistant · 21:14</small></div>
+                    <div class="reply"><span>Reply as your team…</span><span class="pill ghost">Let assistant take over</span></div>
+                  </div>
+                </div>
               </div>
-              <div class="zone-col">
-                <h4>Today’s bookings</h4>
-                <div class="trip">Fun dives<span>06:30 · 4 divers</span></div>
-                <div class="trip">Open Water, day 1<span>08:00 · 2 divers</span></div>
-                <div class="trip">Basic Diver<span>08:30 · 1 diver</span></div>
-                <div class="trip">Fun dives<span>11:30 · 6 divers</span></div>
-                <div class="zone-foot"><span>Print boat list</span><span>Dashboard</span></div>
+              <div class="zc-slide" id="zs-1" role="group" aria-roledescription="slide" aria-label="2 of 4: Bookings">
+                <div class="zc-cap"><em>Bookings</em><h3>Today’s divers, ready for the boat</h3><p>Who’s coming, what’s paid online and what to collect at the shop. Remind divers who didn’t finish paying.</p></div>
+                <div class="tabs"><span>Today</span><span>Tomorrow</span><span>Next 30 days</span></div>
+                <div class="bk-wrap"><table class="bk">
+                  <thead><tr><th>Trip</th><th>Time</th><th>Divers</th><th>Paid online</th><th>At the shop</th></tr></thead>
+                  <tbody>
+                    <tr><td>Fun dives</td><td>06:30</td><td>4</td><td>1,320</td><td>7,480</td></tr>
+                    <tr><td>Open Water, day 1</td><td>08:00</td><td>2</td><td>3,000</td><td>22,000</td></tr>
+                    <tr><td>Basic Diver</td><td>08:30</td><td>1</td><td>525</td><td>2,975</td></tr>
+                    <tr><td>Fun dives</td><td>11:30</td><td>6</td><td>1,980</td><td>11,220</td></tr>
+                  </tbody>
+                </table></div>
+                <div class="unpaid"><div><b>Not paid yet · 2 divers</b><small>Reached the payment page, didn’t pay</small></div><span class="pill">Send reminder</span></div>
+                <div class="zone-foot"><span>Print boat list</span><span>Move / cancel</span></div>
+              </div>
+              <div class="zc-slide" id="zs-2" role="group" aria-roledescription="slide" aria-label="3 of 4: Results">
+                <div class="zc-cap"><em>Results</em><h3>See what Talay brings in</h3><p>Revenue, bookings and how many inquiries arrived outside office hours.</p></div>
+                <h4>Last 30 days</h4>
+                <div class="kpis">
+                  <div class="kpi gold"><small>Revenue via Talay</small><b>318,400</b><span>THB</span></div>
+                  <div class="kpi"><small>Conversations</small><b>212</b><span>41% outside office hours</span></div>
+                  <div class="kpi"><small>Became a booking</small><b>23%</b><span>15 after a follow-up</span></div>
+                  <div class="kpi"><small>Average reply</small><b>9 s</b><span>day and night</span></div>
+                </div>
+                <h4 style="margin-top:var(--s4)">Bookings per week</h4>
+                <div class="bars" aria-hidden="true"><i style="height:38%"></i><i style="height:52%"></i><i style="height:47%"></i><i style="height:66%"></i><i style="height:74%"></i><i style="height:92%"></i></div>
+                <div class="bars-cap"><span>6 weeks ago</span><span>This week</span></div>
+              </div>
+              <div class="zc-slide" id="zs-3" role="group" aria-roledescription="slide" aria-label="4 of 4: Settings">
+                <div class="zc-cap"><em>Settings</em><h3>You decide what’s bookable</h3><p>Prices, booking deadlines and office hours. Pause the assistant any time.</p></div>
+                <div class="mia"><div><b>Assistant is on</b><small>Answering every inquiry, 24/7</small></div><span class="tg" aria-label="On"></span></div>
+                <div class="set"><div>Office hours<small>Handovers reach your team</small></div><span class="v">Daily 9:00 – 18:00</span></div>
+                <div class="set"><div>Open Water<small>Book online until 16:00 the day before</small></div><span class="v">12,500 THB</span><span class="tg" aria-label="Bookable online"></span></div>
+                <div class="set"><div>Fun dive trip<small>Book online until 15:00 the day before</small></div><span class="v">2,200 THB</span><span class="tg" aria-label="Bookable online"></span></div>
+                <div class="set"><div>Deep Diving Specialty<small>Not bookable online right now</small></div><span class="v">7,750 THB</span><span class="tg off" aria-label="Not bookable online"></span></div>
+                <div class="zone-foot"><span>Team &amp; alerts</span><span>Support tickets</span></div>
               </div>
             </div>
+            <div class="zc-ctrl">
+              <button type="button" class="zc-arrow" id="zc-prev" aria-label="Previous"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg></button>
+              <div class="zc-dots" id="zc-dots"><button type="button" aria-label="Show Chats" aria-controls="zs-0" aria-current="true"><span>Chats</span></button><button type="button" aria-label="Show Bookings" aria-controls="zs-1"><span>Bookings</span></button><button type="button" aria-label="Show Results" aria-controls="zs-2"><span>Results</span></button><button type="button" aria-label="Show Settings" aria-controls="zs-3"><span>Settings</span></button></div>
+              <button type="button" class="zc-arrow" id="zc-next" aria-label="Next"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg></button>
+            </div>
           </div>
-          <figcaption class="caption">Illustration of the customer zone.</figcaption>
+          <figcaption class="caption">Illustration of the customer zone. Swipe or use the arrows.</figcaption>
         </figure>
       </div>
       <div class="cta-row"><a class="cta" href="#demo">Book a free demo</a><span class="cta-note">20 minutes, no commitment.</span></div>
@@ -601,16 +765,82 @@ const TURNSTILE_SITEKEY = "0x4AAAAAAFXZnn0VWocS_nWR";  // Cloudflare Turnstile s
 /* ---------------------------------------------- */
 
 (() => {
-  // Chat animation in the hero
-  const demo = document.querySelector('.convo');
+  // Chat demo in the hero: messages appear one by one and scroll inside the phone
+  const chat = document.getElementById('chat');
+  const replay = document.getElementById('replay');
+  const steps = [...chat.querySelectorAll('.step')];
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-  function play() {
-    if (reduced.matches) return;
-    demo.classList.add('playing');
-    setTimeout(() => demo.classList.remove('playing'), 2400);
+  let timers = [], run = 0, stick = true;
+  const pause = ms => new Promise(r => timers.push(setTimeout(r, ms)));
+  const toBottom = () => { if (stick) chat.scrollTop = chat.scrollHeight; };
+  chat.addEventListener('scroll', () => { stick = chat.scrollHeight - chat.scrollTop - chat.clientHeight < 40; });
+  async function playChat() {
+    const id = ++run;
+    timers.forEach(clearTimeout); timers = [];
+    chat.querySelectorAll('.typing').forEach(t => t.remove());
+    steps.forEach(s => s.classList.add('hide'));
+    replay.hidden = true; stick = true; chat.scrollTop = 0;
+    for (const s of steps) {
+      const isNote = s.classList.contains('note') || s.classList.contains('wait');
+      if (s.dataset.typing) {
+        const t = document.createElement('div');
+        t.className = 'typing'; t.setAttribute('aria-hidden', 'true'); t.innerHTML = '<i></i><i></i><i></i>';
+        s.before(t); toBottom();
+        await pause(1400); if (id !== run) return;
+        t.remove();
+      } else if (!isNote) {
+        await pause(1100); if (id !== run) return;
+      }
+      s.classList.remove('hide'); toBottom();
+      await pause(isNote ? 450 : 900); if (id !== run) return;
+    }
+    replay.hidden = false;
   }
-  const start = () => (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => requestAnimationFrame(play));
-  if (document.readyState === 'complete') start(); else addEventListener('load', start, { once: true });
+  replay.addEventListener('click', playChat);
+  if (!reduced.matches) {
+    steps.forEach(s => s.classList.add('hide'));
+    const io = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) { io.disconnect(); playChat(); }
+    }, { threshold: 0.4 });
+    io.observe(chat);
+  }
+
+  // Customer zone carousel: swipe, arrows or labels; plays on its own until someone interacts
+  const zone = document.getElementById('zone');
+  const track = document.getElementById('zc-track');
+  const slides = [...track.children];
+  const dots = [...document.querySelectorAll('#zc-dots button')];
+  let zi = 0, zuser = false, zst;
+  function zmark(i) {
+    zi = i;
+    dots.forEach((d, k) => { d.setAttribute('aria-current', k === i); d.classList.remove('run'); });
+    void dots[i].offsetWidth; dots[i].classList.add('run');
+  }
+  function zgo(i) {
+    i = (i + slides.length) % slides.length;
+    track.scrollTo({ left: slides[i].offsetLeft - track.offsetLeft, behavior: reduced.matches ? 'auto' : 'smooth' });
+    zmark(i);
+  }
+  const stop = () => { zuser = true; zone.classList.remove('auto'); };
+  document.getElementById('zc-prev').addEventListener('click', () => { stop(); zgo(zi - 1); });
+  document.getElementById('zc-next').addEventListener('click', () => { stop(); zgo(zi + 1); });
+  dots.forEach((d, k) => {
+    d.addEventListener('click', () => { stop(); zgo(k); });
+    d.addEventListener('animationend', () => { if (zone.classList.contains('auto')) zgo(zi + 1); });
+  });
+  ['pointerdown', 'wheel', 'touchstart'].forEach(ev => track.addEventListener(ev, stop, { passive: true }));
+  track.addEventListener('scroll', () => {
+    clearTimeout(zst);
+    zst = setTimeout(() => { const i = Math.round(track.scrollLeft / track.clientWidth); if (i !== zi && zuser) zmark(i); }, 80);
+  });
+  zone.addEventListener('mouseenter', () => zone.classList.add('paused'));
+  zone.addEventListener('mouseleave', () => zone.classList.remove('paused'));
+  if (!reduced.matches) {
+    const zio = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting) && !zuser) { zio.disconnect(); zone.classList.add('auto'); zmark(0); }
+    }, { threshold: 0.35 });
+    zio.observe(zone);
+  }
 
   // Demo form
   const form = document.getElementById('demo-form');
