@@ -1158,8 +1158,8 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 }
 
 #sett{flex-direction:column;overflow-y:auto}
-.swrap{width:100%;max-width:760px;margin:0 auto;padding:18px 20px calc(48px + env(safe-area-inset-bottom,0px));display:grid;gap:14px}
-.scard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+.swrap{grid-template-columns:minmax(0,1fr);width:100%;max-width:760px;margin:0 auto;padding:18px 20px calc(48px + env(safe-area-inset-bottom,0px));display:grid;gap:14px}
+.scard{min-width:0;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
 .scard h3{margin:0 0 4px;font-size:17px}
 .scard p.d{margin:0 0 14px;color:var(--muted);font-size:14px}
 .srow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
@@ -1265,6 +1265,51 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
   .chips::-webkit-scrollbar{display:none}
   .chip{flex:none}
   .items,.bwrap,.swrap{padding-bottom:16px}
+  input,select,textarea{font-size:16px !important}
+  body.inchat header{display:none}
+  .pane .head{padding:8px 12px;gap:6px 8px;flex-wrap:nowrap}
+  .pane .head b{font-size:16px}
+  .pane .head .actions{margin-left:auto;width:auto;flex-wrap:nowrap}
+  .pane .head .ghost{font-size:12px;padding:5px 9px;white-space:nowrap}
+  .pane .head > div:not(.actions){min-width:0;overflow:hidden}
+  .pane .head > div:not(.actions) b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pane .head > .tag.need{display:none}
+  .bar2 .sp{display:none}
+  .facts{flex-wrap:nowrap;overflow-x:auto;white-space:nowrap;padding:6px 12px;scrollbar-width:none}
+  .facts::-webkit-scrollbar{display:none}
+  .msgs{padding:12px}
+  .bar2{padding:6px 12px 0;gap:8px}
+  .bar2 > span:first-child,.bar2 .bt{display:none}
+  .bar2 input{flex:1;min-width:0;width:auto}
+  .bar2 select{flex:1;min-width:0}
+  .compose{padding-left:12px;padding-right:12px;gap:8px}
+  .compose textarea{min-height:44px}
+  #note{display:none}
+  #note.err{display:block}
+  .btools{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .btools::-webkit-scrollbar{display:none}
+  .btools .sp{display:none}
+  #print,#stPrint{display:none}
+  .cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .cardn,.kpi{padding:10px 12px}
+  .cardn b,.kpi b{font-size:19px}
+  #books .btable thead,#sett .ptable thead{display:none}
+  #books .btable,#books .btable tbody,#books .btable tr,#books .btable td{display:block;width:100%}
+  #books .btable{border:0;background:none}
+  #books .btable tr{display:flex !important;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px}
+  #books .btable td{border:0;padding:2px 0;display:flex;justify-content:space-between;gap:12px;text-align:right}
+  #books .btable td[data-l]::before{content:attr(data-l);color:var(--muted);font-size:13px;text-align:left}
+  #books .btable td.tname{font-weight:800;font-size:16px;order:-1}
+  #books .btable td.tname::before{content:none}
+  #books .btable td.tlinks{justify-content:flex-start;padding-top:6px}
+  #books .bscroll{overflow:visible}
+  #sett .ptable,#sett .ptable tbody,#sett .ptable tr{display:block}
+  #sett .ptable tr{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px 12px}
+  #sett .ptable td{border:0;padding:0;display:block}
+  #sett .ptable td.nm{grid-column:1 / -1;font-weight:700}
+  #sett .ptable td[data-l]::before{content:attr(data-l);display:block;font-size:12px;color:var(--muted);margin-bottom:2px}
+  #sett .ptable td.tlinks{display:flex;align-items:end;justify-content:flex-end}
+  #sett .ptable input[type=number]{width:100%}
   .compose{padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
   .tools{padding:10px 12px 8px}
   .bwrap,.swrap{padding-left:12px;padding-right:12px}
@@ -1560,7 +1605,7 @@ function zoneClient(cfg) {
         (d.canReply
           ? '<div class="bar2"><span>Sign as</span><input id="sig" maxlength="30" placeholder="your name">' +
             '<select id="prod" aria-label="Booking link"><option value="">+ Booking link…</option></select>' +
-            '<span class="sp"></span><span class="' + (l.soon ? "left soon" : "") + '">' + esc(l.t) + "</span></div>" +
+            '<span class="sp"></span><span class="bt ' + (l.soon ? "left soon" : "") + '">' + esc(l.t) + "</span></div>" +
             '<div class="compose"><textarea id="txt" placeholder="Reply on WhatsApp…" rows="2"></textarea><button class="btn" id="send">Send</button></div>' +
             '<div class="note" id="note">Ctrl/⌘ + Enter sends. A reply pauses ' + esc(cfg.assistant) + " for this diver until you let her take over (or 4 hours after your last message).</div>"
           : '<div class="closed">More than 24 hours since the diver\'s last message, so WhatsApp no longer allows a free reply. Read only.</div>');
@@ -1690,9 +1735,9 @@ function zoneClient(cfg) {
             if (b.chat) links.push('<a href="#" data-chat="' + esc(b.chat) + '">Chat</a>');
             if (b.manage && !isCx(b) && b.date >= t) links.push('<a href="' + esc(b.manage) + '" target="_blank" rel="noopener">Move / cancel</a>');
             var wa = b.phone ? '<a href="https://wa.me/' + esc(b.phone.replace(/[^0-9]/g, "")) + '" target="_blank" rel="noopener">' + esc(b.phone) + "</a>" : "";
-            return '<tr class="' + (isCx(b) ? "cx" : "") + '"><td>' + esc(b.ref) + "</td><td>" + esc(b.name) + "</td><td>" + wa + '</td><td class="num">' + b.divers +
-              '</td><td class="num">' + thb(b.deposit) + '</td><td class="num">' + (isCx(b) ? "–" : thb(b.balance)) + '</td><td class="keep">' + stTag(b) +
-              (b.refunded ? '<br><small>Refunded ' + thb(b.refunded) + "</small>" : "") + '</td><td class="keep noprint">' + links.join(" · ") + "</td></tr>";
+            return '<tr class="' + (isCx(b) ? "cx" : "") + '"><td data-l="Ref">' + esc(b.ref) + '</td><td data-l="Name" class="tname">' + esc(b.name) + '</td><td data-l="Phone">' + wa + '</td><td class="num" data-l="Divers">' + b.divers +
+              '</td><td class="num" data-l="Paid online">' + thb(b.deposit) + '</td><td class="num" data-l="At the shop">' + (isCx(b) ? "–" : thb(b.balance)) + '</td><td class="keep" data-l="Status">' + stTag(b) +
+              (b.refunded ? '<br><small>Refunded ' + thb(b.refunded) + "</small>" : "") + '</td><td class="keep noprint tlinks">' + links.join(" · ") + "</td></tr>";
           }).join("") + "</tbody></table></div>";
       });
     });
@@ -1725,11 +1770,11 @@ function zoneClient(cfg) {
       $("#prods").innerHTML = d.products.map(function (p) {
         var hours = ""; for (var h = 8; h <= 22; h++) hours += '<option value="' + h + '"' + (h === p.cutoff ? " selected" : "") + ">" + h + ":00</option>";
         return '<tr class="' + (p.active ? "" : "off") + '" data-id="' + esc(p.id) + '" data-pct="' + p.pct + '"><td class="nm">' + esc(p.name) + '<br><span class="muted">' + esc(p.code) + "</span></td>" +
-          '<td><input type="number" min="100" step="50" value="' + p.price + '" class="pp"></td>' +
-          '<td class="muted dep">' + Math.round(p.deposit).toLocaleString("en-US") + " THB<br>" + p.pct + "%</td>" +
-          '<td><select class="pc">' + hours + "</select></td>" +
-          '<td><input type="checkbox" class="pa"' + (p.active ? " checked" : "") + "></td>" +
-          '<td><button class="ghost ps" type="button">Save</button></td></tr>';
+          '<td data-l="Price (THB)"><input type="number" min="100" step="50" value="' + p.price + '" class="pp" inputmode="numeric"></td>' +
+          '<td class="muted dep" data-l="Deposit">' + Math.round(p.deposit).toLocaleString("en-US") + " THB<br>" + p.pct + "%</td>" +
+          '<td data-l="Book until (day before)"><select class="pc">' + hours + "</select></td>" +
+          '<td data-l="Bookable online"><input type="checkbox" class="pa"' + (p.active ? " checked" : "") + "></td>" +
+          '<td class="tlinks"><button class="ghost ps" type="button">Save</button></td></tr>';
       }).join("");
       $("#prods").querySelectorAll("tr").forEach(function (tr) {
         var pp = tr.querySelector(".pp");
@@ -1802,8 +1847,8 @@ function zoneClient(cfg) {
         else if (i.chat) act.push('<span class="st">Outside 24 h</span>');
         else act.push('<span class="st">No chat linked</span>');
         if (i.chat) act.push('<a href="#" data-uchat="' + k + '">Chat</a>');
-        return "<tr><td>" + who + "</td><td>" + esc(i.product) + "</td><td>" + esc(dayLabel(i.date)) + '</td><td class="num">' + i.divers +
-          '</td><td class="num">' + thb(i.total) + "</td><td>" + (ago(i.at) === "now" ? "just now" : ago(i.at) + " ago") + '</td><td class="keep noprint">' + act.join(" · ") + "</td></tr>";
+        return '<tr><td class="tname" data-l="Diver">' + who + '</td><td data-l="Product">' + esc(i.product) + '</td><td data-l="For">' + esc(dayLabel(i.date)) + '</td><td class="num" data-l="Divers">' + i.divers +
+          '</td><td class="num" data-l="Value">' + thb(i.total) + '</td><td data-l="Left">' + (ago(i.at) === "now" ? "just now" : ago(i.at) + " ago") + '</td><td class="keep noprint tlinks">' + act.join(" · ") + "</td></tr>";
       }).join("") + "</tbody></table></div>" +
       '<p style="color:var(--muted);font-size:13px">WhatsApp only allows a free message within 24 hours of the diver\'s last message, so older ones can\'t get a reminder from here.</p>';
     function go(k, draft) {
