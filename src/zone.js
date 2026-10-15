@@ -73,6 +73,7 @@ export async function handleZone(request, env, ctx) {
       const per = /^\d{4}-\d{2}$/.test(url.searchParams.get("period") || "") ? url.searchParams.get("period") : "";
       return json(await cached(env, `dash/v2/${center.slug}/${per || "30d"}`, 120, () => dashboard(env, center, per), fresh));
     }
+    if (p === "/zone/api/arriving") return json(await cached(env, `arr/${center.slug}`, 300, () => arriving(env, center), fresh));
     if (p === "/zone/api/overnight") return json(await cached(env, `night/${center.slug}`, 120, () => overnight(env, center), fresh));
     if (p === "/zone/api/unfinished") return json(await cached(env, `unf/${center.slug}`, 180, () => unfinished(env, center), fresh));
     if (p === "/zone/api/tickets") return json(await cached(env, `tick/${center.slug}`, 30, () => tickets(env, center), fresh));
@@ -633,6 +634,89 @@ async function dashboard(env, center, period) {
     weeks: Object.values(weeks),
     statement,
   };
+}
+
+// ---------- Arriving soon, not booked yet ----------
+// Divers who told the assistant when they are on the island, haven't booked and arrive within
+// 14 days (or are on the island now). Dates come from Leads → "Arrival date" (a date field, if
+// it exists) or are read from the free text in "Dates on island" ("18–24 Nov", "Nov 18-24",
+// "18/11 - 2/12", "2026-11-18"). Text it can't read is skipped.
+const MONTHS = { jan: 1, feb: 2, fev: 2, "fév": 2, mar: 3, mrt: 3, "mär": 3, maa: 3, apr: 4, avr: 4, abr: 4, may: 5, mai: 5, mei: 5, jun: 6, jui: 7, jul: 7, aug: 8, aou: 8, "aoû": 8, ago: 8, sep: 9, okt: 10, oct: 10, nov: 11, dec: 12, dez: 12, "déc": 12, dic: 12, ene: 1, juin: 6, juil: 7 };
+function monthOf(w) {
+  w = String(w || "").toLowerCase().replace(/\./g, "");
+  if (w.startsWith("juin") || w.startsWith("juni") || w === "june") return 6;
+  if (w.startsWith("juil") || w.startsWith("juli") || w === "july") return 7;
+  const k = w.slice(0, 3);
+  return MONTHS[k] || null;
+}
+function parseStay(text, createdMs) {
+  const s = String(text || "").toLowerCase();
+  if (!s) return null;
+  const pts = [];
+  const created = new Date(createdMs + 7 * 3600 * 1000);
+  const push = (y, m, d) => { if (m >= 1 && m <= 12 && d >= 1 && d <= 31) pts.push([y, m, d]); };
+  let r;
+  const iso = /(\d{4})-(\d{2})-(\d{2})/g;
+  while ((r = iso.exec(s))) push(+r[1], +r[2], +r[3]);
+  if (!pts.length) {
+    const w = "([a-zà-ÿ]{3,9})\\.?";
+    const range1 = new RegExp("(\\d{1,2})\\s*(?:st|nd|rd|th|e|er)?\\s*(?:-|–|—|to|tot|bis|au|al|until|till)\\s*(\\d{1,2})\\s*(?:st|nd|rd|th|e|er)?\\s+(?:of\\s+)?" + w, "g");
+    const range2 = new RegExp(w + "\\s*(\\d{1,2})\\s*(?:st|nd|rd|th)?\\s*(?:-|–|—|to|until)\\s*(\\d{1,2})(?!\\s*[a-z/.])", "g");
+    const dm = new RegExp("(\\d{1,2})\\s*(?:st|nd|rd|th|e|er)?\\s+(?:of\\s+)?" + w, "g");
+    const md = new RegExp(w + "\\s*(\\d{1,2})(?!\\d)", "g");
+    let m1 = range1.exec(s), m2 = range2.exec(s);
+    if (m1 && monthOf(m1[3])) { push(0, monthOf(m1[3]), +m1[1]); push(0, monthOf(m1[3]), +m1[2]); }
+    else if (m2 && monthOf(m2[1])) { push(0, monthOf(m2[1]), +m2[2]); push(0, monthOf(m2[1]), +m2[3]); }
+    else {
+      const found = [];
+      while ((r = dm.exec(s))) if (monthOf(r[2])) found.push([r.index, monthOf(r[2]), +r[1]]);
+      while ((r = md.exec(s))) if (monthOf(r[1])) found.push([r.index, monthOf(r[1]), +r[2]]);
+      found.sort((a, b) => a[0] - b[0]).forEach((f) => push(0, f[1], f[2]));
+      if (!found.length) {
+        const num = /(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?/g;
+        while ((r = num.exec(s))) push(r[3] ? (+r[3] < 100 ? 2000 + +r[3] : +r[3]) : 0, +r[2], +r[1]);
+      }
+    }
+  }
+  if (!pts.length) return null;
+  const toIso = ([y, m, d]) => {
+    let yr = y || created.getUTCFullYear();
+    let dt = Date.UTC(yr, m - 1, d);
+    if (!y && dt < createdMs - 10 * DAY) dt = Date.UTC(yr + 1, m - 1, d);
+    return new Date(dt).toISOString().slice(0, 10);
+  };
+  const from = toIso(pts[0]);
+  let to = pts.length > 1 ? toIso(pts[pts.length - 1]) : "";
+  if (!to || to < from) { const d = new Date(from + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 5); to = d.toISOString().slice(0, 10); }
+  return [from, to];
+}
+async function arriving(env, center) {
+  const leads = await at(env, "Leads", {
+    formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), IS_AFTER(CREATED_TIME(), DATEADD(NOW(), -60, 'days')))`,
+    max: 3000,
+  });
+  const today = thaiDate(Date.now());
+  const limit = thaiDate(Date.now() + 14 * DAY);
+  const s = (f, k) => { const v = first(f[k]); return v == null ? "" : String(v); };
+  const items = [];
+  for (const r of leads) {
+    const f = r.fields;
+    if (/booked|lost|closed|spam/i.test(s(f, "Status")) || f["Opted out"]) continue;
+    const text = s(f, "Dates on island");
+    const range = parseStay(s(f, "Arrival date") || text, Date.parse(r.createdTime));
+    if (!range) continue;
+    const [from, to] = range;
+    if (to < today || from > limit) continue;
+    const chat = s(f, "External ID");
+    const last = Date.parse(s(f, "Last message at") || 0) || 0;
+    items.push({
+      name: s(f, "Name"), phone: s(f, "Contact"), language: s(f, "Language") ? langCode(s(f, "Language")) : "", cert: s(f, "Cert level"),
+      group: s(f, "Group size"), interested: s(f, "Interested in"), dates: text, from, to, here: from <= today,
+      chat: okId(chat) ? chat : "", canMessage: last > 0 && Date.now() - last < DAY,
+    });
+  }
+  items.sort((a, b) => a.from.localeCompare(b.from));
+  return { today, items };
 }
 
 // ---------- While you were diving ----------
@@ -1545,6 +1629,7 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
       <button class="chip" data-r="next">Next 30 days</button>
       <button class="chip" data-r="past">Past 30 days</button>
       <button class="chip" data-r="unfinished">Not paid yet<span class="count" id="ucount" hidden></span></button>
+      <button class="chip" data-r="arriving">Arriving soon<span class="count" id="acount" hidden></span></button>
       <span class="sp"></span>
       <button class="ghost" id="print" type="button">Print list</button>
     </div>
@@ -1881,6 +1966,7 @@ function zoneClient(cfg) {
       document.querySelectorAll(".chip[data-r]").forEach(function (x) { x.classList.toggle("on", x === c); });
       renderBookings();
       if (brange === "unfinished") loadUnfinished();
+      if (brange === "arriving") loadArriving();
     };
   });
   $("#print").onclick = function () { window.print(); };
@@ -1895,6 +1981,7 @@ function zoneClient(cfg) {
   }
   function renderBookings() {
     if (brange === "unfinished") { renderUnfinished(); return; }
+    if (brange === "arriving") { renderArriving(); return; }
     if (!bdata) return;
     var t = bdata.today, list = bdata.bookings.filter(function (b) {
       if (brange === "today") return b.date === t;
@@ -2059,6 +2146,57 @@ function zoneClient(cfg) {
   }
   loadUnfinished();
   setInterval(function () { if (!document.hidden && $("#books").classList.contains("on")) loadUnfinished(); }, 300000);
+
+  // ---- arriving soon, not booked yet
+  var adata = null;
+  function loadArriving() {
+    return api("arriving").then(function (d) {
+      adata = d; var el = $("#acount"); el.hidden = !d.items.length; el.textContent = d.items.length;
+      if (brange === "arriving") renderArriving();
+    }).catch(function (e) { if (brange === "arriving" && e.message !== "auth") $("#blist").innerHTML = '<div class="bempty">' + esc(e.message) + "</div>"; });
+  }
+  function shortDay(iso) { return new Date(iso + "T12:00:00Z").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" }); }
+  function whenText(i) {
+    if (i.here) return "On the island now";
+    var days = Math.round((Date.parse(i.from) - Date.parse(adata.today)) / 86400000);
+    return days === 1 ? "Arrives tomorrow" : "Arrives in " + days + " days";
+  }
+  function renderArriving() {
+    if (!adata) { $("#bcards").innerHTML = ""; $("#blist").innerHTML = '<div class="bempty">Loading…</div>'; return; }
+    var list = adata.items;
+    var divers = list.reduce(function (a, i) { return a + (Number(i.group) || 1); }, 0);
+    $("#bcards").innerHTML =
+      '<div class="cardn"><small>Not booked yet</small><b>' + list.length + "</b></div>" +
+      '<div class="cardn"><small>Divers</small><b>' + divers + "</b></div>" +
+      '<div class="cardn"><small>On the island now</small><b>' + list.filter(function (i) { return i.here; }).length + "</b></div>";
+    if (!list.length) { $("#blist").innerHTML = '<div class="bempty">Nobody without a booking arrives in the next 14 days.</div>'; return; }
+    $("#blist").innerHTML = '<p class="d" style="color:var(--muted);font-size:14px;margin:0 0 10px">These divers told ' + esc(cfg.assistant) + " when they're on the island, but haven't booked yet. A personal message now often makes the difference.</p>" +
+      '<div class="bscroll"><table class="btable"><thead><tr><th>Diver</th><th>When</th><th>Interested in</th><th>Level</th><th class="num">Group</th><th class="noprint"></th></tr></thead><tbody>' +
+      list.map(function (i, k) {
+        var who = esc(i.name || i.phone || "Unknown diver") + (i.language ? ' <span class="tag lang">' + esc(String(i.language).slice(0, 2)) + "</span>" : "");
+        var when = '<b>' + esc(whenText(i)) + '</b><br><small style="color:var(--muted)">' + esc(shortDay(i.from)) + " – " + esc(shortDay(i.to)) + (i.dates ? " · “" + esc(i.dates) + "”" : "") + "</small>";
+        var act = [];
+        if (i.chat && i.canMessage) act.push('<a href="#" data-amsg="' + k + '">Send a message</a>');
+        else if (i.chat) act.push('<span class="st">Outside 24 h</span>');
+        if (i.chat) act.push('<a href="#" data-achat="' + k + '">Chat</a>');
+        else if (i.phone) act.push(esc(i.phone));
+        return '<tr><td class="tname" data-l="Diver">' + who + '</td><td data-l="When">' + when + '</td><td data-l="Interested in">' + esc(i.interested || "–") +
+          '</td><td data-l="Level">' + esc(i.cert || "–") + '</td><td class="num" data-l="Group">' + esc(i.group || "1") + '</td><td class="keep noprint tlinks">' + act.join(" · ") + "</td></tr>";
+      }).join("") + "</tbody></table></div>" +
+      '<p style="color:var(--muted);font-size:13px">WhatsApp only allows a free message within 24 hours of the diver\'s last message. For the others, message them from your WhatsApp app.</p>';
+    function go(k, draft) {
+      var i = adata.items[k];
+      var first = String(i.name || "").split(" ")[0];
+      pendingDraft = draft ? "Hi" + (first ? " " + first : "") + "! Looking forward to seeing you on Koh Tao" + (i.here ? "" : " from " + shortDay(i.from)) + ". Shall we reserve your " + (i.interested || "dives") + " now? Then your spot is guaranteed." : null;
+      document.querySelector('nav button[data-v="convos"]').click();
+      var all = document.querySelector('.chip[data-f="all"]'); if (all && filter === "open") all.click();
+      openChat(i.chat);
+    }
+    $("#blist").querySelectorAll("[data-amsg]").forEach(function (a) { a.onclick = function (e) { e.preventDefault(); go(Number(a.dataset.amsg), true); }; });
+    $("#blist").querySelectorAll("[data-achat]").forEach(function (a) { a.onclick = function (e) { e.preventDefault(); go(Number(a.dataset.achat), false); }; });
+  }
+  loadArriving();
+  setInterval(function () { if (!document.hidden && $("#books").classList.contains("on")) loadArriving(); }, 600000);
 
   // ---- dashboard
   var ddata = null;
