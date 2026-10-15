@@ -60,9 +60,11 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 .brand{display:inline-flex;align-items:center;gap:var(--s3);min-height:44px;text-decoration:none}
 .brand b{font-size:1.5rem;font-weight:700;letter-spacing:-.025em}
 .mast nav{display:flex;align-items:center;gap:var(--s6);font-weight:500}
-.mast nav a:not(.cta){display:none;color:var(--on-deep);text-decoration:none}
-.mast nav a:not(.cta):hover{color:var(--shore);text-decoration:underline}
+.mast nav a:not(.cta):not(.login){display:none;color:var(--on-deep);text-decoration:none}
+.mast nav a:not(.cta):not(.login):hover{color:var(--shore);text-decoration:underline}
 .mast .cta{min-height:40px;padding:8px 16px;font-size:.92rem}
+.mast nav .login{display:inline-flex;align-items:center;gap:6px;min-height:40px;color:var(--shore);font-weight:500;font-size:.92rem;text-decoration:none}
+.mast nav .login:hover{text-decoration:underline}
 
 /* Hero */
 .hero{display:grid;gap:var(--s12);padding-block:var(--s12) var(--s8);align-items:center}
@@ -118,19 +120,20 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 .light{background:var(--shore);color:var(--deep)}
 .band{padding-block:var(--section)}
 .band + .band{border-top:1px solid var(--shore-rule)}
-.intro{max-width:var(--reading);margin-bottom:var(--s12)}
+.intro{max-width:var(--reading);margin-bottom:var(--s8)}
 .intro h2{margin-bottom:var(--s4)}
 .intro p{color:var(--ink-soft)}
 
 /* Benefits */
-.gains{display:grid;gap:var(--s8) var(--gap)}
-.gains article{padding-top:var(--s6);border-top:1px solid var(--shore-rule)}
-.gains svg{width:28px;height:28px;margin-bottom:var(--s4);color:var(--deep)}
+.gains{display:grid;gap:var(--s6) var(--gap)}
+.gains article{display:grid;grid-template-columns:28px minmax(0,1fr);gap:var(--s1) var(--s4);align-content:start;padding-top:var(--s6);border-top:1px solid var(--shore-rule)}
+.gains article svg{grid-row:1 / 3;margin:2px 0 0}
+.gains svg{width:28px;height:28px;color:var(--deep)}
 .gains h3{margin-bottom:var(--s2);font-size:var(--t-lead)}
 .gains p{color:var(--ink-soft);max-width:44ch}
 
 /* How it works */
-.how{display:grid;gap:var(--s12);align-items:start}
+.how{display:grid;gap:var(--s8);align-items:start}
 .steps{counter-reset:step;display:grid;gap:var(--s6)}
 .steps li{counter-increment:step;display:grid;align-content:start;grid-template-columns:44px minmax(0,1fr);gap:var(--s1) var(--s4)}
 .steps li::before{content:counter(step);grid-row:1 / 3;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:var(--deep);color:var(--sand);font-weight:700;font-variant-numeric:tabular-nums}
@@ -171,7 +174,7 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 .keep-list p{color:var(--on-deep);max-width:46ch}
 
 /* Pricing */
-.pricing{display:grid;gap:var(--s12);align-items:start}
+.pricing{display:grid;gap:var(--s8);align-items:start}
 .pricing h2{margin-bottom:var(--s4)}
 .pricing .strap{font-weight:600;margin-bottom:var(--s4)}
 .pricing p + p{margin-top:var(--s4)}
@@ -188,6 +191,8 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 .faq{display:grid;gap:0 var(--gap)}
 .faq details{border-bottom:1px solid var(--shore-rule)}
 .faq-col{border-top:1px solid var(--shore-rule)}
+.faq-col + .faq-col{border-top:0}
+@media(min-width:780px){.faq-col + .faq-col{border-top:1px solid var(--shore-rule)}}
 .faq summary{display:flex;justify-content:space-between;align-items:baseline;gap:var(--s4);min-height:44px;padding-block:var(--s4);font-weight:600;cursor:pointer;list-style:none}
 .faq summary::-webkit-details-marker{display:none}
 .faq summary::after{content:"+";flex:0 0 20px;text-align:center;font-size:1.25rem;font-weight:400;line-height:1;color:var(--ink-soft)}
@@ -231,7 +236,8 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 .done iframe{display:block;width:100%;height:640px;margin-top:var(--s4);border:0;border-radius:var(--radius);background:var(--shore)}
 
 footer{padding-block:var(--s8);border-top:1px solid var(--ridge);font-size:var(--t-small);color:var(--on-deep)}
-footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(--s3) var(--s6)}
+footer .wrap{display:flex;flex-direction:column;gap:var(--s2)}
+@media(min-width:780px){footer .wrap{flex-direction:row;flex-wrap:wrap;justify-content:space-between;gap:var(--s3) var(--s6)}}
 footer a{text-decoration:none}
 footer a:hover{text-decoration:underline}
 
@@ -255,7 +261,7 @@ footer a:hover{text-decoration:underline}
 @media(min-width:980px){
  :root{--gutter:var(--s12);--gap:var(--s16)}
  .mast{padding-block:var(--s6)}
- .mast nav a:not(.cta){display:inline-flex}
+ .mast nav a:not(.cta):not(.login){display:inline-flex}
  .hero{grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:var(--gap);padding-block:var(--s16) var(--s12)}
  .lede{font-size:var(--t-lead);line-height:1.5}
  .problem-intro{grid-template-columns:1fr 1fr;gap:var(--gap);align-items:end}
@@ -268,7 +274,8 @@ footer a:hover{text-decoration:underline}
  .demo-layout{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:var(--gap)}
 }
 @media(min-width:1200px){h1{font-size:var(--t-hero)}}
-@media(max-width:380px){:root{--gutter:var(--s4)}h1{font-size:2.1rem}.mast .cta{padding:8px 12px}}
+@media(max-width:380px){:root{--gutter:var(--s4)}h1{font-size:2.1rem}.mast nav{gap:var(--s4)}.mast .cta{padding:8px 12px}}
+@media(max-width:779px){:root{--section:var(--s12)}.lost{padding-block:var(--s8) var(--s6)}.problems{gap:var(--s6)}}
 </style>
 </head>
 <body id="top">
@@ -286,6 +293,7 @@ footer a:hover{text-decoration:underline}
       <a href="#your-way">Your bookings</a>
       <a href="#pricing">Pricing</a>
       <a href="#faq">FAQ</a>
+      <a class="login" href="/zone" aria-label="Log in to the customer zone"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Log in</a>
       <a class="cta" href="#demo">Book a demo</a>
     </nav>
   </header>
@@ -294,15 +302,14 @@ footer a:hover{text-decoration:underline}
     <div>
       <p class="kicker">The inquiry assistant for dive centres</p>
       <h1 id="hero-title">More bookings.<br>Less admin. <span>Even while you’re underwater.</span></h1>
-      <p class="lede">Talay answers the inquiries you already receive within seconds, follows up automatically and lets divers book online. All under your dive centre’s name, all in one place.</p>
+      <p class="lede">Talay replies to your inquiries within seconds, follows up and lets divers book online. All under your centre’s name.</p>
       <div class="cta-row">
         <a class="cta" href="#demo">Book a free demo</a>
       </div>
       <ul class="assure" aria-label="Terms">
         <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>Free to use</li>
         <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>No monthly fees</li>
-        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>No fixed-term contract</li>
-        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>Works alongside your booking system</li>
+                <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>Works alongside your booking system</li>
       </ul>
     </div>
 
@@ -333,12 +340,12 @@ footer a:hover{text-decoration:underline}
   <section class="lost" aria-labelledby="lost-title">
     <div class="problem-intro">
       <h2 id="lost-title">You’re on the boat.<br>Who’s answering?</h2>
-      <p>Teaching, checking gear, getting everyone aboard. Meanwhile, someone is asking about a course, and messaging three other centres.</p>
+      <p>Meanwhile, a diver is asking about a course, and messaging three other centres.</p>
     </div>
     <div class="problems">
-      <article><svg class="problem-art" viewBox="0 0 104 104" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 18h48a8 8 0 0 1 8 8v29a8 8 0 0 1-8 8H39L24 76V63h-5a8 8 0 0 1-8-8V26a8 8 0 0 1 8-8Z"/><path d="M25 34h35M25 45h22"/><circle cx="75" cy="68" r="19" fill="#0A2029" stroke="#DCA44A"/><path d="M75 57v12l8 5" stroke="#DCA44A"/></svg><h3>A quick question.<br>A reply hours later.</h3><p>By the time you check your messages between boat trips, the diver may already have booked elsewhere.</p></article>
-      <article><svg class="problem-art" viewBox="0 0 104 104" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h47a8 8 0 0 1 8 8v25a8 8 0 0 1-8 8H41L24 70V58h-5a8 8 0 0 1-8-8V25a8 8 0 0 1 8-8Z"/><circle cx="29" cy="38" r="2" fill="#DCA44A" stroke="#DCA44A"/><circle cx="43" cy="38" r="2" fill="#DCA44A" stroke="#DCA44A"/><circle cx="57" cy="38" r="2" fill="#DCA44A" stroke="#DCA44A"/><path d="M49 71h26m-26 9h17M82 45v19l10 8V45" stroke-dasharray="3 5" opacity=".55"/></svg><h3>“Let me think about it.”<br>Then nothing.</h3><p>They seemed interested. Nobody follows up. You never find out whether they still want to dive.</p></article>
-      <article><svg class="problem-art" viewBox="0 0 104 104" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="22" y="18" width="56" height="70" rx="7"/><rect x="36" y="12" width="28" height="13" rx="4" fill="#0A2029"/><path d="M34 71V58m15 13V47m15 24V37" stroke="#DCA44A" stroke-width="4"/><path d="M33 79h34M84 30h10m-10 10h7"/><path d="M11 47h6m-9 10h9" opacity=".5"/></svg><h3>Plenty of messages.<br>Little visibility.</h3><p>Which inquiries became bookings? How long did replies take? The answers are scattered across conversations.</p></article>
+      <article><svg class="problem-art" viewBox="0 0 104 104" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 18h48a8 8 0 0 1 8 8v29a8 8 0 0 1-8 8H39L24 76V63h-5a8 8 0 0 1-8-8V26a8 8 0 0 1 8-8Z"/><path d="M25 34h35M25 45h22"/><circle cx="75" cy="68" r="19" fill="#0A2029" stroke="#DCA44A"/><path d="M75 57v12l8 5" stroke="#DCA44A"/></svg><h3>A quick question.<br>A reply hours later.</h3><p>By the time you reply between boat trips, the diver has booked elsewhere.</p></article>
+      <article><svg class="problem-art" viewBox="0 0 104 104" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h47a8 8 0 0 1 8 8v25a8 8 0 0 1-8 8H41L24 70V58h-5a8 8 0 0 1-8-8V25a8 8 0 0 1 8-8Z"/><circle cx="29" cy="38" r="2" fill="#DCA44A" stroke="#DCA44A"/><circle cx="43" cy="38" r="2" fill="#DCA44A" stroke="#DCA44A"/><circle cx="57" cy="38" r="2" fill="#DCA44A" stroke="#DCA44A"/><path d="M49 71h26m-26 9h17M82 45v19l10 8V45" stroke-dasharray="3 5" opacity=".55"/></svg><h3>“Let me think about it.”<br>Then nothing.</h3><p>Nobody follows up, and the booking quietly disappears.</p></article>
+      <article><svg class="problem-art" viewBox="0 0 104 104" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="22" y="18" width="56" height="70" rx="7"/><rect x="36" y="12" width="28" height="13" rx="4" fill="#0A2029"/><path d="M34 71V58m15 13V47m15 24V37" stroke="#DCA44A" stroke-width="4"/><path d="M33 79h34M84 30h10m-10 10h7"/><path d="M11 47h6m-9 10h9" opacity=".5"/></svg><h3>Plenty of messages.<br>Little visibility.</h3><p>Which inquiries became bookings? Nobody really knows.</p></article>
     </div>
   </section>
 </div>
@@ -364,38 +371,37 @@ footer a:hover{text-decoration:underline}
     <div class="wrap">
       <div class="intro">
         <h2 id="gains-title">Everything your team gains</h2>
-        <p>Talay takes the first reply, the questions and the follow-up off your team’s hands, so more conversations end in a booking.</p>
       </div>
       <div class="gains">
         <article>
           <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 6h14a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-7l-5 4v-4H5a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3Z"/><path d="M15.5 9.5 11 14h4l-4.5 4.5" stroke="#DCA44A"/></svg>
-          <h3>Never miss another inquiry</h3>
-          <p>Every message gets a fast, helpful reply, day and night, even when your whole team is underwater. You answer before the diver messages the next centre.</p>
+          <h3>Never miss an inquiry</h3>
+          <p>A fast, helpful reply to every message, day and night.</p>
         </article>
         <article>
           <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="22" height="19" rx="3"/><path d="M3 11h22M9 3v4m10-4v4"/><path d="m10 17 3 3 5-6" stroke="#DCA44A"/></svg>
-          <h3>Turn more inquiries into bookings</h3>
-          <p>Talay asks about experience, recommends the right course or dive and follows up when a diver goes quiet. Interested divers can book and pay a deposit straight away.</p>
+          <h3>More inquiries become bookings</h3>
+          <p>Talay recommends the right course, follows up and lets divers book straight away.</p>
         </article>
         <article>
           <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="14" cy="14" r="10.5"/><path d="M14 8v6l4 2.5" stroke="#DCA44A"/></svg>
           <h3>Save your team’s time</h3>
-          <p>Fewer repetitive questions about prices, courses, dive times and what to bring. Your team spends its time on divers, not on typing the same answers.</p>
+          <p>No more typing the same answers about prices, courses and dive times.</p>
         </article>
         <article>
           <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h11a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-4 3v-3H3"/><path d="M12 19h7l4 3v-3h1a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-5" stroke="#DCA44A"/></svg>
           <h3>Speak your diver’s language</h3>
-          <p>Talay replies in the diver’s language, with your own prices and policies. English, Dutch, French, German and Spanish are ready today, and more languages can be added for your centre.</p>
+          <p>Five languages today, more on request. Always with your own prices and policies.</p>
         </article>
         <article>
           <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3 5 6.5V13c0 5.5 3.8 9.7 9 11.5 5.2-1.8 9-6 9-11.5V6.5Z"/><path d="m10 14 3 3 5-6" stroke="#DCA44A"/></svg>
           <h3>Stay in control</h3>
-          <p>Reply in any conversation and Talay steps back. Medical questions, complaints and large groups go straight to your team. Talay assists your team; it doesn’t replace it.</p>
+          <p>Your team can take over any conversation. Medical questions and complaints always go to you.</p>
         </article>
         <article>
           <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="22" height="17" rx="3"/><path d="M10 25h8M14 21v4"/><path d="M8 16v-3m4 3V9m4 7v-5m4 5V8" stroke="#DCA44A"/></svg>
           <h3>Everything in one place</h3>
-          <p>Every conversation, every booking and every result through Talay, together in one dashboard on your computer or your phone.</p>
+          <p>Conversations, bookings and results in one dashboard, on your computer or phone.</p>
         </article>
       </div>
     </div>
@@ -405,17 +411,16 @@ footer a:hover{text-decoration:underline}
     <div class="wrap">
       <div class="intro">
         <h2 id="how-title">How Talay works</h2>
-        <p>Most of it runs on its own. Your team steps in only where it matters.</p>
+        <p>Most of it runs on its own. Your team steps in where it matters.</p>
       </div>
       <div class="how">
         <div>
           <ol class="steps">
-            <li><h3>Divers reach out where they like</h3><p>A diver messages your centre with a question about a course, a price or a date.</p></li>
-            <li><h3>Talay answers within seconds, in their language</h3><p>It asks about experience, recommends the right course or dive, answers practical questions and follows up when a diver goes quiet.</p></li>
-            <li><h3>The diver books online with a deposit</h3><p>Or walks in, or your team takes over the conversation whenever it wants.</p></li>
-            <li><h3>Everything lands in one place</h3><p>Every conversation and every booking appears in your customer zone, with your boat list ready to print.</p></li>
+            <li><h3>Divers reach out</h3><p>With a question about a course, a price or a date.</p></li>
+            <li><h3>Talay answers within seconds</h3><p>In their language: it recommends, answers questions and follows up.</p></li>
+            <li><h3>The diver books online</h3><p>With a deposit. Or walks in, or your team takes over.</p></li>
+            <li><h3>Everything lands in one place</h3><p>Every conversation and booking, in your customer zone.</p></li>
           </ol>
-          <div class="cta-row"><a class="cta" href="#demo">Book a free demo</a><span class="cta-note">20 minutes, no commitment.</span></div>
         </div>
         <figure>
           <div class="zone" role="img" aria-label="Illustration of the Talay customer zone with conversations and today's bookings">
@@ -439,9 +444,10 @@ footer a:hover{text-decoration:underline}
               </div>
             </div>
           </div>
-          <figcaption class="caption">Illustration of the customer zone. Works on your computer and installs on your phone.</figcaption>
+          <figcaption class="caption">Illustration of the customer zone.</figcaption>
         </figure>
       </div>
+      <div class="cta-row"><a class="cta" href="#demo">Book a free demo</a><span class="cta-note">20 minutes, no commitment.</span></div>
     </div>
   </section>
 </div>
@@ -450,13 +456,13 @@ footer a:hover{text-decoration:underline}
   <div class="wrap">
     <div class="intro">
       <h2 id="way-title">Your centre. Your bookings. Your way.</h2>
-      <p>Talay works alongside your existing booking system. You decide how you manage bookings, and your team stays in control.</p>
+      <p>Talay works alongside your booking system. Your team stays in control.</p>
     </div>
     <ul class="keep-list">
-      <li><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg><h3>Keep your current tools</h3><p>No need to replace your booking software or CRM. Talay handles the inquiry until the diver books.</p></li>
-      <li><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg><h3>Keep your direct bookings</h3><p>Walk-ins, phone bookings and bookings made directly with your team stay yours, without commission.</p></li>
-      <li><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg><h3>Offer online booking when it helps</h3><p>Divers can book and pay a deposit through Talay, but they never have to.</p></li>
-      <li><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg><h3>Have the final word</h3><p>Your team can move or cancel any booking made through Talay within two hours. If you cancel, the diver gets a full refund.</p></li>
+      <li><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg><h3>Keep your current tools</h3><p>No need to replace your booking software or CRM.</p></li>
+      <li><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg><h3>Keep your direct bookings</h3><p>Walk-ins and direct bookings stay yours, without commission.</p></li>
+      <li><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg><h3>Online booking, never required</h3><p>Divers can book through Talay, but never have to.</p></li>
+      <li><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg><h3>Have the final word</h3><p>Move or cancel any Talay booking within two hours.</p></li>
     </ul>
   </div>
 </section>
@@ -467,27 +473,26 @@ footer a:hover{text-decoration:underline}
       <div>
         <h2 id="price-title">Free to use. Pay only for bookings made through Talay.</h2>
         <p class="strap">No setup fees. No subscription. No fixed-term contract.</p>
-        <p class="body">Use the assistant, the automated follow-ups and your customer zone at no cost. You only pay a commission when a diver books and pays a deposit through Talay.</p>
-        <p class="body">Commission rates are agreed with your centre before you start. Your divers pay your normal prices, with no booking fee.</p>
+        <p class="body">Commission rates are agreed with your centre before you start. Divers pay your normal prices, with no booking fee.</p>
         <div class="cta-row"><a class="cta" href="#demo">Book a free demo</a></div>
       </div>
       <div class="ledger">
         <section>
           <h3>Free</h3>
           <ul>
-            <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>Setup with your prices, courses and policies</li>
-            <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>Instant replies and automated follow-ups</li>
-            <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>Online booking pages under your name</li>
-            <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>Customer zone and dashboard, also on your phone</li>
+            <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>Setup with your prices and courses</li>
+            <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>Instant replies and follow-ups</li>
+            <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>Online booking pages</li>
+            <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>Customer zone and dashboard</li>
           </ul>
         </section>
         <section>
           <h3>Commission</h3>
-          <p>Only when a diver books and pays a deposit through Talay. The commission is settled through that online deposit, so there is nothing to pay afterwards.</p>
+          <p>Only when a diver books and pays a deposit through Talay. Settled through that deposit, so nothing to pay afterwards.</p>
         </section>
         <section>
           <h3>Always commission-free</h3>
-          <p>Walk-ins, direct reservations and bookings handled in your own system.</p>
+          <p>Walk-ins, direct bookings and bookings in your own system.</p>
         </section>
       </div>
     </div>
@@ -500,20 +505,16 @@ footer a:hover{text-decoration:underline}
       </div>
       <div class="faq">
         <div class="faq-col">
-          <details><summary>Is Talay a booking system?</summary><p>No. Talay handles the inquiry until the diver books. Your booking system, your CRM and the way you work stay the same.</p></details>
-          <details><summary>Do divers have to book through Talay?</summary><p>No. Divers can still walk in, call or book with you directly. Talay offers online booking; it never forces it. Only bookings made through Talay carry a commission.</p></details>
-          <details><summary>What does it cost?</summary><p>Nothing to use: no setup cost, no monthly fee and no fixed-term contract. Talay earns a commission only on bookings made through Talay, settled through the online deposit. We agree the rates with you before you start.</p></details>
-          <details><summary>Does it reply under our centre’s name?</summary><p>Yes. Talay replies as your centre’s assistant, with your prices, courses and policies. Divers talk to your centre, not to a marketplace.</p></details>
-          <details><summary>Which channels does Talay work with?</summary><p>WhatsApp today. Instagram, Messenger, LINE, Telegram, website forms and email are being added. All conversations come together in one place.</p></details>
-          <details><summary>Which languages does it speak?</summary><p>English, Dutch, French, German and Spanish are ready today. Divers who write in another language get a reply in English, and new languages can be added for your centre.</p></details>
+          <details><summary>Is Talay a booking system?</summary><p>No. Talay handles the inquiry until the diver books. Your booking system and CRM stay the same.</p></details>
+          <details><summary>Do divers have to book through Talay?</summary><p>No. They can still walk in, call or book with you directly. Only bookings made through Talay carry a commission.</p></details>
+          <details><summary>What does it cost?</summary><p>Nothing to use. Talay earns a commission only on bookings made through Talay, at rates agreed with you up front.</p></details>
+          <details><summary>Which channels does Talay work with?</summary><p>WhatsApp today. Instagram, Messenger, LINE, Telegram, website forms and email are coming.</p></details>
         </div>
         <div class="faq-col">
-          <details><summary>Can our team take over a conversation?</summary><p>Yes, at any time. Reply from your customer zone or your inbox and Talay steps back. It picks up again a few hours after your team’s last message.</p></details>
-          <details><summary>What happens with medical questions or complaints?</summary><p>They go to your team, together with questions about children and groups of more than ten. Talay never gives medical advice. If nobody has replied after two hours during office hours, your team gets a reminder.</p></details>
-          <details><summary>How do the follow-ups work?</summary><p>When a diver goes quiet, Talay sends up to three short follow-ups within a day, never at night. Then it stops.</p></details>
-          <details><summary>What if we’re fully booked?</summary><p>Your team sees every booking straight away and can move it to another day or cancel it within two hours. If you cancel, the diver gets a full refund.</p></details>
-          <details><summary>Does Talay bring us new leads?</summary><p>No. Talay works on the inquiries your centre already receives. It makes sure fewer of them get lost.</p></details>
-          <details><summary>What do you need from us to start?</summary><p>Your prices, courses and policies, and who on your team takes over conversations. We set everything up for you.</p></details>
+          <details><summary>Which languages does it speak?</summary><p>English, Dutch, French, German and Spanish today. Other languages get English for now, and more can be added.</p></details>
+          <details><summary>Can our team take over a conversation?</summary><p>Yes, at any time. Reply from your customer zone or inbox and Talay steps back.</p></details>
+          <details><summary>What about medical questions or complaints?</summary><p>They always go to your team. Talay never gives medical advice.</p></details>
+          <details><summary>Does Talay bring us new leads?</summary><p>No. It makes sure fewer of the inquiries you already get are lost.</p></details>
         </div>
       </div>
     </div>
@@ -524,13 +525,8 @@ footer a:hover{text-decoration:underline}
   <div class="wrap demo-layout">
     <div>
       <h2 id="demo-title">See Talay in action.</h2>
-      <p class="lead-in">Discover how Talay can help your dive centre answer inquiries, save time and turn conversations into bookings.</p>
+      <p class="lead-in">We show you Talay with your own centre’s name, prices and courses.</p>
       <p class="free">Free 20-minute demo, by video or in person. No commitment.</p>
-      <ul class="see">
-        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>Talay answering a diver as your centre</li>
-        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>A booking, from first message to deposit</li>
-        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>Your customer zone and dashboard</li>
-      </ul>
       <p class="alt">Prefer WhatsApp? <a href="https://wa.me/32456953907?text=Hi%20Talay%2C%20I%20run%20a%20dive%20centre%20and%20would%20like%20to%20see%20a%20demo.">Message us</a> or email <a href="mailto:info@talay.io?subject=Talay%20demo">info@talay.io</a>.</p>
     </div>
 
@@ -540,10 +536,10 @@ footer a:hover{text-decoration:underline}
           <div class="field"><label for="f-name">Your name</label><input id="f-name" name="name" autocomplete="name" required maxlength="100"></div>
           <div class="field"><label for="f-centre">Dive centre</label><input id="f-centre" name="centre" autocomplete="organization" required maxlength="120"></div>
           <div class="field"><label for="f-location">Location</label><input id="f-location" name="location" placeholder="Koh Tao, Thailand" required maxlength="120"></div>
-          <div class="field"><label for="f-role">Your role <span>(optional)</span></label>
-            <select id="f-role" name="role"><option value="">Choose your role</option><option>Owner</option><option>Manager</option><option>Staff</option><option>Other</option></select></div>
           <div class="field"><label for="f-email">Email</label><input id="f-email" name="email" type="email" autocomplete="email" required maxlength="160"></div>
           <div class="field"><label for="f-wa">WhatsApp number</label><input id="f-wa" name="whatsapp" type="tel" autocomplete="tel" placeholder="+66 81 234 5678" required maxlength="40"></div>
+          <div class="field"><label for="f-role">Your role <span>(optional)</span></label>
+            <select id="f-role" name="role"><option value="">Choose your role</option><option>Owner</option><option>Manager</option><option>Staff</option><option>Other</option></select></div>
           <div class="field full"><label for="f-msg">Anything we should know? <span>(optional)</span></label><textarea id="f-msg" name="message" maxlength="2000" placeholder="For example: how many inquiries you get, or which channels divers use."></textarea></div>
         </div>
         <div class="hp" aria-hidden="true"><label for="f-web">Website</label><input id="f-web" name="website" tabindex="-1" autocomplete="off"></div>
@@ -569,6 +565,7 @@ footer a:hover{text-decoration:underline}
     <span>Keienberglaan 6B, 1850 Grimbergen, Belgium</span>
     <span>Enterprise number 0738.781.890</span>
     <a href="mailto:info@talay.io">info@talay.io</a>
+    <a href="/zone">Customer zone</a>
     <a href="/privacy/">Privacy</a>
     <span>© 2026 Talay</span>
   </div>
