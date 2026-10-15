@@ -2205,6 +2205,24 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 @media (max-width:1100px){.kpis.main{grid-template-columns:repeat(2,minmax(0,1fr))}.dgrid,.dgrid3{grid-template-columns:1fr}}
 @media (max-width:760px){.minis{grid-template-columns:1fr}.dsec{flex-direction:column;gap:2px}.kpis.main{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media print{details.stmt{border:0;box-shadow:none}details.stmt summary{display:none}body.print-statement .minis,body.print-statement .dgrid,body.print-statement .dgrid3,body.print-statement .dsec,body.print-statement #start,body.print-statement #ms{display:none !important}}
+
+/* Today layout v2: balanced rows */
+.trow1{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;margin-bottom:14px;align-items:stretch}
+.trow1 .night.big{margin:0;display:flex;flex-direction:column;justify-content:space-between}
+.trow1 .night.big[hidden]{display:none}
+.trow2{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:14px;align-items:stretch}
+.trow2 .tcard,.trow1 .tcard{display:flex;flex-direction:column;min-width:0}
+.tbig{display:flex;align-items:baseline;gap:8px;margin:2px 0 10px}
+.tbig b{font-size:32px;line-height:1;letter-spacing:-.03em}
+.tbig span{font-size:13px;color:var(--muted)}
+.tboat{padding:7px 12px;margin-top:6px}
+#tWeek .tbars{margin-top:auto}
+.tarr{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;width:100%;min-width:0}
+.tarr .trow{min-width:0;width:auto}
+.tarr .trow{background:var(--paper-2);border-radius:12px;padding:10px}
+.tarr .trow .tr-b small{white-space:normal;overflow:visible}
+@media (max-width:1100px){.trow2{grid-template-columns:1fr 1fr}.trow2 #tWeek{grid-column:1 / -1}.tarr{grid-template-columns:1fr 1fr}}
+@media (max-width:760px){.trow1,.trow2{grid-template-columns:1fr}.trow2 #tWeek{grid-column:auto}.tarr{grid-template-columns:1fr}}
 </style></head>
 <body>
 <header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>Customer zone</small></span></div><span class="sp"></span>${switcher}<div class="htools"><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">Sign out</span></a></div></header>
@@ -2213,17 +2231,16 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 <section id="today" class="view on">
   <div class="twrap">
     <div class="thead"><div><h1 id="tGreet">Today</h1><p id="tDate"></p></div></div>
-    <div class="tgrid">
-      <div class="tcol">
-        <div class="tcard" id="tNeed"><div class="skel"><i></i></div></div>
-        <div class="tcard" id="tBoats"><div class="skel"><i></i><i></i></div></div>
-      </div>
-      <div class="tcol">
-        <div class="night big" id="nightToday" hidden></div>
-        <div class="tcard" id="tArr"><div class="skel"><i></i></div></div>
-        <div class="tcard" id="tWeek"><div class="skel"><i></i></div></div>
-      </div>
+    <div class="trow1">
+      <div class="tcard" id="tNeed"><div class="skel"><i></i></div></div>
+      <div class="night big" id="nightToday"><div class="skel"><i></i></div></div>
     </div>
+    <div class="trow2">
+      <div class="tcard" id="tToday"><div class="skel"><i></i></div></div>
+      <div class="tcard" id="tTomorrow"><div class="skel"><i></i></div></div>
+      <div class="tcard" id="tWeek"><div class="skel"><i></i></div></div>
+    </div>
+    <div class="tcard" id="tArr"><div class="skel"><i></i></div></div>
   </div>
 </section>
 
@@ -2988,26 +3005,28 @@ function zoneClient(cfg) {
         live.filter(function (b) { return b.date === iso; }).forEach(function (b) { g[b.product] = g[b.product] || { divers: 0, n: 0 }; g[b.product].divers += b.divers; g[b.product].n++; });
         return Object.keys(g).map(function (k) { return [k, g[k]]; }).sort(function (a, b) { return b[1].divers - a[1].divers; });
       };
-      var block = function (label, iso) {
-        var rows = day(iso), tot = rows.reduce(function (a, r) { return a + r[1].divers; }, 0);
-        return '<div class="tday"><div class="tdh"><b>' + label + '</b><small>' + esc(dayLabel(iso)) + (tot ? " · " + tot + (tot === 1 ? " diver" : " divers") : "") + "</small></div>" +
-          (rows.length ? rows.map(function (r) { return '<div class="tboat"><span>' + esc(r[0]) + "</span><b>" + r[1].divers + (r[1].divers === 1 ? " diver" : " divers") + "</b></div>"; }).join("") : '<p class="tok">No bookings via ' + esc(cfg.assistant) + " yet.</p>") + "</div>";
+      var block = function (label, iso, r) {
+        var rows = day(iso), tot = rows.reduce(function (a, x) { return a + x[1].divers; }, 0);
+        return '<div class="th"><b>' + label + '</b><a href="#" class="tlink" data-gb="' + r + '">Boat list</a></div>' +
+          '<div class="tbig"><b>' + tot + "</b><span>" + (tot === 1 ? "diver" : "divers") + " · " + esc(new Date(iso + "T12:00:00Z").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" })) + "</span></div>" +
+          (rows.length ? rows.map(function (x) { return '<div class="tboat"><span>' + esc(x[0]) + "</span><b>" + x[1].divers + "</b></div>"; }).join("") : '<p class="tok">No bookings via ' + esc(cfg.assistant) + " yet.</p>");
       };
-      $("#tBoats").innerHTML = '<div class="th"><b>On the boat</b><a href="#" class="tlink" id="tPrint">Boat list</a></div>' + block("Today", d.today) + block("Tomorrow", d.tomorrow);
-      $("#tPrint").onclick = function (e) { e.preventDefault(); goBookings("today"); };
+      $("#tToday").innerHTML = block("On the boat today", d.today, "today");
+      $("#tTomorrow").innerHTML = block("Tomorrow", d.tomorrow, "tomorrow");
+      document.querySelectorAll("#today [data-gb]").forEach(function (a) { a.onclick = function (e) { e.preventDefault(); goBookings(a.dataset.gb); }; });
       var next = [], max = 1;
       for (var i = 0; i < 7; i++) { var iso = addDays(d.today, i); var dv = live.filter(function (b) { return b.date === iso; }).reduce(function (a, b) { return a + b.divers; }, 0); next.push([iso, dv]); max = Math.max(max, dv); }
       var total = next.reduce(function (a, x) { return a + x[1]; }, 0);
       $("#tWeek").innerHTML = '<div class="th"><b>Next 7 days</b><small>' + total + (total === 1 ? " diver" : " divers") + ' booked</small><a href="#" class="tlink" id="tCal">Calendar</a></div><div class="tbars">' +
         next.map(function (x) { return '<div class="tb"><span class="tbv">' + (x[1] || "") + '</span><span class="tbb" style="height:' + Math.max(4, Math.round(x[1] / max * 70)) + 'px"></span><small>' + new Date(x[0] + "T12:00:00Z").toLocaleDateString([], { weekday: "short" }) + "</small></div>"; }).join("") + "</div>";
       $("#tCal").onclick = function (e) { e.preventDefault(); goBookings("calendar"); };
-    }).catch(function () { $("#tBoats").innerHTML = '<div class="th"><b>On the boat</b></div><p class="tok">Couldn\'t load bookings.</p>'; $("#tWeek").innerHTML = ""; });
+    }).catch(function () { $("#tToday").innerHTML = '<div class="th"><b>On the boat today</b></div><p class="tok">Couldn\'t load bookings.</p>'; $("#tTomorrow").innerHTML = ""; $("#tWeek").innerHTML = ""; });
     api("arriving").then(function (d) {
       var n = d.items.length;
       $("#tArr").innerHTML = '<div class="th"><b>Arriving soon, not booked</b>' + (n ? '<span class="tag lang">' + n + "</span>" : "") + '<a href="#" class="tlink" id="tArrAll">See all</a></div>' +
-        (n ? d.items.slice(0, 3).map(function (i) {
+        (n ? '<div class="tarr">' + d.items.slice(0, 4).map(function (i) {
           return '<div class="trow static">' + avatar(i.name || i.phone, "") + '<span class="tr-b"><b>' + esc(i.name || i.phone || "Diver") + "</b><small>" + esc(i.interested || "Interested") + " · " + (i.here ? "on the island now" : "arrives " + esc(new Date(i.from + "T12:00:00Z").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" }))) + "</small></span></div>";
-        }).join("") : '<p class="tok">Nobody without a booking arrives in the next 14 days.</p>');
+        }).join("") + "</div>" : '<p class="tok">Nobody without a booking arrives in the next 14 days.</p>');
       $("#tArrAll").onclick = function (e) { e.preventDefault(); goBookings("arriving"); };
     }).catch(function () { $("#tArr").innerHTML = ""; });
   }
