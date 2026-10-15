@@ -71,7 +71,7 @@ export async function handleZone(request, env, ctx) {
     if (p === "/zone/api/bookings") return json(await cached(env, `book/${center.slug}`, 60, () => bookings(env, center), fresh));
     if (p === "/zone/api/dashboard") {
       const per = /^\d{4}-\d{2}$/.test(url.searchParams.get("period") || "") ? url.searchParams.get("period") : "";
-      return json(await cached(env, `dash/v3/${center.slug}/${per || "30d"}`, 120, () => dashboard(env, center, per), fresh));
+      return json(await cached(env, `dash/v4/${center.slug}/${per || "30d"}`, 120, () => dashboard(env, center, per), fresh));
     }
     if (p === "/zone/api/arriving") return json(await cached(env, `arr/${center.slug}`, 300, () => arriving(env, center), fresh));
     if (p === "/zone/api/overnight") return json(await cached(env, `night/${center.slug}`, 120, () => overnight(env, center), fresh));
@@ -582,13 +582,39 @@ function countryOf(phone) {
   return null;
 }
 
+// Stripe Checkout sessions created between start and end (ms), newest first, at most 500.
+async function checkoutSessions(env, start, end) {
+  if (!env.STRIPE_SECRET_KEY) return [];
+  const out = [];
+  let after = "";
+  for (let page = 0; page < 5; page++) {
+    const u = new URL("https://api.stripe.com/v1/checkout/sessions");
+    u.searchParams.set("limit", "100");
+    u.searchParams.set("created[gte]", String(Math.floor(start / 1000)));
+    u.searchParams.set("created[lt]", String(Math.floor(end / 1000)));
+    if (after) u.searchParams.set("starting_after", after);
+    const res = await fetch(u, { headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}` } });
+    if (!res.ok) throw new Error(`Stripe: ${res.status}`);
+    const body = await res.json();
+    out.push(...(body.data || []));
+    if (!body.has_more || !body.data?.length) break;
+    after = body.data[body.data.length - 1].id;
+  }
+  return out;
+}
+
 async function dashboard(env, center, period) {
   const { start, end, label, months } = periodRange(period);
   const iso = (ms) => new Date(ms).toISOString();
   const inPeriod = `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE(CREATED_TIME(), DATETIME_PARSE('${iso(end)}'))`;
-  const [leads, books] = await Promise.all([
+  const [leads, books, linkMsgs, sessions] = await Promise.all([
     at(env, "Leads", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${inPeriod})`, max: 5000 }),
     at(env, "Bookings", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${inPeriod})`, max: 5000 }),
+    at(env, "Chat", {
+      formula: `AND({Center} = '${q(center.slug)}', FIND('talay.io/b/', {Text}), {Direction} != 'Customer', IS_AFTER({Sent at}, DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE({Sent at}, DATETIME_PARSE('${iso(end)}')))`,
+      fields: ["Contact ID"], max: 5000,
+    }).catch(() => []),
+    checkoutSessions(env, start, end).catch(() => []),
   ]);
   const n = (v) => Number(first(v)) || 0;
   const cx = (b) => /cancel|refund/i.test(String(first(b.fields["Status"]) || ""));
@@ -639,6 +665,16 @@ async function dashboard(env, center, period) {
       commission: statement.reduce((a, r) => a + r.commission, 0),
       refunded: statement.reduce((a, r) => a + r.refunded, 0),
     },
+    funnel: (() => {
+      const mine = sessions.filter((s) => (s.metadata || {}).center_slug === center.slug);
+      const opened = new Set(mine.map((s) => (s.metadata || {}).lead_ref || s.id)).size;
+      return {
+        conversations: leads.length,
+        linkSent: new Set(linkMsgs.map((m) => String(m.fields["Contact ID"] || "")).filter(Boolean)).size,
+        opened,
+        booked: live.length,
+      };
+    })(),
     languages: Object.entries(langs).sort((a, b) => b[1] - a[1]),
     heat: (() => {
       const h = Array.from({ length: 7 }, () => Array(24).fill(0));
@@ -1631,6 +1667,20 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .panel{border-radius:16px;box-shadow:var(--shadow);padding:18px 20px}
 .panel h4{font-size:15px;letter-spacing:-.01em}
 @media (max-width:760px){.heat{grid-template-columns:28px repeat(24,minmax(0,1fr));gap:2px}.heat i{border-radius:2px;min-height:8px}.heat .hh{font-size:9px}}
+
+/* Funnel */
+.funnel{margin-bottom:14px}
+.fsteps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin-top:28px}
+.fstep{position:relative;display:flex;flex-direction:column;gap:2px}
+.fbar{height:10px;border-radius:5px;background:var(--paper);overflow:hidden;margin-bottom:10px}
+.fbar span{display:block;height:100%;border-radius:5px;background:var(--sand)}
+.fstep:first-child .fbar span{background:var(--side)}
+@media (prefers-color-scheme:dark){.fstep:first-child .fbar span{background:#9DB0B5}}
+.fstep b{font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
+.fstep small{font-size:13px;font-weight:600}
+.fstep em{font-style:normal;font-size:12px;color:var(--muted)}
+.fpct{position:absolute;right:0;top:-24px;font-size:12px;font-weight:700;color:var(--muted)}
+@media (max-width:760px){.fsteps{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 14px}.fstep b{font-size:22px}}
 </style></head>
 <body>
 <header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>Customer zone</small></span></div><span class="sp"></span>${switcher}<div class="htools"><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">Sign out</span></a></div></header>
@@ -2273,6 +2323,26 @@ function zoneClient(cfg) {
       renderDash();
     }).catch(function (e) { $("#dbody").style.opacity = ""; if (e.message !== "auth") $("#dbody").innerHTML = '<div class="bempty">' + esc(e.message) + "</div>"; });
   }
+  function funnelHtml(f) {
+    if (!f) return "";
+    var steps = [
+      ["Conversations", f.conversations, "divers who wrote"],
+      ["Got a booking link", f.linkSent, "from " + esc(cfg.assistant) + " or your team"],
+      ["Opened the payment page", f.opened, "chose a date and divers"],
+      ["Booked", f.booked, "paid the deposit"],
+    ];
+    var top = Math.max(1, f.conversations);
+    var html = steps.map(function (s, i) {
+      var w = Math.max(4, Math.round(s[1] / top * 100));
+      var prev = i ? steps[i - 1][1] : 0;
+      var conv = i ? '<span class="fpct" title="of the step before">' + (prev ? Math.round(s[1] / prev * 100) + "% of previous" : "–") + "</span>" : "";
+      return '<div class="fstep">' + conv + '<div class="fbar"><span style="width:' + w + '%"></span></div>' +
+        '<b>' + s[1] + '</b><small>' + s[0] + '</small><em>' + s[2] + "</em></div>";
+    }).join("");
+    var lost = Math.max(0, f.opened - f.booked);
+    var tip = lost ? lost + " " + (lost === 1 ? "diver" : "divers") + " opened the payment page but didn't pay. See <b>Bookings → Not paid yet</b> to send a reminder." : "Nobody dropped off at the payment page in this period.";
+    return '<div class="panel funnel"><h4>From question to booking</h4><div class="fsteps">' + html + '</div><p class="hnote">' + tip + "</p></div>";
+  }
   function flag(cc) { return String(cc || "").toUpperCase().replace(/./g, function (c) { return String.fromCodePoint(127397 + c.charCodeAt(0)); }); }
   function heatAndCountries(d) {
     if (!d.heat) return "";
@@ -2315,7 +2385,7 @@ function zoneClient(cfg) {
         kp(esc(cfg.assistant) + "'s response time", fmtSec(k.avgResponse), "average first reply") +
         kp("Handed over to your team", k.handedOver, pct(k.handedOver, k.conversations) + " of conversations") +
         kp("Collected at your shop", thb(k.atShop), "balance paid on arrival") +
-      "</div>" +
+      "</div>" + funnelHtml(d.funnel) +
       '<div class="grid2"><div class="panel"><h4>Per week</h4><div class="legend"><span><i style="background:#9FB2B8"></i>Conversations</span><span><i style="background:#E8B04B"></i>Bookings</span></div>' +
         '<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:160px;display:block">' + bars + "</svg>" +
         '<div style="display:flex;font-size:11px;color:var(--muted);margin-top:4px">' + labels + "</div></div>" +
