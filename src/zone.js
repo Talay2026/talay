@@ -1953,6 +1953,39 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .ms.small .msbody b{font-size:13.5px}
 @media (prefers-color-scheme:dark){.ms .msicon{color:var(--sand)}}
 @media (max-width:760px){.ms.small{margin:8px 10px 2px}}
+
+/* Polish: list tags on their own line, skeletons, empty states, getting started */
+.item .top{gap:10px}
+.item .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.item .pv{margin-top:5px}
+.skel{display:grid;gap:10px;padding:4px 0}
+.skel.list{padding:10px 12px}
+.skel.pad{padding:24px;max-width:880px;width:100%;margin:0 auto}
+.skel i{display:block;height:56px;border-radius:14px;background:linear-gradient(90deg,var(--paper-2) 0%,var(--line) 50%,var(--paper-2) 100%);background-size:200% 100%;animation:skel 1.3s ease-in-out infinite}
+.skel.list i{height:62px}
+.skel i:nth-child(2){opacity:.75}.skel i:nth-child(3){opacity:.5}.skel i:nth-child(4){opacity:.3}
+@keyframes skel{from{background-position:200% 0}to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.skel i{animation:none}}
+.empty-card{display:flex;flex-direction:column;align-items:flex-start;gap:8px;max-width:560px;margin:8px 0;padding:24px;border-radius:16px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow)}
+.empty-card .eic{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(220,164,74,.18);color:#B07F1E}
+.empty-card b{font-size:16px}
+.empty-card p{margin:0;font-size:14px;color:var(--muted);line-height:1.55}
+.start{margin:0 0 14px;padding:18px 20px;border-radius:16px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow)}
+.start .sh{display:flex;align-items:baseline;gap:10px}
+.start .sh b{font-size:15px}
+.start .sh small{color:var(--muted);font-size:12.5px}
+.start .lnk3{margin-left:auto;background:none;border:0;font:inherit;font-size:12.5px;color:var(--muted);cursor:pointer}
+.start .lnk3:hover{color:var(--deep);text-decoration:underline}
+.sprog{height:6px;border-radius:3px;background:var(--paper);overflow:hidden;margin:10px 0 12px}
+.sprog span{display:block;height:100%;background:var(--sand)}
+.slist{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 20px}
+.slist li{display:flex;align-items:center;gap:10px;font-size:14px}
+.slist li.ok{color:var(--muted);text-decoration:line-through}
+.slist .ck{flex:none;width:20px;height:20px;border-radius:50%;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;color:#09262F}
+.slist li.ok .ck{background:var(--sand);border-color:var(--sand)}
+.slist a{color:var(--deep);font-weight:600}
+@media (max-width:760px){.slist{grid-template-columns:1fr}}
 </style></head>
 <body>
 <header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>Customer zone</small></span></div><span class="sp"></span>${switcher}<div class="htools"><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">Sign out</span></a></div></header>
@@ -1971,7 +2004,7 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
     </div>
     <div class="night" id="night" hidden></div>
     <div class="ms small" id="msChat" hidden></div>
-    <div class="items" id="list"><div class="empty">Loading…</div></div>
+    <div class="items" id="list"><div class="skel list"><i></i><i></i><i></i><i></i></div></div>
   </div>
   <div class="pane" id="pane"><div class="placeholder">Pick a conversation.<br><br><b>Open</b> shows every diver who wrote in the last 24 hours: WhatsApp only lets you reply freely within that window. <b>Needs you</b> means ${esc(center.assistant)} handed it over to your team.</div></div>
 </section>
@@ -1989,7 +2022,7 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
       <button class="ghost" id="print" type="button">Print list</button>
     </div>
     <div id="bcards" class="cards"></div>
-    <div id="blist"><div class="bempty">Loading…</div></div>
+    <div id="blist"><div class="skel"><i></i><i></i><i></i></div></div>
   </div>
 </section>
 
@@ -2049,7 +2082,7 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
       <span class="sp"></span>
       <button class="btn" id="tNew" type="button">New ticket</button>
     </div>
-    <div id="tbody"><div class="bempty">Loading…</div></div>
+    <div id="tbody"><div class="skel"><i></i><i></i><i></i></div></div>
   </div>
 </section>
 
@@ -2062,8 +2095,9 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
       <button class="ghost" id="stCsv" type="button">Download CSV</button>
     </div>
     <div class="night big" id="nightDash" hidden></div>
+    <div class="start" id="start" hidden></div>
     <div class="ms" id="ms" hidden></div>
-    <div id="dbody"><div class="bempty">Loading…</div></div>
+    <div id="dbody"><div class="skel"><i></i><i></i><i></i></div></div>
   </div>
 </section>
 
@@ -2133,9 +2167,9 @@ function zoneClient(cfg) {
       document.querySelectorAll("nav button").forEach(function (x) { x.classList.toggle("on", x === b); });
       document.querySelectorAll(".view").forEach(function (v) { v.classList.toggle("on", v.id === b.dataset.v); });
       if (b.dataset.v !== "convos") document.body.classList.remove("inchat");
-      if (b.dataset.v === "dash") loadDash();
+      if (b.dataset.v === "dash") { loadDash(); loadStart(); }
       if (b.dataset.v === "books") loadBookings();
-      if (b.dataset.v === "sett") loadSettings();
+      if (b.dataset.v === "sett") { loadSettings(); try { localStorage.setItem("talay-seen-prices", "1"); } catch (e) {} }
       if (b.dataset.v === "supp") { tview = null; loadTickets(); }
     };
   });
@@ -2182,11 +2216,12 @@ function zoneClient(cfg) {
       var who = c.previewDir === "Customer" ? "" : (c.previewDir === "Team" ? "You: " : cfg.assistant + ": ");
       return '<button class="item' + (c.id === current ? " on" : "") + '" data-id="' + esc(c.id) + '" data-close="' + esc(c.closesAt || "") + '">' +
         '<div class="top"><span class="nm">' + esc(c.name || "Diver") + "</span>" +
+        '<span class="tm">' + ago(c.lastAt) + "</span></div>" +
+        ((c.needsYou || c.teamActive || /booked/i.test(c.status) || c.language) ? '<div class="tags">' +
         (c.needsYou ? '<span class="tag need">Needs you</span>' : "") +
         (c.teamActive ? '<span class="tag team">Team</span>' : "") +
         (/booked/i.test(c.status) ? '<span class="tag st">Booked</span>' : "") +
-        (c.language ? '<span class="tag lang">' + esc(c.language) + "</span>" : "") +
-        '<span class="tm">' + ago(c.lastAt) + "</span></div>" +
+        (c.language ? '<span class="tag lang">' + esc(c.language) + "</span>" : "") + "</div>" : "") +
         '<div class="pv">' + esc(who + c.preview) + "</div>" +
         (l.t ? '<div class="left' + (l.soon ? " soon" : "") + '">' + l.t + "</div>" : "") + "</button>";
     }).join("");
@@ -2204,7 +2239,7 @@ function zoneClient(cfg) {
     current = id; lastChat = ""; chatSeenAt = null;
     document.querySelectorAll(".item").forEach(function (b) { b.classList.toggle("on", b.dataset.id === id); });
     $("#convos").classList.add("open"); document.body.classList.add("inchat");
-    $("#pane").innerHTML = '<div class="placeholder">Loading…</div>';
+    $("#pane").innerHTML = '<div class="skel pad"><i></i><i></i><i></i></div>';
     loadChat(true);
   }
   function fact(label, v) { return v ? "<span>" + label + " <b>" + esc(v) + "</b></span>" : ""; }
@@ -2277,6 +2312,7 @@ function zoneClient(cfg) {
         t.value = draft;
         if (pendingDraft) { t.value = pendingDraft; pendingDraft = null; t.focus(); }
         try { s.value = localStorage.getItem("talay-sig") || ""; } catch (e) {}
+        if (!s.value && cfg.email) { var nm = String(cfg.email).split("@")[0].split(/[._-]/)[0]; if (nm && !/^(info|team|hello|contact|admin|dive|office)$/i.test(nm)) s.value = nm.charAt(0).toUpperCase() + nm.slice(1); }
         s.oninput = function () { try { localStorage.setItem("talay-sig", s.value); } catch (e) {} };
         t.onkeydown = function (e) { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send(); };
         $("#send").onclick = send;
@@ -2475,7 +2511,7 @@ function zoneClient(cfg) {
     }).catch(function (e) { if (brange === "unfinished" && e.message !== "auth") $("#blist").innerHTML = '<div class="bempty">' + esc(e.message) + "</div>"; });
   }
   function renderUnfinished() {
-    if (!udata) { $("#bcards").innerHTML = ""; $("#blist").innerHTML = '<div class="bempty">Loading…</div>'; return; }
+    if (!udata) { $("#bcards").innerHTML = ""; $("#blist").innerHTML = '<div class="skel"><i></i><i></i><i></i></div>'; return; }
     var list = udata.items;
     var value = list.reduce(function (a, i) { return a + i.total; }, 0);
     $("#bcards").innerHTML =
@@ -2524,7 +2560,7 @@ function zoneClient(cfg) {
     return days === 1 ? "Arrives tomorrow" : "Arrives in " + days + " days";
   }
   function renderArriving() {
-    if (!adata) { $("#bcards").innerHTML = ""; $("#blist").innerHTML = '<div class="bempty">Loading…</div>'; return; }
+    if (!adata) { $("#bcards").innerHTML = ""; $("#blist").innerHTML = '<div class="skel"><i></i><i></i><i></i></div>'; return; }
     var list = adata.items;
     var divers = list.reduce(function (a, i) { return a + (Number(i.group) || 1); }, 0);
     $("#bcards").innerHTML =
@@ -2669,6 +2705,36 @@ function zoneClient(cfg) {
     }).catch(function () {});
   }
 
+  // ---- Getting started (hidden once everything is done, or when someone hides it)
+  function loadStart() {
+    var el = $("#start");
+    try { if (localStorage.getItem("talay-start-hide")) return; } catch (e) {}
+    var pushCheck = ("serviceWorker" in navigator && "PushManager" in window) ?
+      Promise.race([navigator.serviceWorker.ready.then(function (r) { return r.pushManager.getSubscription(); }).then(function (s) { return !!s; }), new Promise(function (r) { setTimeout(function () { r(false); }, 1500); })]).catch(function () { return false; }) : Promise.resolve(false);
+    Promise.all([api("settings").catch(function () { return null; }), pushCheck]).then(function (res) {
+      var s = res[0], push = res[1];
+      if (!s) return;
+      var seen = false; try { seen = !!localStorage.getItem("talay-seen-prices"); } catch (e) {}
+      var items = [
+        ["Check your prices and products", seen, "sett"],
+        ["Set your office hours", !!s.hoursText, "sett"],
+        ["Add your team", (s.staff || []).length > 1, "sett"],
+        ["Turn on notifications on this device", push, "sett"],
+      ];
+      var done = items.filter(function (i) { return i[1]; }).length;
+      if (done === items.length) { el.hidden = true; return; }
+      el.innerHTML = '<div class="sh"><b>Get started with Talay</b><small>' + done + " of " + items.length + ' done</small><button type="button" class="lnk3" id="startHide">Hide</button></div>' +
+        '<div class="sprog"><span style="width:' + Math.round(done / items.length * 100) + '%"></span></div>' +
+        '<ul class="slist">' + items.map(function (i) {
+          return '<li class="' + (i[1] ? "ok" : "") + '"><span class="ck">' + (i[1] ? '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8.5 3.2 3L13 4.5"/></svg>' : "") + "</span>" +
+            (i[1] ? esc(i[0]) : '<a href="#" data-go="' + i[2] + '">' + esc(i[0]) + "</a>") + "</li>";
+        }).join("") + "</ul>";
+      el.hidden = false;
+      el.querySelectorAll("[data-go]").forEach(function (a) { a.onclick = function (e) { e.preventDefault(); document.querySelector('nav button[data-v="' + a.dataset.go + '"]').click(); }; });
+      $("#startHide").onclick = function () { try { localStorage.setItem("talay-start-hide", "1"); } catch (e) {} el.hidden = true; };
+    });
+  }
+
   function loadDash() {
     var p = $("#period").value || "";
     $("#dbody").style.opacity = ".5";
@@ -2730,8 +2796,8 @@ function zoneClient(cfg) {
     var W = Math.max(d.weeks.length, 1), bw = 100 / W;
     var bars = d.weeks.map(function (w, i) {
       var h1 = w.conversations / maxW * 100, h2 = w.bookings / maxW * 100, x = i * bw;
-      return '<rect x="' + (x + bw * 0.12) + '" y="' + (100 - h1) + '" width="' + (bw * 0.36) + '" height="' + h1 + '" fill="#9FB2B8" rx="1"><title>' + w.conversations + " conversations</title></rect>" +
-        '<rect x="' + (x + bw * 0.52) + '" y="' + (100 - h2) + '" width="' + (bw * 0.36) + '" height="' + h2 + '" fill="#E8B04B" rx="1"><title>' + w.bookings + " bookings</title></rect>";
+      return '<rect x="' + (x + bw * 0.12) + '" y="' + (100 - h1) + '" width="' + (bw * 0.36) + '" height="' + h1 + '" fill="#4E7480" rx="1"><title>' + w.conversations + " conversations</title></rect>" +
+        '<rect x="' + (x + bw * 0.52) + '" y="' + (100 - h2) + '" width="' + (bw * 0.36) + '" height="' + h2 + '" fill="#DCA44A" rx="1"><title>' + w.bookings + " bookings</title></rect>";
     }).join("");
     var labels = d.weeks.map(function (w) { return '<span style="flex:1;text-align:center">' + new Date(w.week + "T12:00:00Z").toLocaleDateString([], { day: "numeric", month: "short" }) + "</span>"; }).join("");
     var langMax = Math.max(1, d.languages.length ? d.languages[0][1] : 1);
@@ -2744,7 +2810,7 @@ function zoneClient(cfg) {
         kp("Handed over to your team", k.handedOver, pct(k.handedOver, k.conversations) + " of conversations") +
         kp("Collected at your shop", thb(k.atShop), "balance paid on arrival") +
       "</div>" + funnelHtml(d.funnel) +
-      '<div class="grid2"><div class="panel"><h4>Per week</h4><div class="legend"><span><i style="background:#9FB2B8"></i>Conversations</span><span><i style="background:#E8B04B"></i>Bookings</span></div>' +
+      '<div class="grid2"><div class="panel"><h4>Per week</h4><div class="legend"><span><i style="background:#4E7480"></i>Conversations</span><span><i style="background:#DCA44A"></i>Bookings</span></div>' +
         '<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:160px;display:block">' + bars + "</svg>" +
         '<div style="display:flex;font-size:11px;color:var(--muted);margin-top:4px">' + labels + "</div></div>" +
         '<div class="panel"><h4>Languages</h4>' + (d.languages.length ? d.languages.map(function (l) {
@@ -2796,8 +2862,9 @@ function zoneClient(cfg) {
     if (!tdata) return;
     var list = tdata.tickets.filter(function (t) { return tfilter === "done" ? t.status === "Done" : t.status !== "Done"; });
     if (!list.length) {
-      $("#tbody").innerHTML = '<div class="bempty">' + (tfilter === "done" ? "No closed tickets yet." :
-        "No open tickets. Something not working, a wrong answer from " + esc(cfg.assistant) + ", or an idea? Click <b>New ticket</b>, or <b>Report</b> under any message from " + esc(cfg.assistant) + ".") + "</div>";
+      $("#tbody").innerHTML = tfilter === "done" ? '<div class="bempty">No closed tickets yet.</div>' :
+        '<div class="empty-card"><div class="eic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/><path d="m9 11 2 2 4-4"/></svg></div>' +
+        "<b>No open tickets. All good.</b><p>Something not working, a wrong answer from " + esc(cfg.assistant) + ", or an idea for Talay? Click <b>New ticket</b>, or <b>Report</b> under any message from " + esc(cfg.assistant) + ". We reply here.</p></div>";
       return;
     }
     $("#tbody").innerHTML = '<div class="tlist">' + list.map(function (t) {
@@ -2828,7 +2895,7 @@ function zoneClient(cfg) {
   }
   function openTicket(id) {
     tview = id;
-    $("#tbody").innerHTML = '<div class="bempty">Loading…</div>';
+    $("#tbody").innerHTML = '<div class="skel"><i></i><i></i><i></i></div>';
     api("ticket?id=" + encodeURIComponent(id)).then(function (d) {
       if (tview !== id) return;
       var t = d.ticket;
