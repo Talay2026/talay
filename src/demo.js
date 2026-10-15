@@ -1,12 +1,12 @@
 // Demo requests from the homepage form: POST talay.io/api/demo
 // Writes one row to the Airtable table "Demo requests" (base AIRTABLE_BASE, token AIRTABLE_TOKEN).
-// Spam protection: hidden honeypot field, max 5 requests per hour per IP,
+// Spam protection: hidden honeypot field, max 10 saved requests per hour per IP,
 // and Cloudflare Turnstile as soon as the secret TURNSTILE_SECRET is set in Cloudflare.
 
 const TABLE = "Demo requests";
 const ROLES = ["Owner", "Manager", "Staff", "Other"];
 const ALLOWED_ORIGINS = ["https://talay.io", "https://www.talay.io"];
-const MAX_PER_HOUR = 5;
+const MAX_PER_HOUR = 10; // only saved requests count
 
 export async function handleDemo(request, env, ctx) {
   if (request.method !== "POST") return reply({ ok: false, error: "method" }, 405);
@@ -37,12 +37,12 @@ export async function handleDemo(request, env, ctx) {
   }
 
   const ip = request.headers.get("CF-Connecting-IP") || "";
-  if (await tooMany(ip, ctx)) return reply({ ok: false, error: "rate" }, 429);
+  if (await tooMany(ip)) return reply({ ok: false, error: "rate" }, 429);
 
   const secret = String(env.TURNSTILE_SECRET || "").trim();
   if (secret) {
     const token = clean(data.turnstile, 4096);
-    if (!token) { console.log("Turnstile: no token received"); return reply({ ok: false, error: "check" }, 400); }
+    if (!token) { console.log("Turnstile: no token received"); return reply({ ok: false, error: "check", codes: ["no-token"] }, 400); }
     const body = new FormData();
     body.append("secret", secret);
     body.append("response", token);
@@ -51,7 +51,7 @@ export async function handleDemo(request, env, ctx) {
     const result = await check.json().catch(() => ({}));
     if (!result.success) {
       console.log("Turnstile failed:", JSON.stringify(result["error-codes"] || result), "hostname:", result.hostname || "-");
-      return reply({ ok: false, error: "check" }, 400);
+      return reply({ ok: false, error: "check", codes: result["error-codes"] || [] }, 400);
     }
   }
 
@@ -75,6 +75,7 @@ export async function handleDemo(request, env, ctx) {
     console.log("Demo request: Airtable error", res.status, await res.text());
     return reply({ ok: false, error: "save" }, 502);
   }
+  await countRequest(ip, ctx);
   return reply({ ok: true });
 }
 
@@ -85,16 +86,24 @@ function clean(value, max, multiline = false) {
 }
 
 // Best-effort limit per IP, kept in the Cloudflare cache for one hour.
-async function tooMany(ip, ctx) {
+// Only requests that were actually saved count, so failed attempts never lock someone out.
+const rlKey = (ip) => new Request(`https://talay.io/__ratelimit/demo2/${encodeURIComponent(ip)}`);
+
+async function readCount(ip) {
+  const hit = await caches.default.match(rlKey(ip));
+  return hit ? parseInt(await hit.text(), 10) || 0 : 0;
+}
+
+async function tooMany(ip) {
   if (!ip) return false;
-  const cache = caches.default;
-  const key = new Request(`https://talay.io/__ratelimit/demo/${encodeURIComponent(ip)}`);
-  const hit = await cache.match(key);
-  const count = hit ? parseInt(await hit.text(), 10) || 0 : 0;
-  if (count >= MAX_PER_HOUR) return true;
-  const put = cache.put(key, new Response(String(count + 1), { headers: { "Cache-Control": "max-age=3600" } }));
+  return (await readCount(ip)) >= MAX_PER_HOUR;
+}
+
+async function countRequest(ip, ctx) {
+  if (!ip) return;
+  const next = (await readCount(ip)) + 1;
+  const put = caches.default.put(rlKey(ip), new Response(String(next), { headers: { "Cache-Control": "max-age=3600" } }));
   if (ctx && ctx.waitUntil) ctx.waitUntil(put); else await put;
-  return false;
 }
 
 function reply(obj, status = 200) {
