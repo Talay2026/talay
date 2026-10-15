@@ -71,7 +71,7 @@ export async function handleZone(request, env, ctx) {
     if (p === "/zone/api/bookings") return json(await cached(env, `book/${center.slug}`, 60, () => bookings(env, center), fresh));
     if (p === "/zone/api/dashboard") {
       const per = /^\d{4}-\d{2}$/.test(url.searchParams.get("period") || "") ? url.searchParams.get("period") : "";
-      return json(await cached(env, `dash/v2/${center.slug}/${per || "30d"}`, 120, () => dashboard(env, center, per), fresh));
+      return json(await cached(env, `dash/v3/${center.slug}/${per || "30d"}`, 120, () => dashboard(env, center, per), fresh));
     }
     if (p === "/zone/api/arriving") return json(await cached(env, `arr/${center.slug}`, 300, () => arriving(env, center), fresh));
     if (p === "/zone/api/overnight") return json(await cached(env, `night/${center.slug}`, 120, () => overnight(env, center), fresh));
@@ -572,6 +572,16 @@ function periodRange(period) {
   return { start, end, label, months };
 }
 
+// Country from a phone number's dialling code (longest prefix wins). Flag drawn in the browser.
+const DIAL = { "1": ["US", "USA / Canada"], "7": ["RU", "Russia / Kazakhstan"], "20": ["EG", "Egypt"], "27": ["ZA", "South Africa"], "30": ["GR", "Greece"], "31": ["NL", "Netherlands"], "32": ["BE", "Belgium"], "33": ["FR", "France"], "34": ["ES", "Spain"], "36": ["HU", "Hungary"], "39": ["IT", "Italy"], "40": ["RO", "Romania"], "41": ["CH", "Switzerland"], "43": ["AT", "Austria"], "44": ["GB", "United Kingdom"], "45": ["DK", "Denmark"], "46": ["SE", "Sweden"], "47": ["NO", "Norway"], "48": ["PL", "Poland"], "49": ["DE", "Germany"], "51": ["PE", "Peru"], "52": ["MX", "Mexico"], "54": ["AR", "Argentina"], "55": ["BR", "Brazil"], "56": ["CL", "Chile"], "57": ["CO", "Colombia"], "60": ["MY", "Malaysia"], "61": ["AU", "Australia"], "62": ["ID", "Indonesia"], "63": ["PH", "Philippines"], "64": ["NZ", "New Zealand"], "65": ["SG", "Singapore"], "66": ["TH", "Thailand"], "81": ["JP", "Japan"], "82": ["KR", "South Korea"], "84": ["VN", "Vietnam"], "86": ["CN", "China"], "90": ["TR", "Turkey"], "91": ["IN", "India"], "351": ["PT", "Portugal"], "352": ["LU", "Luxembourg"], "353": ["IE", "Ireland"], "354": ["IS", "Iceland"], "358": ["FI", "Finland"], "359": ["BG", "Bulgaria"], "370": ["LT", "Lithuania"], "371": ["LV", "Latvia"], "372": ["EE", "Estonia"], "380": ["UA", "Ukraine"], "381": ["RS", "Serbia"], "385": ["HR", "Croatia"], "386": ["SI", "Slovenia"], "420": ["CZ", "Czechia"], "421": ["SK", "Slovakia"], "852": ["HK", "Hong Kong"], "886": ["TW", "Taiwan"], "971": ["AE", "UAE"], "972": ["IL", "Israel"] };
+function countryOf(phone) {
+  let d = String(phone || "").replace(/[^\d+]/g, "");
+  if (!d) return null;
+  if (d.startsWith("00")) d = d.slice(2); else if (d.startsWith("+")) d = d.slice(1); else if (d.startsWith("0")) return null;
+  for (const len of [3, 2, 1]) { const c = DIAL[d.slice(0, len)]; if (c) return c; }
+  return null;
+}
+
 async function dashboard(env, center, period) {
   const { start, end, label, months } = periodRange(period);
   const iso = (ms) => new Date(ms).toISOString();
@@ -630,6 +640,16 @@ async function dashboard(env, center, period) {
       refunded: statement.reduce((a, r) => a + r.refunded, 0),
     },
     languages: Object.entries(langs).sort((a, b) => b[1] - a[1]),
+    heat: (() => {
+      const h = Array.from({ length: 7 }, () => Array(24).fill(0));
+      leads.forEach((l) => { const d = new Date(Date.parse(l.createdTime) + 7 * 3600 * 1000); h[(d.getUTCDay() + 6) % 7][d.getUTCHours()]++; });
+      return h;
+    })(),
+    countries: (() => {
+      const c = {};
+      leads.forEach((l) => { const k = countryOf(first(l.fields["Contact"])); if (k) { c[k[0]] = c[k[0]] || [k[0], k[1], 0]; c[k[0]][2]++; } });
+      return Object.values(c).sort((a, b) => b[2] - a[2]).slice(0, 8);
+    })(),
     products: Object.entries(prods).sort((a, b) => b[1].value - a[1].value),
     weeks: Object.values(weeks),
     statement,
@@ -1599,6 +1619,18 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .night.big .nstats span{font-size:13px}
 .night.big .nline{font-size:14px;margin-top:14px}
 @media (max-width:760px){.night{margin:10px 10px 2px}.night.big{margin:0 0 12px;padding:18px}.night.big .nstats b{font-size:26px}}
+
+/* Heatmap and countries */
+.heat{display:grid;grid-template-columns:34px repeat(24,minmax(0,1fr));gap:3px;align-items:center;margin-top:6px}
+.heat i{display:block;aspect-ratio:1;border-radius:4px;min-height:10px}
+.heat .hd{font-size:11px;color:var(--muted);font-weight:600}
+.heat .hh{font-size:10.5px;color:var(--muted)}
+.hnote{margin:12px 0 0;font-size:12.5px;color:var(--muted)}
+.flag{font-size:16px;line-height:1}
+.barrow .lb.lbw{width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--deep)}
+.panel{border-radius:16px;box-shadow:var(--shadow);padding:18px 20px}
+.panel h4{font-size:15px;letter-spacing:-.01em}
+@media (max-width:760px){.heat{grid-template-columns:28px repeat(24,minmax(0,1fr));gap:2px}.heat i{border-radius:2px;min-height:8px}.heat .hh{font-size:9px}}
 </style></head>
 <body>
 <header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>Customer zone</small></span></div><span class="sp"></span>${switcher}<div class="htools"><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">Sign out</span></a></div></header>
@@ -2241,6 +2273,28 @@ function zoneClient(cfg) {
       renderDash();
     }).catch(function (e) { $("#dbody").style.opacity = ""; if (e.message !== "auth") $("#dbody").innerHTML = '<div class="bempty">' + esc(e.message) + "</div>"; });
   }
+  function flag(cc) { return String(cc || "").toUpperCase().replace(/./g, function (c) { return String.fromCodePoint(127397 + c.charCodeAt(0)); }); }
+  function heatAndCountries(d) {
+    if (!d.heat) return "";
+    var days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], max = 1, total = 0;
+    d.heat.forEach(function (r) { r.forEach(function (v) { max = Math.max(max, v); total += v; }); });
+    var best = null;
+    d.heat.forEach(function (r, di) { for (var h = 0; h < 24; h += 3) { var s = r[h] + r[h + 1] + r[h + 2]; if (!best || s > best.s) best = { s: s, d: di, h: h }; } });
+    var cells = d.heat.map(function (r, di) {
+      return '<span class="hd">' + days[di] + "</span>" + r.map(function (v, h) {
+        var a = v ? 0.18 + 0.82 * v / max : 0;
+        return '<i title="' + days[di] + " " + String(h).padStart(2, "0") + ":00 · " + v + " new " + (v === 1 ? "diver" : "divers") + '" style="background:' + (v ? "rgba(220,164,74," + a.toFixed(2) + ")" : "var(--paper)") + '"></i>';
+      }).join("");
+    }).join("");
+    var hours = '<span></span>' + [0, 3, 6, 9, 12, 15, 18, 21].map(function (h) { return '<span class="hh" style="grid-column:span 3">' + String(h).padStart(2, "0") + "</span>"; }).join("");
+    var note = total && best && best.s ? "Busiest: " + days[best.d] + " " + String(best.h).padStart(2, "0") + ":00–" + String(best.h + 3).padStart(2, "0") + ":00 (Koh Tao time)." : "No new divers in this period yet.";
+    var cmax = Math.max(1, d.countries.length ? d.countries[0][2] : 1);
+    var ctry = d.countries.length ? d.countries.map(function (c) {
+      return '<div class="barrow"><span class="lb lbw"><span class="flag">' + flag(c[0]) + "</span> " + esc(c[1]) + '</span><span class="bar" style="width:' + (c[2] / cmax * 60) + '%"></span><span>' + c[2] + "</span></div>";
+    }).join("") : '<div class="bempty">No phone numbers yet.</div>';
+    return '<div class="grid2"><div class="panel"><h4>When new divers write</h4><div class="heat">' + hours + cells + '</div><p class="hnote">' + note + "</p></div>" +
+      '<div class="panel"><h4>Where your divers come from</h4>' + ctry + '<p class="hnote">Based on the country code of their phone number.</p></div></div>';
+  }
   function renderDash() {
     var d = ddata, k = d.kpi;
     var kp = function (label, val, sub, hi) { return '<div class="kpi' + (hi ? " hi" : "") + '"><small>' + label + "</small><b>" + val + "</b>" + (sub ? "<span>" + sub + "</span>" : "") + "</div>"; };
@@ -2267,6 +2321,7 @@ function zoneClient(cfg) {
         '<div style="display:flex;font-size:11px;color:var(--muted);margin-top:4px">' + labels + "</div></div>" +
         '<div class="panel"><h4>Languages</h4>' + (d.languages.length ? d.languages.map(function (l) {
           return '<div class="barrow"><span class="lb">' + esc(l[0]) + '</span><span class="bar" style="width:' + (l[1] / langMax * 70) + '%"></span><span>' + l[1] + "</span></div>"; }).join("") : '<div class="bempty">No conversations yet.</div>') + "</div></div>" +
+      heatAndCountries(d) +
       (d.products.length ? '<div class="panel" style="margin-bottom:14px"><h4>Bookings per product</h4><div class="bscroll"><table class="btable"><thead><tr><th>Product</th><th class="num">Bookings</th><th class="num">Divers</th><th class="num">Value</th></tr></thead><tbody>' +
         d.products.map(function (p) { return "<tr><td>" + esc(p[0]) + '</td><td class="num">' + p[1].bookings + '</td><td class="num">' + p[1].divers + '</td><td class="num">' + thb(p[1].value) + "</td></tr>"; }).join("") + "</tbody></table></div></div>" : "") +
       '<div class="panel"><div class="st-head"><h2 style="margin:0">Talay statement · ' + esc(d.center) + "</h2><p>" + esc(d.label) + "</p></div>" +
