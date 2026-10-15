@@ -171,6 +171,7 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem}
 
   <section>
     <h2>Resultaten tot nu</h2>
+    <div class="row" style="margin-bottom:12px"><button id="exp" class="btn primary" type="button" hidden>Download alle resultaten (Excel)</button><span id="savestate" class="muted"></span></div>
     <div class="res" id="res"></div>
     <div class="tablewrap"><table id="tbl"></table></div>
   </section>
@@ -245,7 +246,7 @@ function persist(path,data){
   const run=async()=>{
     q.busy=true;
     while(q.next){const d=q.next;q.next=null;
-      try{await db.doc(path).set(d);}
+      try{await db.doc(path).set(d);markSaved();}
       catch(e){
         if(e&&e.code==="invalid_argument"){readOnly=true;showBanner("Je kan deze pagina bekijken, maar niet bewerken. Vraag Jonas om je als bewerker uit te nodigen. Wat je aantikt, blijft voorlopig alleen in deze browser.");break;}
         else if(e&&e.code==="unavailable"){await new Promise(r=>setTimeout(r,800+Math.random()*800));q.next=q.next||d;}
@@ -501,12 +502,34 @@ document.getElementById("q").addEventListener("input",()=>render());
 clock(); setInterval(clock,30000); setInterval(safeRender,5*60000);
 render();
 
+/* ---------- opgeslagen-status en export ---------- */
+function markSaved(){const e=document.getElementById("savestate");if(e)e.textContent="Gedeeld opgeslagen om "+fmtLocal.format(new Date())+".";}
+function csvTime(iso){if(!iso)return "";const v=toInput(iso);return v.slice(8,10)+"/"+v.slice(5,7)+"/"+v.slice(0,4)+" "+v.slice(11,16);}
+function csvH(a,b){if(!a||!b)return "";return (Math.round(hours(a,b)*100)/100).toString().replace(".",",");}
+function yesno(v){return v===true?"Ja":v===false?"Nee":"";}
+function buildCSV(){
+  const head=["Tester","Center","Gebied","Taal","Kanaal","Nummer of account","Verzonden (Thaise tijd)","Automatisch bericht?","Automatisch om","Automatisch na (uren)","Echt antwoord om","Antwoordtijd (uren)","Tussen automatisch en echt (uren)","Wie antwoordde","Prijs gegeven","Beschikbaarheid bevestigd","Boekingslink of betaalwijze","Follow-up 1","Follow-up 2","Aantal follow-ups","Afgesloten","Screenshots bewaard","Notities"];
+  const rows=LEADS.map(l=>{const s=L(l.id);return [NAMES[l.who],l.name,l.area||"",l.lang,l.channel==="wa"?"WhatsApp":"Instagram",handle(l),csvTime(s.sent),yesno(s.auto),csvTime(s.autoAt),csvH(s.sent,s.autoAt),csvTime(s.reply),csvH(s.sent,s.reply),s.auto?csvH(s.autoAt,s.reply):"",s.type||"",yesno(s.price),yesno(s.avail),s.link||"",csvTime(s.fu1),csvTime(s.fu2),(s.fu1?1:0)+(s.fu2?1:0),s.closed?"Ja":"",s.shots?"Ja":"",(s.notes||"").replace(/\s+/g," ")];});
+  const esc=v=>{v=String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+  return "\ufeff"+[head,...rows].map(r=>r.map(esc).join(";")).join("\r\n");
+}
+(async()=>{
+  if(!window.claude||!window.claude.use) return;
+  const dl=await window.claude.use("downloads"); if(!dl) return;
+  const b=document.getElementById("exp"); b.hidden=false;
+  b.addEventListener("click",async()=>{
+    const d=new Date(); const stamp=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+    try{const r=await dl.save({filename:"mystery-shop-koh-tao-"+stamp+".csv",data:buildCSV()}); if(r&&r.status==="saved"){const o=b.textContent;b.textContent="Gedownload";setTimeout(()=>b.textContent=o,1800);}}
+    catch(e){ if(e&&e.code==="unavailable") b.hidden=true; }
+  });
+})();
+
 /* ---------- gedeelde opslag inschakelen ---------- */
 (async()=>{
   if(!window.claude||!window.claude.use){showBanner("Je wijzigingen worden alleen in deze browser bewaard.");return;}
   const d=await window.claude.use("db");
   if(!d){showBanner("Je wijzigingen worden alleen in deze browser bewaard. Open de pagina via de gedeelde Claude-link om samen in één lijst te werken.");return;}
-  db=d; shared=true;
+  db=d; shared=true; document.getElementById("savestate").textContent="Alles wat je aantikt, wordt meteen gedeeld opgeslagen.";
   try{const u=await window.claude.use("user"); if(u&&u.can){const w=await u.can("data.write"); if(w===false){readOnly=true;showBanner("Je kan deze pagina bekijken, maar niet bewerken. Vraag Jonas om je als bewerker uit te nodigen.");}}}catch(e){}
   db.collection("leads").onSnapshot(snap=>{
     for(const doc of snap.docs){ if(doc.exists){ const q=queue["leads/"+doc.id]; if(q&&(q.busy||q.next)) continue; state.leads[doc.id]={...doc.data()}; } }
