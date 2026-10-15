@@ -39,16 +39,20 @@ export async function handleDemo(request, env, ctx) {
   const ip = request.headers.get("CF-Connecting-IP") || "";
   if (await tooMany(ip, ctx)) return reply({ ok: false, error: "rate" }, 429);
 
-  if (env.TURNSTILE_SECRET) {
+  const secret = String(env.TURNSTILE_SECRET || "").trim();
+  if (secret) {
     const token = clean(data.turnstile, 4096);
-    if (!token) return reply({ ok: false, error: "check" }, 400);
+    if (!token) { console.log("Turnstile: no token received"); return reply({ ok: false, error: "check" }, 400); }
     const body = new FormData();
-    body.append("secret", env.TURNSTILE_SECRET);
+    body.append("secret", secret);
     body.append("response", token);
     if (ip) body.append("remoteip", ip);
     const check = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body });
     const result = await check.json().catch(() => ({}));
-    if (!result.success) return reply({ ok: false, error: "check" }, 400);
+    if (!result.success) {
+      console.log("Turnstile failed:", JSON.stringify(result["error-codes"] || result), "hostname:", result.hostname || "-");
+      return reply({ ok: false, error: "check" }, 400);
+    }
   }
 
   const fields = {
