@@ -32,7 +32,7 @@ export async function handleDemo(request, env, ctx) {
   };
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email);
   const phoneOk = /^[+0-9 ()\-.]{6,40}$/.test(f.whatsapp);
-  if (!f.name || !f.centre || !f.location || !emailOk || !phoneOk) {
+  if (!f.name || !f.centre || !emailOk || !phoneOk) { // location is optional
     return reply({ ok: false, error: "fields" }, 400);
   }
 
