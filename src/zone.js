@@ -573,7 +573,7 @@ function periodRange(period) {
 async function dashboard(env, center, period) {
   const { start, end, label, months } = periodRange(period);
   const iso = (ms) => new Date(ms).toISOString();
-  const inPeriod = `IS_AFTER(CREATED_TIME(), '${iso(start - 1000)}'), IS_BEFORE(CREATED_TIME(), '${iso(end)}')`;
+  const inPeriod = `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE(CREATED_TIME(), DATETIME_PARSE('${iso(end)}'))`;
   const [leads, books] = await Promise.all([
     at(env, "Leads", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${inPeriod})`, max: 5000 }),
     at(env, "Bookings", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${inPeriod})`, max: 5000 }),
@@ -1247,6 +1247,7 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 #install{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:50;display:flex;align-items:center;gap:10px;background:#0A2029;color:#F4F0E6;border-radius:14px;padding:10px 12px;box-shadow:0 10px 30px rgba(0,0,0,.25);font-size:14px;max-width:560px;margin:0 auto}
 #install span{flex:1}
 #install .btn{padding:8px 14px}
+@media (display-mode: standalone){body{bottom:calc(0px - env(safe-area-inset-top,0px))}}
 #install .lnk2{background:none;border:0;color:#C9D4D7;font-size:16px;cursor:pointer}
 :focus-visible{outline:3px solid var(--sand);outline-offset:2px}
 @media (max-width:760px){
