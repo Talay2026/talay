@@ -71,7 +71,7 @@ export async function handleZone(request, env, ctx) {
     if (p === "/zone/api/bookings") return json(await cached(env, `book/${center.slug}`, 60, () => bookings(env, center), fresh));
     if (p === "/zone/api/dashboard") {
       const per = /^\d{4}-\d{2}$/.test(url.searchParams.get("period") || "") ? url.searchParams.get("period") : "";
-      return json(await cached(env, `dash/v4/${center.slug}/${per || "30d"}`, 120, () => dashboard(env, center, per), fresh));
+      return json(await cached(env, `dash/v5/${center.slug}/${per || "30d"}`, 120, () => dashboard(env, center, per), fresh));
     }
     if (p === "/zone/api/arriving") return json(await cached(env, `arr/${center.slug}`, 300, () => arriving(env, center), fresh));
     if (p === "/zone/api/milestones") return json(await cached(env, `ms/${center.slug}`, 600, () => milestones(env, center), fresh));
@@ -387,6 +387,7 @@ async function conversations(env, center, view) {
       needsYou: open && handover > teamAt && !lead.optedOut,
       teamActive: lead.human, open,
       preview: String(c.last.text).slice(0, 140), previewDir: c.last.dir, lastAt: c.last.at,
+      cc: (countryOf(lead.contact) || [""])[0],
       closesAt: closes ? new Date(closes).toISOString() : null,
       hay: (lead.name.toLowerCase() + " " + c.hay).slice(0, 3000),
     };
@@ -418,6 +419,7 @@ async function chat(env, center, id) {
   return {
     id, lead, hasLead: !!leads[id], messages, closesAt, canReply,
     needsYou: canReply && handover > teamAt && !lead.optedOut,
+    cc: (countryOf(lead.contact) || [""])[0],
     _leadRec: leads[id] || null,
   };
 }
@@ -688,6 +690,28 @@ async function dashboard(env, center, period) {
 
   return {
     label, months, period: period || "30d", center: center.name,
+    kpiPrev: await (async () => {
+      try {
+        const len = end - start, ps = start - len, pe = start;
+        const inPrev = `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${iso(ps - 1000)}')), IS_BEFORE(CREATED_TIME(), DATETIME_PARSE('${iso(pe)}'))`;
+        const [pl, pb] = await Promise.all([
+          at(env, "Leads", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${inPrev})`, fields: ["Status", "Response seconds", "Outside hours"], max: 5000 }),
+          at(env, "Bookings", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${inPrev})`, fields: ["Status", "Group size", "Total value THB", "Balance at shop"], max: 5000 }),
+        ]);
+        const pLive = pb.filter((b) => !cx(b));
+        const pResp = pl.map((l) => n(l.fields["Response seconds"])).filter((x) => x > 0 && x < 3600);
+        const pBooked = pl.filter((l) => /booked/i.test(String(first(l.fields["Status"]) || "")));
+        return {
+          conversations: pl.length,
+          bookings: pLive.length,
+          divers: pLive.reduce((a, b) => a + (n(b.fields["Group size"]) || 1), 0),
+          revenue: pLive.reduce((a, b) => a + n(b.fields["Total value THB"]), 0),
+          atShop: pLive.reduce((a, b) => a + n(b.fields["Balance at shop"]), 0),
+          conversion: pl.length ? Math.round((pBooked.length / pl.length) * 1000) / 10 : 0,
+          avgResponse: pResp.length ? Math.round(pResp.reduce((a, b) => a + b, 0) / pResp.length) : null,
+        };
+      } catch (e) { return null; }
+    })(),
     kpi: {
       conversations: leads.length,
       outsideHours: sum(leads, "Outside hours"),
@@ -1986,12 +2010,104 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .slist li.ok .ck{background:var(--sand);border-color:var(--sand)}
 .slist a{color:var(--deep);font-weight:600}
 @media (max-width:760px){.slist{grid-template-columns:1fr}}
+
+/* Avatars */
+.av{position:relative;flex:none;width:40px;height:40px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#F7F3EA;font-size:14px;font-weight:700;letter-spacing:.02em}
+.av .avf{position:absolute;right:-3px;bottom:-3px;font-size:13px;line-height:1;background:var(--card);border-radius:50%;padding:1px}
+.item{display:flex;gap:12px;align-items:flex-start}
+.item .ib{flex:1;min-width:0}
+.pane .head .av{width:38px;height:38px}
+/* Booking chips */
+.pchips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:10px 16px 0;background:var(--card)}
+.pchips .pcl{font-size:12px;color:var(--muted);font-weight:600;margin-right:2px}
+.pchip{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);background:var(--paper-2);color:var(--deep);border-radius:999px;padding:5px 11px;cursor:pointer}
+.pchip:hover{border-color:var(--sand);background:rgba(220,164,74,.12)}
+@media (max-width:760px){.pchips .pcl{display:none}.pchips{padding:8px 12px 0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.pchips::-webkit-scrollbar{display:none}.pchip{flex:none}}
+/* Trends */
+.kpi em.trend{display:inline-block;font-style:normal;font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 8px;margin:6px 0 2px}
+.kpi em.trend.up{background:rgba(35,133,90,.12);color:#1E7A52}
+.kpi em.trend.down{background:rgba(180,86,27,.12);color:#A34E19}
+.kpi em.trend.flat{background:var(--paper);color:var(--muted)}
+.kpi.hi em.trend.up{background:rgba(95,192,138,.18);color:#7FD3A5}
+.kpi.hi em.trend.down{background:rgba(232,160,106,.18);color:#F0B48A}
+.kpi span{display:block}
+@media (prefers-color-scheme:dark){.kpi em.trend.up{color:#6FCF9B}.kpi em.trend.down{color:#F0A877}}
+/* Today */
+#today{flex-direction:column;overflow-y:auto}
+.twrap{width:100%;max-width:1120px;margin:0 auto;padding:28px 20px calc(40px + env(safe-area-inset-bottom,0px))}
+.thead h1{margin:0;font-size:28px;letter-spacing:-.025em}
+.thead p{margin:4px 0 18px;color:var(--muted);font-size:14px}
+.tgrid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:14px;align-items:start}
+.tcol{display:grid;gap:14px;min-width:0;grid-template-columns:minmax(0,1fr)}
+.tcard{min-width:0}
+.tcol .night.big{margin:0}
+.tcard{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:18px 20px}
+.th{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.th b{font-size:15px;letter-spacing:-.01em}
+.th small{color:var(--muted);font-size:12.5px}
+.th .tlink{margin-left:auto;font-size:13px;font-weight:600;color:var(--deep)}
+.trow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;font:inherit;color:inherit;background:none;border:0;border-radius:12px;padding:10px 8px;cursor:pointer}
+.trow:hover{background:var(--paper-2)}
+.trow.static{cursor:default}.trow.static:hover{background:none}
+.trow .tr-b{flex:1;min-width:0;display:flex;flex-direction:column}
+.trow .tr-b b{font-size:14px}
+.trow .tr-b small{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trow .tr-t{font-size:12px;color:var(--muted)}
+.tok{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:14px;color:var(--muted)}
+.okdot{width:8px;height:8px;border-radius:50%;background:var(--live,#5FC08A);flex:none}
+.tday+.tday{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.tdh{display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
+.tdh b{font-size:14px}.tdh small{color:var(--muted);font-size:12.5px}
+.tboat{display:flex;justify-content:space-between;gap:10px;padding:8px 12px;margin-top:6px;border-radius:10px;background:var(--paper-2);font-size:14px}
+.tboat b{font-weight:700}
+.tbars{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;align-items:end;height:110px}
+.tb{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%}
+.tbb{width:100%;max-width:34px;border-radius:6px 6px 3px 3px;background:var(--sand)}
+.tb:first-child .tbb{background:var(--side)}
+@media (prefers-color-scheme:dark){.tb:first-child .tbb{background:#9DB0B5}}
+.tbv{font-size:12px;font-weight:700}
+.tb small{font-size:11.5px;color:var(--muted)}
+@media (max-width:900px){.tgrid{grid-template-columns:1fr}}
+@media (max-width:760px){.twrap{padding:18px 12px 20px}.thead h1{font-size:23px}}
+/* Calendar */
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.cday{min-height:120px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.cday.wk{background:var(--paper-2)}
+.cday.today{border-color:var(--sand);box-shadow:0 0 0 2px rgba(220,164,74,.25)}
+.cdh{display:flex;align-items:baseline;gap:6px}
+.cdh small{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.cdh b{font-size:18px}
+.ctot{margin-left:auto;font-size:11px;font-weight:700;background:var(--side);color:#F7F3EA;border-radius:999px;padding:1px 7px}
+@media (prefers-color-scheme:dark){.ctot{background:var(--sand);color:#09262F}}
+.cblk{background:rgba(220,164,74,.16);border-left:3px solid var(--sand);border-radius:8px;padding:6px 8px;display:flex;flex-direction:column}
+.cblk b{font-size:12.5px;line-height:1.3}
+.cblk small{font-size:11.5px;color:var(--muted)}
+.cnone{color:var(--line);font-size:13px}
+@media (max-width:760px){.cal{grid-template-columns:repeat(2,minmax(0,1fr))}.cday{min-height:0}}
+@media print{#today{display:none !important}}
 </style></head>
 <body>
 <header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>Customer zone</small></span></div><span class="sp"></span>${switcher}<div class="htools"><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">Sign out</span></a></div></header>
-<nav><button class="on" data-v="convos"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg></i><span class="nl"><span class="long">Conversations</span><span class="short">Chats</span></span><span class="count" id="count" hidden></span></button><button data-v="books"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></i><span class="nl">Bookings</span></button><button data-v="dash"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></i><span class="nl">Dashboard</span></button><button data-v="sett"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></i><span class="nl">Settings</span></button><button data-v="supp"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg></i><span class="nl">Support</span><span class="count" id="tcount" hidden></span></button></nav>
+<nav><button class="on" data-v="today"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></i><span class="nl">Today</span></button><button data-v="convos"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg></i><span class="nl"><span class="long">Conversations</span><span class="short">Chats</span></span><span class="count" id="count" hidden></span></button><button data-v="books"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></i><span class="nl">Bookings</span></button><button data-v="dash"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></i><span class="nl">Dashboard</span></button><button data-v="sett"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></i><span class="nl">Settings</span></button><button data-v="supp"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg></i><span class="nl">Support</span><span class="count" id="tcount" hidden></span></button></nav>
 
-<section id="convos" class="view on">
+<section id="today" class="view on">
+  <div class="twrap">
+    <div class="thead"><div><h1 id="tGreet">Today</h1><p id="tDate"></p></div></div>
+    <div class="tgrid">
+      <div class="tcol">
+        <div class="tcard" id="tNeed"><div class="skel"><i></i></div></div>
+        <div class="tcard" id="tBoats"><div class="skel"><i></i><i></i></div></div>
+      </div>
+      <div class="tcol">
+        <div class="night big" id="nightToday" hidden></div>
+        <div class="tcard" id="tArr"><div class="skel"><i></i></div></div>
+        <div class="tcard" id="tWeek"><div class="skel"><i></i></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="convos" class="view">
   <div class="list">
     <div class="tools">
       <input id="search" type="search" placeholder="Search name or message" aria-label="Search">
@@ -2016,6 +2132,7 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
       <button class="chip" data-r="tomorrow">Tomorrow</button>
       <button class="chip" data-r="next">Next 30 days</button>
       <button class="chip" data-r="past">Past 30 days</button>
+      <button class="chip" data-r="calendar">Calendar</button>
       <button class="chip" data-r="unfinished">Not paid yet<span class="count" id="ucount" hidden></span></button>
       <button class="chip" data-r="arriving">Arriving soon<span class="count" id="acount" hidden></span></button>
       <span class="sp"></span>
@@ -2168,6 +2285,7 @@ function zoneClient(cfg) {
       document.querySelectorAll(".view").forEach(function (v) { v.classList.toggle("on", v.id === b.dataset.v); });
       if (b.dataset.v !== "convos") document.body.classList.remove("inchat");
       if (b.dataset.v === "dash") { loadDash(); loadStart(); }
+      if (b.dataset.v === "today") loadToday();
       if (b.dataset.v === "books") loadBookings();
       if (b.dataset.v === "sett") { loadSettings(); try { localStorage.setItem("talay-seen-prices", "1"); } catch (e) {} }
       if (b.dataset.v === "supp") { tview = null; loadTickets(); }
@@ -2215,6 +2333,7 @@ function zoneClient(cfg) {
       var l = left(c.closesAt);
       var who = c.previewDir === "Customer" ? "" : (c.previewDir === "Team" ? "You: " : cfg.assistant + ": ");
       return '<button class="item' + (c.id === current ? " on" : "") + '" data-id="' + esc(c.id) + '" data-close="' + esc(c.closesAt || "") + '">' +
+        avatar(c.name, c.cc) + '<div class="ib">' +
         '<div class="top"><span class="nm">' + esc(c.name || "Diver") + "</span>" +
         '<span class="tm">' + ago(c.lastAt) + "</span></div>" +
         ((c.needsYou || c.teamActive || /booked/i.test(c.status) || c.language) ? '<div class="tags">' +
@@ -2223,7 +2342,7 @@ function zoneClient(cfg) {
         (/booked/i.test(c.status) ? '<span class="tag st">Booked</span>' : "") +
         (c.language ? '<span class="tag lang">' + esc(c.language) + "</span>" : "") + "</div>" : "") +
         '<div class="pv">' + esc(who + c.preview) + "</div>" +
-        (l.t ? '<div class="left' + (l.soon ? " soon" : "") + '">' + l.t + "</div>" : "") + "</button>";
+        (l.t ? '<div class="left' + (l.soon ? " soon" : "") + '">' + l.t + "</div>" : "") + "</div></button>";
     }).join("");
     el.querySelectorAll(".item").forEach(function (b) { b.onclick = function () { openChat(b.dataset.id); }; });
   }
@@ -2266,7 +2385,7 @@ function zoneClient(cfg) {
         (L.human ? "<span><b>Team is handling this.</b> " + esc(cfg.assistant) + " is paused for this diver.</span>" : "");
 
       $("#pane").innerHTML =
-        '<div class="head"><button class="back" aria-label="Back">‹</button><div><b>' + esc(L.name || L.contact || "Diver") + "</b>" +
+        '<div class="head"><button class="back" aria-label="Back">‹</button>' + avatar(L.name || L.contact, d.cc) + '<div><b>' + esc(L.name || L.contact || "Diver") + "</b>" +
         (l.t ? '<div class="sub">' + esc(l.t) + "</div>" : "") + "</div>" +
         (d.needsYou ? '<span class="tag need">Needs you</span>' : "") + '<div class="actions">' + actions + "</div></div>" +
         (facts ? '<div class="facts">' + facts + "</div>" : "") +
@@ -2285,6 +2404,7 @@ function zoneClient(cfg) {
           ? '<div class="bar2"><span>Sign as</span><input id="sig" maxlength="30" placeholder="your name">' +
             '<select id="prod" aria-label="Booking link"><option value="">+ Booking link…</option></select>' +
             '<span class="sp"></span><span class="bt ' + (l.soon ? "left soon" : "") + '">' + esc(l.t) + "</span></div>" +
+            '<div class="pchips" id="pchips" hidden></div>' +
             '<div class="compose"><textarea id="txt" placeholder="Reply on WhatsApp…" rows="2"></textarea><button class="btn" id="send">Send</button></div>' +
             '<div class="note" id="note">Ctrl/⌘ + Enter sends. A reply pauses ' + esc(cfg.assistant) + " for this diver until you let her take over (or 4 hours after your last message).</div>"
           : '<div class="closed">More than 24 hours since the diver\'s last message, so WhatsApp no longer allows a free reply. Read only.</div>');
@@ -2332,6 +2452,14 @@ function zoneClient(cfg) {
         var x = d.products[Number(p.value)]; p.value = ""; if (!x) return;
         var t = $("#txt"); t.value = (t.value.trim() ? t.value.trim() + "\n\n" : "") + x.text; t.focus();
       };
+      var pc = $("#pchips");
+      if (pc && d.products.length) {
+        pc.innerHTML = '<span class="pcl">Booking link</span>' + d.products.slice(0, 6).map(function (x, i) { return '<button type="button" class="pchip" data-pi="' + i + '">' + esc(x.name) + "</button>"; }).join("");
+        pc.hidden = false;
+        pc.querySelectorAll("[data-pi]").forEach(function (b) {
+          b.onclick = function () { var x = d.products[Number(b.dataset.pi)]; var t = $("#txt"); t.value = (t.value.trim() ? t.value.trim() + "\n\n" : "") + x.text; t.focus(); };
+        });
+      }
     }).catch(function () { var p = $("#prod"); if (p) p.remove(); });
   }
 
@@ -2380,6 +2508,7 @@ function zoneClient(cfg) {
   function renderBookings() {
     if (brange === "unfinished") { renderUnfinished(); return; }
     if (brange === "arriving") { renderArriving(); return; }
+    if (brange === "calendar") { renderCalendar(); return; }
     if (!bdata) return;
     var t = bdata.today, list = bdata.bookings.filter(function (b) {
       if (brange === "today") return b.date === t;
@@ -2648,6 +2777,97 @@ function zoneClient(cfg) {
     };
   })();
 
+  // ---- Avatars
+  var AVC = ["#163741", "#4E7480", "#9A6B1F", "#2F6B5A", "#7A4E3A", "#5A5A7A"];
+  function avatar(name, cc) {
+    var s = String(name || "?").trim(), parts = s.split(/\s+/).filter(Boolean);
+    var ini = parts.length > 1 && /[A-Za-zÀ-ÿ]/.test(parts[1][0]) ? parts[0][0] + parts[1][0] : s.replace(/^\+/, "").slice(0, 2);
+    var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return '<span class="av" style="background:' + AVC[h % AVC.length] + '">' + esc(ini.toUpperCase()) + (cc ? '<span class="avf">' + flag(cc) + "</span>" : "") + "</span>";
+  }
+
+  // ---- Today
+  function greet() {
+    var h = new Date().getHours(), part = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+    var nm = ""; try { nm = localStorage.getItem("talay-sig") || ""; } catch (e) {}
+    if (!nm && cfg.email) { var x = String(cfg.email).split("@")[0].split(/[._-]/)[0]; if (x && !/^(info|team|hello|contact|admin|dive|office)$/i.test(x)) nm = x.charAt(0).toUpperCase() + x.slice(1); }
+    return part + (nm ? ", " + nm : "");
+  }
+  function goChat(id) {
+    document.querySelector('nav button[data-v="convos"]').click();
+    openChat(id);
+  }
+  function goBookings(r) {
+    document.querySelector('nav button[data-v="books"]').click();
+    var c = document.querySelector('.chip[data-r="' + r + '"]'); if (c) c.click();
+  }
+  function loadToday() {
+    $("#tGreet").textContent = greet();
+    $("#tDate").textContent = new Date().toLocaleDateString([], { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Bangkok" }) + " · " + cfg.center;
+    loadNight();
+    api("conversations?view=open").then(function (d) {
+      var need = d.conversations.filter(function (c) { return c.needsYou; });
+      var open = d.conversations.length;
+      $("#tNeed").innerHTML = '<div class="th"><b>Needs your team</b>' + (need.length ? '<span class="tag need">' + need.length + "</span>" : "") + '<a href="#" class="tlink" id="tAllChats">All chats (' + open + ")</a></div>" +
+        (need.length ? need.slice(0, 5).map(function (c) {
+          return '<button class="trow" data-chat="' + esc(c.id) + '">' + avatar(c.name, c.cc) + '<span class="tr-b"><b>' + esc(c.name || "Diver") + "</b><small>" + esc(String(c.preview || "").slice(0, 90)) + '</small></span><span class="tr-t">' + ago(c.lastAt) + "</span></button>";
+        }).join("") : '<p class="tok"><span class="okdot"></span>Nothing waiting. ' + esc(cfg.assistant) + " is handling every conversation.</p>");
+      $("#tNeed").querySelectorAll("[data-chat]").forEach(function (b) { b.onclick = function () { goChat(b.dataset.chat); }; });
+      $("#tAllChats").onclick = function (e) { e.preventDefault(); document.querySelector('nav button[data-v="convos"]').click(); };
+    }).catch(function () { $("#tNeed").innerHTML = '<div class="th"><b>Needs your team</b></div><p class="tok">Couldn\'t load conversations.</p>'; });
+    api("bookings").then(function (d) {
+      var live = d.bookings.filter(function (b) { return !isCx(b); });
+      var day = function (iso) {
+        var g = {};
+        live.filter(function (b) { return b.date === iso; }).forEach(function (b) { g[b.product] = g[b.product] || { divers: 0, n: 0 }; g[b.product].divers += b.divers; g[b.product].n++; });
+        return Object.keys(g).map(function (k) { return [k, g[k]]; }).sort(function (a, b) { return b[1].divers - a[1].divers; });
+      };
+      var block = function (label, iso) {
+        var rows = day(iso), tot = rows.reduce(function (a, r) { return a + r[1].divers; }, 0);
+        return '<div class="tday"><div class="tdh"><b>' + label + '</b><small>' + esc(dayLabel(iso)) + (tot ? " · " + tot + (tot === 1 ? " diver" : " divers") : "") + "</small></div>" +
+          (rows.length ? rows.map(function (r) { return '<div class="tboat"><span>' + esc(r[0]) + "</span><b>" + r[1].divers + (r[1].divers === 1 ? " diver" : " divers") + "</b></div>"; }).join("") : '<p class="tok">No bookings via ' + esc(cfg.assistant) + " yet.</p>") + "</div>";
+      };
+      $("#tBoats").innerHTML = '<div class="th"><b>On the boat</b><a href="#" class="tlink" id="tPrint">Boat list</a></div>' + block("Today", d.today) + block("Tomorrow", d.tomorrow);
+      $("#tPrint").onclick = function (e) { e.preventDefault(); goBookings("today"); };
+      var next = [], max = 1;
+      for (var i = 0; i < 7; i++) { var iso = addDays(d.today, i); var dv = live.filter(function (b) { return b.date === iso; }).reduce(function (a, b) { return a + b.divers; }, 0); next.push([iso, dv]); max = Math.max(max, dv); }
+      var total = next.reduce(function (a, x) { return a + x[1]; }, 0);
+      $("#tWeek").innerHTML = '<div class="th"><b>Next 7 days</b><small>' + total + (total === 1 ? " diver" : " divers") + ' booked</small><a href="#" class="tlink" id="tCal">Calendar</a></div><div class="tbars">' +
+        next.map(function (x) { return '<div class="tb"><span class="tbv">' + (x[1] || "") + '</span><span class="tbb" style="height:' + Math.max(4, Math.round(x[1] / max * 70)) + 'px"></span><small>' + new Date(x[0] + "T12:00:00Z").toLocaleDateString([], { weekday: "short" }) + "</small></div>"; }).join("") + "</div>";
+      $("#tCal").onclick = function (e) { e.preventDefault(); goBookings("calendar"); };
+    }).catch(function () { $("#tBoats").innerHTML = '<div class="th"><b>On the boat</b></div><p class="tok">Couldn\'t load bookings.</p>'; $("#tWeek").innerHTML = ""; });
+    api("arriving").then(function (d) {
+      var n = d.items.length;
+      $("#tArr").innerHTML = '<div class="th"><b>Arriving soon, not booked</b>' + (n ? '<span class="tag lang">' + n + "</span>" : "") + '<a href="#" class="tlink" id="tArrAll">See all</a></div>' +
+        (n ? d.items.slice(0, 3).map(function (i) {
+          return '<div class="trow static">' + avatar(i.name || i.phone, "") + '<span class="tr-b"><b>' + esc(i.name || i.phone || "Diver") + "</b><small>" + esc(i.interested || "Interested") + " · " + (i.here ? "on the island now" : "arrives " + esc(new Date(i.from + "T12:00:00Z").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" }))) + "</small></span></div>";
+        }).join("") : '<p class="tok">Nobody without a booking arrives in the next 14 days.</p>');
+      $("#tArrAll").onclick = function (e) { e.preventDefault(); goBookings("arriving"); };
+    }).catch(function () { $("#tArr").innerHTML = ""; });
+  }
+  loadToday();
+  setInterval(function () { if (!document.hidden && $("#today").classList.contains("on")) loadToday(); }, 60000);
+
+  // ---- Calendar (next 14 days)
+  function renderCalendar() {
+    if (!bdata) { $("#bcards").innerHTML = ""; $("#blist").innerHTML = '<div class="skel"><i></i><i></i></div>'; return; }
+    var live = bdata.bookings.filter(function (b) { return !isCx(b); });
+    var days = [];
+    for (var i = 0; i < 14; i++) days.push(addDays(bdata.today, i));
+    var total = live.filter(function (b) { return b.date >= days[0] && b.date <= days[13]; }).reduce(function (a, b) { return a + b.divers; }, 0);
+    $("#bcards").innerHTML = '<div class="cardn"><small>Divers next 14 days</small><b>' + total + "</b></div>" +
+      '<div class="cardn"><small>Busiest day</small><b>' + (function () { var best = null; days.forEach(function (dd) { var v = live.filter(function (b) { return b.date === dd; }).reduce(function (a, b) { return a + b.divers; }, 0); if (!best || v > best[1]) best = [dd, v]; }); return best && best[1] ? esc(new Date(best[0] + "T12:00:00Z").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" })) : "–"; })() + "</b></div>";
+    $("#blist").innerHTML = '<div class="cal">' + days.map(function (dd, idx) {
+      var g = {};
+      live.filter(function (b) { return b.date === dd; }).forEach(function (b) { g[b.product] = g[b.product] || { divers: 0, n: 0 }; g[b.product].divers += b.divers; g[b.product].n++; });
+      var keys = Object.keys(g).sort(function (a, b) { return g[b].divers - g[a].divers; });
+      var tot = keys.reduce(function (a, k2) { return a + g[k2].divers; }, 0);
+      var dt = new Date(dd + "T12:00:00Z");
+      return '<div class="cday' + (idx === 0 ? " today" : "") + (dt.getUTCDay() === 0 || dt.getUTCDay() === 6 ? " wk" : "") + '"><div class="cdh"><small>' + dt.toLocaleDateString([], { weekday: "short" }) + "</small><b>" + dt.getUTCDate() + "</b>" + (tot ? '<span class="ctot">' + tot + "</span>" : "") + "</div>" +
+        (keys.length ? keys.map(function (k2) { return '<div class="cblk"><b>' + esc(k2) + "</b><small>" + g[k2].divers + (g[k2].divers === 1 ? " diver" : " divers") + "</small></div>"; }).join("") : '<div class="cnone">–</div>') + "</div>";
+    }).join("") + "</div>";
+  }
+
   // ---- Milestones
   var MS_LABEL = {
     divers: function (v) { return v.toLocaleString("en-US") + " divers booked through Talay"; },
@@ -2701,7 +2921,7 @@ function zoneClient(cfg) {
     return api("overnight" + (fresh ? "?fresh=1" : "")).then(function (d) {
       if (!d || d.error) return;
       var h = nightHtml(d);
-      ["#night", "#nightDash"].forEach(function (s) { var el = $(s); if (el) { el.innerHTML = h; el.hidden = false; } });
+      ["#night", "#nightDash", "#nightToday"].forEach(function (s) { var el = $(s); if (el) { el.innerHTML = h; el.hidden = false; } });
     }).catch(function () {});
   }
 
@@ -2791,7 +3011,18 @@ function zoneClient(cfg) {
   }
   function renderDash() {
     var d = ddata, k = d.kpi;
-    var kp = function (label, val, sub, hi) { return '<div class="kpi' + (hi ? " hi" : "") + '"><small>' + label + "</small><b>" + val + "</b>" + (sub ? "<span>" + sub + "</span>" : "") + "</div>"; };
+    var P = d.kpiPrev;
+    var tr = function (key, lowerBetter) {
+      if (!P || P[key] == null || k[key] == null) return "";
+      var a = Number(k[key]), b = Number(P[key]);
+      if (!b && !a) return "";
+      if (!b) return '<em class="trend up">New</em>';
+      var ch = Math.round((a - b) / b * 100);
+      if (!ch) return '<em class="trend flat">= vs previous</em>';
+      var good = lowerBetter ? ch < 0 : ch > 0;
+      return '<em class="trend ' + (good ? "up" : "down") + '">' + (ch > 0 ? "↑ " : "↓ ") + Math.abs(ch) + "% vs previous</em>";
+    };
+    var kp = function (label, val, sub, hi, key, lowerBetter) { return '<div class="kpi' + (hi ? " hi" : "") + '"><small>' + label + "</small><b>" + val + "</b>" + (key ? tr(key, lowerBetter) : "") + (sub ? "<span>" + sub + "</span>" : "") + "</div>"; };
     var maxW = Math.max(1, Math.max.apply(null, d.weeks.map(function (w) { return Math.max(w.conversations, w.bookings); })));
     var W = Math.max(d.weeks.length, 1), bw = 100 / W;
     var bars = d.weeks.map(function (w, i) {
@@ -2803,12 +3034,12 @@ function zoneClient(cfg) {
     var langMax = Math.max(1, d.languages.length ? d.languages[0][1] : 1);
     var html =
       '<div class="kpis">' +
-        kp("Revenue via " + esc(cfg.assistant), thb(k.revenue), k.bookings + " bookings · " + k.divers + " divers", true) +
-        kp("Conversations", k.conversations, k.outsideHours + " outside office hours (" + pct(k.outsideHours, k.conversations) + ")") +
-        kp("Booking conversion", k.conversion + "%", k.afterFollowUp + " booked after a follow-up") +
-        kp(esc(cfg.assistant) + "'s response time", fmtSec(k.avgResponse), "average first reply") +
+        kp("Revenue via " + esc(cfg.assistant), thb(k.revenue), k.bookings + " bookings · " + k.divers + " divers", true, "revenue") +
+        kp("Conversations", k.conversations, k.outsideHours + " outside office hours (" + pct(k.outsideHours, k.conversations) + ")", false, "conversations") +
+        kp("Booking conversion", k.conversion + "%", k.afterFollowUp + " booked after a follow-up", false, "conversion") +
+        kp(esc(cfg.assistant) + "'s response time", fmtSec(k.avgResponse), "average first reply", false, "avgResponse", true) +
         kp("Handed over to your team", k.handedOver, pct(k.handedOver, k.conversations) + " of conversations") +
-        kp("Collected at your shop", thb(k.atShop), "balance paid on arrival") +
+        kp("Collected at your shop", thb(k.atShop), "balance paid on arrival", false, "atShop") +
       "</div>" + funnelHtml(d.funnel) +
       '<div class="grid2"><div class="panel"><h4>Per week</h4><div class="legend"><span><i style="background:#4E7480"></i>Conversations</span><span><i style="background:#DCA44A"></i>Bookings</span></div>' +
         '<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:160px;display:block">' + bars + "</svg>" +
