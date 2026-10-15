@@ -1027,7 +1027,7 @@ function app(center, centers, email) {
       `<option value="${esc(c.slug)}"${c.slug === center.slug ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select>` : "";
   const logo = center.logo
     ? `<img src="${esc(center.logo)}" alt="" class="logo">`
-    : `<svg width="28" height="28" viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="14" fill="#F4F0E6"/><path d="M1 15a14 14 0 0 0 28 0z" fill="#E8B04B"/></svg>`;
+    : `<svg width="32" height="32" viewBox="0 0 100 100" aria-hidden="true" class="logo-svg"><path d="M 12 50 A 38 38 0 0 0 88 50 Z" fill="#DCA44A"/><circle cx="50" cy="50" r="38" fill="none" stroke="#F7F3EA" stroke-width="10"/><line x1="6" y1="50" x2="94" y2="50" stroke="#F7F3EA" stroke-width="10" stroke-linecap="round"/></svg>`;
   const cfg = {
     qs: centers.length > 1 ? `?center=${encodeURIComponent(center.slug)}` : "",
     assistant: center.assistant, center: center.name, email,
@@ -1321,10 +1321,139 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
   .m{max-width:88%}
   .actions{margin-left:0;width:100%}
 }
+
+/* ===== Talay theme v2 (house style) ===== */
+:root{--deep:#09262F;--paper:#F7F3EA;--paper-2:#FBF8F2;--card:#FFFFFF;--muted:#5B6B70;--line:#E7E0D3;--in:#FFFFFF;--mia:#F1E6CF;--team:#DCEFE4;--ok:#23855A;--warn:#B4561B;--sand:#DCA44A;--side:#09262F;--side-2:#103540;--shadow:0 1px 2px rgba(9,38,47,.05),0 4px 16px -8px rgba(9,38,47,.12)}
+@media (prefers-color-scheme:dark){:root{--deep:#F2EEE4;--paper:#0A1E25;--paper-2:#0E252D;--card:#12303A;--muted:#9DB0B5;--line:#1F3E48;--in:#14343F;--mia:#3A3320;--team:#1D4636;--ok:#46B884;--warn:#E8A06A;--side:#061519;--side-2:#0D2C35;--shadow:0 1px 2px rgba(0,0,0,.25)}}
+body{font-size:15px;letter-spacing:-.003em}
+::selection{background:rgba(220,164,74,.35)}
+/* header / brand */
+header{background:var(--side);color:#F7F3EA;gap:12px}
+header .brand{display:flex;align-items:center;gap:11px;min-width:0}
+header .brand .logo,header .brand .logo-svg{flex:none;width:32px;height:32px;border-radius:50%}
+header .bn{display:flex;flex-direction:column;min-width:0;line-height:1.2}
+header .bn b{font-size:15px;font-weight:700;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (min-width:761px){header .bn b{white-space:normal;overflow:visible}}
+header .bn small{font-size:12px;color:#93A9AE;font-weight:500}
+header .htools{display:flex;align-items:center;gap:4px}
+header .htools .lnk,header .htools a{display:inline-flex;align-items:center;gap:8px;color:#B7C7CB;font-size:13.5px;font-weight:500;padding:8px 10px;border-radius:9px;text-decoration:none}
+header .htools .lnk:hover,header .htools a:hover{background:rgba(247,243,234,.07);color:#F7F3EA}
+header select{background:var(--side-2);color:#F7F3EA;border:1px solid rgba(247,243,234,.12);border-radius:10px;padding:8px 10px}
+/* nav */
+nav button{gap:10px;font-weight:600;letter-spacing:-.005em}
+nav i{display:inline-flex;align-items:center}
+nav i svg{display:block}
+nav .count{background:var(--sand);color:#09262F;font-weight:700}
+/* desktop: sidebar layout */
+@media (min-width:761px){
+ body{display:grid;grid-template-columns:248px minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto;grid-template-areas:"brand main" "switch main" "nav main" "tools main";background:linear-gradient(90deg,var(--side) 248px,var(--paper) 248px)}
+ header{display:contents}
+ header .brand{grid-area:brand;padding:22px 20px 20px}
+ header .sp{display:none}
+ header select{grid-area:switch;margin:0 14px 14px;width:auto}
+ header .htools{grid-area:tools;flex-direction:column;align-items:stretch;padding:12px 12px 16px;border-top:1px solid rgba(247,243,234,.08)}
+ header .htools .lnk,header .htools a{width:100%;justify-content:flex-start;text-align:left}
+ nav{grid-area:nav;flex-direction:column;align-items:stretch;gap:2px;padding:4px 12px;border:0;background:none;overflow:visible}
+ nav button{width:100%;justify-content:flex-start;padding:10px 12px;border:0;border-radius:10px;color:#A9BDC1;font-size:14.5px}
+ nav button:hover{background:rgba(247,243,234,.06);color:#F7F3EA}
+ nav button.on{background:rgba(220,164,74,.14);color:#F7F3EA;border:0}
+ nav button.on i{color:var(--sand)}
+ nav .count{margin-left:auto}
+ .view{grid-area:main;min-height:0}
+ .list{width:340px;background:var(--card);border-right:1px solid var(--line)}
+ .tools .chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+ .tools .chips::-webkit-scrollbar{display:none}
+ .chip{flex:none}
+}
+/* conversation list */
+.tools{padding:16px 16px 12px;border-bottom:1px solid var(--line);gap:10px}
+.tools input{border-radius:11px;padding:10px 12px 10px 36px;background:var(--paper-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235B6B70' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 12px 50%;border-color:var(--line)}
+.tools input:focus,.compose textarea:focus,.srow input:focus,.tform input:focus,.tform textarea:focus,.tform select:focus,.ptable input:focus{outline:none;border-color:var(--sand);box-shadow:0 0 0 3px rgba(220,164,74,.2)}
+.chip{font-weight:600;font-size:12.5px;padding:5px 12px;background:transparent;transition:background .15s,border-color .15s}
+.chip:hover{border-color:var(--muted)}
+.chip.on{background:var(--side);border-color:var(--side);color:#F7F3EA}
+@media (prefers-color-scheme:dark){.chip.on{background:var(--sand);border-color:var(--sand);color:#09262F}}
+.items{padding:6px 8px 12px}
+.item{border:0;border-radius:12px;margin:2px 0;padding:12px 12px 12px 14px;border-left:0;position:relative;transition:background .12s}
+.item:hover{background:var(--paper-2)}
+.item.on{background:var(--paper)}
+.item.on::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:3px;background:var(--sand)}
+.item .nm{font-weight:650;font-size:14.5px}
+.item .pv{font-size:13.5px}
+.tag{font-weight:700;font-size:10.5px;letter-spacing:.01em;padding:2px 8px}
+.tag.lang{background:var(--paper);color:var(--muted);border:1px solid var(--line)}
+/* conversation pane */
+.pane{background:var(--paper)}
+.pane .head{background:var(--card);padding:14px 22px;border-bottom:1px solid var(--line)}
+.pane .head b{font-size:17px;letter-spacing:-.01em}
+.facts{background:var(--card);padding:0 22px 12px;gap:6px;border-bottom:1px solid var(--line)}
+.facts span{background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12.5px}
+.ghost{font-weight:600;border-radius:10px;padding:7px 13px;background:var(--card);transition:border-color .15s,background .15s}
+.ghost:hover{border-color:var(--deep);background:var(--paper-2)}
+.msgs{gap:8px;padding-top:24px;padding-bottom:24px}
+.m{border-radius:16px;font-size:14.5px;padding:10px 14px 7px;box-shadow:none}
+.m.Customer{border:1px solid var(--line);border-top-left-radius:5px;background:var(--in)}
+.m.Mia{background:var(--mia);border-top-right-radius:5px}
+.m.Team{background:#163741;color:#F7F3EA;border-top-right-radius:5px}
+.m.Team small,.m.Team .who,.m.Team a{color:#B7C7CB}
+.m .who{font-weight:700;letter-spacing:.06em;font-size:10.5px}
+.day{background:var(--card);font-weight:600}
+.compose{background:var(--card);padding-top:12px;gap:10px}
+.compose textarea{border-radius:14px;background:var(--paper-2);min-height:48px}
+.bar2,.note,.closed{background:var(--card)}
+.bar2 input,.bar2 select{border-radius:9px;background:var(--paper-2)}
+.btn{font-weight:700;border-radius:12px;padding:11px 20px;background:var(--sand);color:#09262F;transition:filter .15s}
+.btn:hover{filter:brightness(1.05)}
+.placeholder{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:28px;box-shadow:var(--shadow);line-height:1.6;font-size:14px}
+/* bookings, dashboard, settings, support */
+.bwrap,.swrap{padding-top:28px}
+.bwrap{max-width:1080px}
+.btools{gap:8px;margin-bottom:18px}
+.cards,.kpis{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.cardn,.kpi,.scard{border-radius:16px;border-color:var(--line);box-shadow:var(--shadow);background:var(--card)}
+.cardn,.kpi{padding:16px 18px}
+.cardn small,.kpi small{font-size:12.5px;font-weight:500}
+.cardn b,.kpi b{font-size:26px;letter-spacing:-.025em;font-weight:700;margin-top:4px}
+.kpi.hi{background:var(--side);border-color:var(--side);color:#F7F3EA}
+.kpi.hi b{color:var(--sand)}
+.dayh{font-size:16px;font-weight:700;margin:26px 0 10px;letter-spacing:-.01em}
+.prodh{font-weight:700;font-size:11.5px;letter-spacing:.07em}
+.btable{border-radius:14px;box-shadow:var(--shadow);font-size:14px}
+.btable th{background:var(--paper-2);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;font-weight:600;padding:10px 12px}
+.btable td{padding:11px 12px}
+.btable tbody tr:hover td{background:var(--paper-2)}
+.scard{padding:22px 24px}
+.scard h3{font-size:17px;letter-spacing:-.01em}
+.ptable th{font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;font-weight:600}
+.ptable input[type=number],.ptable select,.srow input[type=email],.srow input[type=time]{border-radius:10px}
+.st{font-weight:700;font-size:10.5px}
+#dash iframe{background:var(--card)}
+:focus-visible{outline:2px solid var(--sand);outline-offset:2px}
+@media (min-width:1100px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* phone */
+@media (max-width:760px){
+ header{padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px 14px}
+ header .bn small{display:none}
+ header .htools .sl{display:none}
+ header .htools .lnk,header .htools a{padding:8px}
+ nav{background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:saturate(1.4) blur(12px);-webkit-backdrop-filter:saturate(1.4) blur(12px);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px))}
+ nav button{font-size:10.5px;font-weight:600;padding:6px 2px 5px;border-radius:12px;color:var(--muted);gap:3px}
+ nav button.on{background:var(--paper);color:var(--deep)}
+ nav button.on i{color:var(--sand)}
+ nav i{font-size:inherit}
+ nav i svg{width:22px;height:22px}
+ .list{background:var(--card)}
+ .items{padding:4px 6px 12px}
+ .pane .head{padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px}
+ .facts{padding:0 12px 10px}
+ .cardn b,.kpi b{font-size:21px}
+ .bwrap,.swrap{padding-top:16px}
+ .cards,.kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+}
 </style></head>
 <body>
-<header>${logo}<b>${esc(center.name)}</b><span class="sp"></span>${switcher}<button class="lnk" id="sound" type="button">🔔<span class="sl"> Sound on</span></button><a href="/cdn-cgi/access/logout" title="${esc(email)}">Sign out</a></header>
-<nav><button class="on" data-v="convos"><i>💬</i><span class="nl"><span class="long">Conversations</span><span class="short">Chats</span></span><span class="count" id="count" hidden></span></button><button data-v="books"><i>📅</i><span class="nl">Bookings</span></button><button data-v="dash"><i>📊</i><span class="nl">Dashboard</span></button><button data-v="sett"><i>⚙️</i><span class="nl">Settings</span></button><button data-v="supp"><i>🛟</i><span class="nl">Support</span><span class="count" id="tcount" hidden></span></button></nav>
+<header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>Customer zone</small></span></div><span class="sp"></span>${switcher}<div class="htools"><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">Sign out</span></a></div></header>
+<nav><button class="on" data-v="convos"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg></i><span class="nl"><span class="long">Conversations</span><span class="short">Chats</span></span><span class="count" id="count" hidden></span></button><button data-v="books"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></i><span class="nl">Bookings</span></button><button data-v="dash"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></i><span class="nl">Dashboard</span></button><button data-v="sett"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></i><span class="nl">Settings</span></button><button data-v="supp"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg></i><span class="nl">Support</span><span class="count" id="tcount" hidden></span></button></nav>
 
 <section id="convos" class="view on">
   <div class="list">
@@ -1456,7 +1585,7 @@ function zoneClient(cfg) {
   function clock(iso) { return new Date(iso).toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); }
 
   // ---- sound + title badge
-  function setSoundLabel() { $("#sound").innerHTML = soundOn ? '🔔<span class="sl"> Sound on</span>' : '🔕<span class="sl"> Sound off</span>'; $("#sound").title = soundOn ? "Sound on" : "Sound off"; }
+  function setSoundLabel() { $("#sound").innerHTML = soundOn ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15L6 16ZM10 21h4"/></svg><span class="sl">Sound on</span>' : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 9.7-4.7M18 11v5l1.5 2H8M10 21h4M3 3l18 18"/></svg><span class="sl">Sound off</span>'; $("#sound").title = soundOn ? "Sound on" : "Sound off"; }
   setSoundLabel();
   $("#sound").onclick = function () { soundOn = !soundOn; try { localStorage.setItem("talay-sound", soundOn ? "on" : "off"); } catch (e) {} setSoundLabel(); if (soundOn) beep(); };
   document.addEventListener("click", function () { if (!audio && window.AudioContext) { try { audio = new AudioContext(); } catch (e) {} } }, { once: true });
