@@ -238,13 +238,13 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 .done p{color:var(--on-deep);max-width:40ch;margin-bottom:var(--s3)}
 .sheet{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:var(--s4);background:rgba(4,20,25,.72)}
 .sheet[hidden]{display:none}
-.sheet-panel{display:flex;flex-direction:column;width:100%;max-width:760px;height:min(88vh,820px);background:var(--shore);color:var(--deep);border-radius:14px;overflow:hidden;box-shadow:0 30px 60px -20px rgba(0,0,0,.5)}
+.sheet-panel{display:flex;flex-direction:column;width:100%;max-width:820px;height:min(88vh,760px);background:var(--shore);color:var(--deep);border-radius:14px;overflow:hidden;box-shadow:0 30px 60px -20px rgba(0,0,0,.5)}
 .sheet-head{display:flex;justify-content:space-between;align-items:center;gap:var(--s4);padding:var(--s3) var(--s3) var(--s3) var(--s6);border-bottom:1px solid var(--shore-rule)}
 .sheet-head h3{font-size:1rem}
 .sheet-close{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border:0;border-radius:50%;background:none;color:var(--deep);cursor:pointer}
 .sheet-close:hover{background:var(--sand-wash)}
-.sheet-body{flex:1;min-height:0}
-.sheet-body iframe{display:block;width:100%;height:100%;border:0}
+.sheet-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;background:#F7F3EA}
+.sheet-body iframe{display:block;width:100%;border:0}
 @media(max-width:599px){.sheet{padding:0;align-items:flex-end}.sheet-panel{height:92vh;border-radius:14px 14px 0 0}}
 
 footer{padding-block:var(--s8);border-top:1px solid var(--ridge);font-size:var(--t-small);color:var(--on-deep)}
@@ -596,7 +596,7 @@ footer a:hover{text-decoration:underline}
 
 <script>
 /* ---- Settings: fill these in during setup ---- */
-const BOOKING_URL = "https://calendar.google.com/calendar/appointments/schedules/AcZssZ03R6pXmR5TNrUW2EaNpAn03JbG0_4G-3LOFW9bZKwRLaVWVTrk6DRkFsbi049T6yPNI4mfNZfy?gv=true"; // Google Calendar booking page (short link opens in a new tab; a .../appointments/schedules/... link shows inline)
+const CAL_LINK = "jonas-talay/talay-demo"; // Cal.com: username/event
 const TURNSTILE_SITEKEY = "0x4AAAAAAFXZnn0VWocS_nWR";  // Cloudflare Turnstile site key (public, safe to put here)
 /* ---------------------------------------------- */
 
@@ -690,7 +690,7 @@ const TURNSTILE_SITEKEY = "0x4AAAAAAFXZnn0VWocS_nWR";  // Cloudflare Turnstile s
       const res = await fetch('/api/demo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
       const out = await res.json().catch(() => ({}));
       if (!res.ok || !out.ok) { const er = new Error(out.error || 'send'); er.codes = (out.codes || []).join(', '); throw er; }
-      showDone(data.name);
+      showDone(data.name, data.email);
     } catch (err) {
       const msg = String(err.message);
       status.textContent = msg === 'rate' ? 'Too many requests from this connection. Try again in an hour, or message us on WhatsApp.'
@@ -702,16 +702,35 @@ const TURNSTILE_SITEKEY = "0x4AAAAAAFXZnn0VWocS_nWR";  // Cloudflare Turnstile s
     }
   });
 
+  // Cal.com booking calendar, loaded only when needed, in Talay colours, name and email prefilled
+  let calReady = false, person = { name: '', email: '' };
+  function loadCal() {
+    if (calReady) return;
+    calReady = true;
+    (function (C, A, L) { let p = function (a, ar) { a.q.push(ar); }; let d = C.document; C.Cal = C.Cal || function () { let cal = C.Cal; let ar = arguments; if (!cal.loaded) { cal.ns = {}; cal.q = cal.q || []; d.head.appendChild(d.createElement("script")).src = A; cal.loaded = true; } if (ar[0] === L) { const api = function () { p(api, arguments); }; const namespace = ar[1]; api.q = api.q || []; if (typeof namespace === "string") { cal.ns[namespace] = cal.ns[namespace] || api; p(cal.ns[namespace], ar); p(cal, ["initNamespace", namespace]); } else p(cal, ar); return; } p(cal, ar); }; })(window, "https://app.cal.com/embed/embed.js", "init");
+    Cal("init", "talay", { origin: "https://app.cal.com" });
+    Cal.ns.talay("inline", {
+      elementOrSelector: "#sheet-body",
+      calLink: CAL_LINK,
+      config: { layout: "month_view", theme: "light", name: person.name, email: person.email },
+    });
+    Cal.ns.talay("ui", {
+      theme: "light",
+      hideEventTypeDetails: true,
+      layout: "month_view",
+      cssVarsPerTheme: { light: { "cal-brand": "#09262F", "cal-brand-emphasis": "#163741", "cal-brand-text": "#F7F3EA", "cal-bg": "#F7F3EA", "cal-bg-muted": "#F1E6CF" } },
+    });
+    const booked = () => {
+      document.getElementById('done-title').textContent = 'Your demo is booked.';
+      document.getElementById('done-text').textContent = 'You’ll get a confirmation by email with the video link. See you then!';
+      document.getElementById('pick-time').hidden = true;
+    };
+    Cal.ns.talay("on", { action: "bookingSuccessfulV2", callback: booked });
+    Cal.ns.talay("on", { action: "bookingSuccessful", callback: booked });
+  }
   function openSheet() {
-    if (!BOOKING_URL) return;
-    if (!BOOKING_URL.includes('/appointments/schedules/')) { window.open(BOOKING_URL, '_blank', 'noopener'); return; }
-    const body = document.getElementById('sheet-body');
-    if (!body.firstChild) {
-      const f = document.createElement('iframe');
-      f.src = BOOKING_URL.includes('gv=true') ? BOOKING_URL : BOOKING_URL + (BOOKING_URL.includes('?') ? '&' : '?') + 'gv=true';
-      f.title = 'Pick a time for your Talay demo';
-      body.appendChild(f);
-    }
+    if (!CAL_LINK) return;
+    loadCal();
     lastFocus = document.activeElement;
     sheet.hidden = false;
     document.body.style.overflow = 'hidden';
@@ -727,12 +746,13 @@ const TURNSTILE_SITEKEY = "0x4AAAAAAFXZnn0VWocS_nWR";  // Cloudflare Turnstile s
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !sheet.hidden) closeSheet(); });
   document.getElementById('pick-time').addEventListener('click', openSheet);
 
-  function showDone(name) {
-    const first = String(name || '').trim().split(/\s+/)[0];
+  function showDone(name, email) {
+    person = { name: String(name || '').trim(), email: String(email || '').trim() };
+    const first = person.name.split(/\s+/)[0];
     form.hidden = true;
     done.hidden = false;
     document.getElementById('done-title').textContent = (first ? 'Thanks, ' + first + '! ' : 'Thanks! ') + 'Your request is in.';
-    if (!BOOKING_URL) {
+    if (!CAL_LINK) {
       document.getElementById('done-text').textContent = 'We’ll contact you by WhatsApp or email to plan the demo.';
       document.getElementById('pick-time').hidden = true;
       done.focus();
