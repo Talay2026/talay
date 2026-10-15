@@ -644,12 +644,12 @@ const TURNSTILE_SITEKEY = "0x4AAAAAAFXZnn0VWocS_nWR";  // Cloudflare Turnstile s
     try {
       const res = await fetch('/api/demo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
       const out = await res.json().catch(() => ({}));
-      if (!res.ok || !out.ok) throw new Error(out.error || 'send');
+      if (!res.ok || !out.ok) { const e = new Error(out.error || 'send'); e.codes = (out.codes || []).join(', '); throw e; }
       showDone(data.name);
     } catch (err) {
       const msg = String(err.message);
       status.textContent = msg === 'rate' ? 'Too many requests from this connection. Try again in an hour, or message us on WhatsApp.'
-        : msg === 'check' ? 'The security check failed. Complete it again and send the form.'
+        : msg === 'check' ? 'The security check failed. Complete it again and send the form.' + (err.codes ? ' (' + err.codes + ')' : '')
         : 'Your request did not go through. Send it again, or message us on WhatsApp.';
       if (TURNSTILE_SITEKEY && window.turnstile && tsWidget !== null) window.turnstile.reset(tsWidget);
       button.disabled = false;
