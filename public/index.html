@@ -88,7 +88,7 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 .msg{width:fit-content;max-width:92%;padding:var(--s2) var(--s3);margin-bottom:var(--s3);font-size:.84rem;line-height:1.55;border-radius:var(--radius)}
 .them{background:var(--ridge);border-bottom-left-radius:var(--s1)}
 .us{margin-left:auto;background:var(--shore);color:var(--deep);border-bottom-right-radius:var(--s1)}
-.msg time{display:block;margin-top:2px;font-size:.72rem;font-variant-numeric:tabular-nums;color:var(--on-deep)}
+.msg time{display:block;margin-top:2px;font-size:.72rem;color:var(--on-deep)}
 .us time{color:var(--ink-soft)}
 .wait{display:flex;align-items:center;gap:var(--s2);margin-block:var(--s4);font-size:.75rem;color:var(--on-deep)}
 .wait::before,.wait::after{content:"";flex:1;height:1px;background:var(--ridge)}
@@ -156,7 +156,7 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 .how{display:grid;gap:var(--s8);align-items:start}
 .steps{counter-reset:step;display:grid;gap:var(--s6)}
 .steps li{counter-increment:step;display:grid;align-content:start;grid-template-columns:44px minmax(0,1fr);gap:var(--s1) var(--s4)}
-.steps li::before{content:counter(step);grid-row:1 / 3;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:var(--deep);color:var(--sand);font-weight:700;font-variant-numeric:tabular-nums}
+.steps li::before{content:counter(step);grid-row:1 / 3;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:var(--deep);color:var(--sand);font-weight:700}
 .steps h3{font-size:var(--t-lead);padding-top:4px}
 .steps p{color:var(--ink-soft);max-width:48ch}
 
@@ -179,7 +179,7 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 .tag.open{border:1px solid var(--ridge);color:var(--on-deep)}
 .trip{display:flex;justify-content:space-between;gap:var(--s3);padding:var(--s2) 0;border-top:1px solid var(--ridge);font-size:.8rem}
 .trip:first-of-type{border-top:0}
-.trip span{color:var(--on-deep);font-variant-numeric:tabular-nums}
+.trip span{color:var(--on-deep)}
 .zone-foot{display:flex;flex-wrap:wrap;gap:var(--s2);margin-top:var(--s3)}
 .zone-foot span{padding:4px 10px;border-radius:6px;background:var(--shelf);font-size:.72rem;color:var(--on-deep)}
 .caption{margin-top:var(--s3);font-size:var(--t-small);color:var(--ink-soft)}
@@ -212,7 +212,7 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 .reply span{flex:1;padding:6px 10px;border:1px solid var(--ridge);border-radius:8px;color:#8FA5AA;font-size:.74rem}
 .pill{display:inline-flex;align-items:center;padding:5px 10px;border-radius:8px;background:var(--sand);color:var(--deep);font-size:.72rem;font-weight:600;white-space:nowrap}
 .pill.ghost{background:none;border:1px solid var(--ridge);color:var(--on-deep)}
-.bk{width:100%;border-collapse:collapse;font-size:.76rem;font-variant-numeric:tabular-nums}
+.bk{width:100%;border-collapse:collapse;font-size:.76rem}
 .bk th{padding:0 0 var(--s2);text-align:left;font-size:.68rem;font-weight:600;color:#8FA5AA}
 .bk td{padding:7px 0;border-top:1px solid var(--ridge);color:var(--on-deep)}
 .bk td:first-child{color:var(--shore);font-weight:600}
@@ -223,7 +223,7 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 .kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s2)}
 .kpi{padding:var(--s3);border-radius:10px;background:var(--shelf)}
 .kpi small{display:block;font-size:.68rem;color:#8FA5AA}
-.kpi b{display:block;margin-top:2px;font-size:1.15rem;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi b{display:block;margin-top:2px;font-size:1.15rem;letter-spacing:-.02em}
 .kpi span{display:block;font-size:.68rem;color:var(--on-deep)}
 .kpi.gold b{color:var(--sand)}
 .bars{display:flex;align-items:flex-end;gap:6px;height:96px;padding:var(--s2) var(--s3) 0;border-radius:10px;background:var(--shelf)}
@@ -233,7 +233,7 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 .set{display:flex;justify-content:space-between;align-items:center;gap:var(--s3);padding:8px 0;border-top:1px solid var(--ridge);font-size:.78rem}
 .set:first-of-type{border-top:0}
 .set small{display:block;color:var(--on-deep);font-size:.7rem}
-.set .v{color:var(--on-deep);font-variant-numeric:tabular-nums;white-space:nowrap}
+.set .v{color:var(--on-deep);white-space:nowrap}
 .tg{position:relative;flex:0 0 30px;width:30px;height:17px;border-radius:999px;background:var(--live)}
 .tg::after{content:"";position:absolute;top:2px;right:2px;width:13px;height:13px;border-radius:50%;background:var(--shore)}
 .tg.off{background:var(--ridge)}.tg.off::after{right:auto;left:2px}
@@ -397,6 +397,34 @@ footer a:hover{text-decoration:underline}
 @media(min-width:1200px){h1{font-size:var(--t-hero)}}
 @media(max-width:380px){:root{--gutter:var(--s4)}h1{font-size:2.1rem}.mast nav{gap:var(--s4)}.mast .cta{padding:8px 12px}}
 @media(max-width:779px){:root{--section:var(--s12)}.lost{padding-block:var(--s8) var(--s6)}.problems{gap:var(--s6)}}
+
+/* Layout v3: steps in a row, customer zone as its own section */
+.steps{grid-template-columns:1fr}
+@media(min-width:780px){
+ .steps{grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s8) var(--gap)}
+}
+@media(min-width:1100px){
+ .steps{grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s8)}
+ .steps li{grid-template-columns:1fr;gap:var(--s3)}
+ .steps li::before{grid-row:auto}
+ .steps h3{padding-top:0}
+}
+.zone-wrap{max-width:900px;margin-inline:auto}
+#zone-section .intro{margin-inline:auto;text-align:center}
+#zone-section .caption{text-align:center}
+#zone-section + .cta-row, #zone-section .cta-row{justify-content:center}
+.zc-ctrl{margin-top:var(--s4);padding-top:0;padding-bottom:var(--s3);border-top:0;border-bottom:1px solid var(--ridge)}
+.zc-dots{flex:1;justify-content:center}
+@media(max-width:599px){
+ .zc-arrow{display:none}
+ .zc-dots{justify-content:space-between;gap:var(--s1)}
+ .zc-dots button{width:auto;height:auto;padding:6px 10px}
+ .zc-dots button span{display:inline}
+ .zc-dots button[aria-current="true"]{width:auto;background:var(--shore)}
+ .zone{padding:var(--s3)}
+ .zone-head span{display:none}
+ .zc-dots button{padding:6px 8px;font-size:.72rem}
+}
 </style>
 </head>
 <body id="top">
@@ -545,18 +573,30 @@ footer a:hover{text-decoration:underline}
         <h2 id="how-title">How Talay works</h2>
         <p>Most of it runs on its own. Your team steps in where it matters.</p>
       </div>
-      <div class="how">
-        <div>
-          <ol class="steps">
+      <ol class="steps">
             <li><h3>Divers reach out</h3><p>With a question about a course, a price or a date.</p></li>
             <li><h3>Talay answers within seconds</h3><p>In their language: it recommends, answers questions and follows up.</p></li>
             <li><h3>The diver books online</h3><p>With a deposit. Or walks in, or your team takes over.</p></li>
             <li><h3>Everything lands in one place</h3><p>Chats, bookings, results and settings, in your customer zone.</p></li>
           </ol>
-        </div>
+    </div>
+  </section>
+
+  <section class="band" id="zone-section" aria-labelledby="zone-title">
+    <div class="wrap">
+      <div class="intro">
+        <h2 id="zone-title">Your customer zone</h2>
+        <p>Chats, bookings, results and settings. On your computer or phone.</p>
+      </div>
+      <div class="zone-wrap">
         <figure>
           <div class="zone" id="zone" role="region" aria-roledescription="carousel" aria-label="The Talay customer zone">
             <div class="zone-head"><b>Your dive centre</b><span>Customer zone · computer or phone</span></div>
+            <div class="zc-ctrl">
+              <button type="button" class="zc-arrow" id="zc-prev" aria-label="Previous"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg></button>
+              <div class="zc-dots" id="zc-dots"><button type="button" aria-label="Show Chats" aria-controls="zs-0" aria-current="true"><span>Chats</span></button><button type="button" aria-label="Show Bookings" aria-controls="zs-1"><span>Bookings</span></button><button type="button" aria-label="Show Results" aria-controls="zs-2"><span>Results</span></button><button type="button" aria-label="Show Settings" aria-controls="zs-3"><span>Settings</span></button></div>
+              <button type="button" class="zc-arrow" id="zc-next" aria-label="Next"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg></button>
+            </div>
             <div class="zc-track" id="zc-track">
               <div class="zc-slide" id="zs-0" role="group" aria-roledescription="slide" aria-label="1 of 4: Chats">
                 <div class="zc-cap"><em>Chats</em><h3>Every conversation, one inbox</h3><p>See at a glance who booked and who needs your team. Reply yourself, or let the assistant carry on.</p></div>
@@ -615,13 +655,9 @@ footer a:hover{text-decoration:underline}
                 <div class="zone-foot"><span>Team &amp; alerts</span><span>Support tickets</span></div>
               </div>
             </div>
-            <div class="zc-ctrl">
-              <button type="button" class="zc-arrow" id="zc-prev" aria-label="Previous"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg></button>
-              <div class="zc-dots" id="zc-dots"><button type="button" aria-label="Show Chats" aria-controls="zs-0" aria-current="true"><span>Chats</span></button><button type="button" aria-label="Show Bookings" aria-controls="zs-1"><span>Bookings</span></button><button type="button" aria-label="Show Results" aria-controls="zs-2"><span>Results</span></button><button type="button" aria-label="Show Settings" aria-controls="zs-3"><span>Settings</span></button></div>
-              <button type="button" class="zc-arrow" id="zc-next" aria-label="Next"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg></button>
-            </div>
+            
           </div>
-          <figcaption class="caption">Illustration of the customer zone. Swipe or use the arrows.</figcaption>
+          <figcaption class="caption">Illustration of the customer zone.</figcaption>
         </figure>
       </div>
       <div class="cta-row"><a class="cta" href="#demo">Book a free demo</a><span class="cta-note">20 minutes, no commitment.</span></div>
