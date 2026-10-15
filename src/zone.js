@@ -85,7 +85,24 @@ export async function handleZone(request, env, ctx) {
     if (p === "/zone/api/ticket-close" && request.method === "POST") return await ticketAction(request, env, center, email, "close");
     if (p === "/zone/api/settings" && request.method === "GET") return json(await settings(env, center));
     if (p === "/zone/api/settings" && request.method === "POST") return await saveSettings(request, env, center, email);
+    if (p === "/zone/api/push-key") return json({ key: env.VAPID_PRIVATE ? await vapidPublic(env) : "" });
+    if (p === "/zone/api/push-latest") {
+      const d = await conversations(env, center, "open");
+      const need = d.conversations.filter((c) => c.needsYou);
+      if (!need.length) return json({ title: "", body: "" });
+      const c = need[0];
+      return json({
+        title: need.length > 1 ? `${need.length} divers need your team` : `${c.name || "A diver"} needs your team`,
+        body: need.length > 1 ? `Latest: ${c.name || "a diver"}: “${String(c.preview || "").slice(0, 80)}”` : `“${String(c.preview || "").slice(0, 100)}”`,
+      });
+    }
     if (request.method === "POST") {
+      if (p === "/zone/api/push-subscribe") return await pushSubscribe(request, env, center, email);
+      if (p === "/zone/api/push-unsubscribe") return await pushUnsubscribe(request, env);
+      if (p === "/zone/api/push-test") {
+        const n = await pushToCenter(env, center.slug, email);
+        return json(n ? { ok: true, sent: n } : { error: "This device isn't registered yet. Tap Turn on notifications first." }, n ? 200 : 400);
+      }
       if (p === "/zone/api/reply") return await reply(request, env, center);
       if (p === "/zone/api/handback") return await leadAction(request, env, center, "handback");
       if (p === "/zone/api/handled") return await leadAction(request, env, center, "handled");
@@ -131,6 +148,25 @@ function zoneAsset(url) {
 // short message instead of a browser error. Nothing is stored offline.
 const SW = `self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
+// Push without payload: look up who needs the team, else show a general message.
+self.addEventListener("push", (e) => {
+  e.waitUntil((async () => {
+    let title = "A diver needs your team", body = "Open Conversations → Needs you.";
+    try {
+      const r = await fetch("/zone/api/push-latest", { credentials: "same-origin", cache: "no-store" });
+      if (r.ok) { const d = await r.json(); if (d.title) { title = d.title; body = d.body || body; } }
+    } catch (err) {}
+    await self.registration.showNotification(title, { body, icon: "/zone/icon-192.png", badge: "/zone/icon-192.png", tag: "talay-needs-you", renotify: true, data: { url: "/zone" } });
+  })());
+});
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  e.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const c of all) { if (c.url.includes("/zone")) { await c.focus(); return; } }
+    await self.clients.openWindow("/zone");
+  })());
+});
 self.addEventListener("fetch", (e) => {
   if (e.request.mode !== "navigate") return;
   e.respondWith(fetch(e.request).catch(() => new Response(
@@ -809,6 +845,82 @@ async function milestones(env, center) {
     out[k] = { total: sum, reached, next: steps[si] || null };
   }
   return out;
+}
+
+// ---------- Push notifications ("Needs you") ----------
+// Web push without payload: the phone's service worker asks /zone/api/push-latest what to show.
+// Secrets: VAPID_PRIVATE = a P-256 private key in PKCS8 PEM (openssl), PUSH_KEY = key for Make.
+// Airtable table "Push subscriptions": Endpoint (primary), Center (text), Email (text).
+// Make calls  GET talay.io/api/push?key=PUSH_KEY&center=<slug>  when a conversation is handed over.
+const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const fromB64u = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
+async function vapidKey(env) {
+  const pem = String(env.VAPID_PRIVATE || "").replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
+  const der = Uint8Array.from(atob(pem), (c) => c.charCodeAt(0));
+  return crypto.subtle.importKey("pkcs8", der, { name: "ECDSA", namedCurve: "P-256" }, true, ["sign"]);
+}
+async function vapidPublic(env) {
+  const jwk = await crypto.subtle.exportKey("jwk", await vapidKey(env));
+  const x = fromB64u(jwk.x), y = fromB64u(jwk.y);
+  const raw = new Uint8Array(65); raw[0] = 4; raw.set(x, 1); raw.set(y, 33);
+  return b64u(raw);
+}
+async function vapidAuth(env, endpoint) {
+  const aud = new URL(endpoint).origin;
+  const enc = (o) => b64u(new TextEncoder().encode(JSON.stringify(o)));
+  const head = enc({ typ: "JWT", alg: "ES256" });
+  const body = enc({ aud, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: "mailto:info@talay.io" });
+  const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, await vapidKey(env), new TextEncoder().encode(`${head}.${body}`));
+  return `vapid t=${head}.${body}.${b64u(sig)}, k=${await vapidPublic(env)}`;
+}
+const okEndpoint = (u) => { try { const x = new URL(u); return x.protocol === "https:" && u.length < 1000; } catch { return false; } };
+async function pushSubscribe(request, env, center, email) {
+  const b = await readBody(request);
+  const endpoint = String(b?.endpoint || "");
+  if (!okEndpoint(endpoint)) return json({ error: "Bad subscription" }, 400);
+  const found = await at(env, "Push subscriptions", { formula: `{Endpoint} = '${q(endpoint)}'`, max: 1 });
+  const fields = { "Endpoint": endpoint, "Center": center.slug, "Email": email };
+  if (found.length) await atWrite(env, "Push subscriptions", "PATCH", [{ id: found[0].id, fields }]);
+  else await atWrite(env, "Push subscriptions", "POST", [{ fields }]);
+  return json({ ok: true });
+}
+async function pushUnsubscribe(request, env) {
+  const b = await readBody(request);
+  const endpoint = String(b?.endpoint || "");
+  if (!okEndpoint(endpoint)) return json({ ok: true });
+  const found = await at(env, "Push subscriptions", { formula: `{Endpoint} = '${q(endpoint)}'`, max: 5 });
+  if (found.length) await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Push%20subscriptions?${found.map((r) => "records[]=" + r.id).join("&")}`,
+    { method: "DELETE", headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` } });
+  return json({ ok: true });
+}
+async function pushToCenter(env, slug, onlyEmail) {
+  if (!env.VAPID_PRIVATE) return 0;
+  let formula = `{Center} = '${q(slug)}'`;
+  if (onlyEmail) formula = `AND(${formula}, LOWER({Email}) = '${q(onlyEmail.toLowerCase())}')`;
+  const subs = await at(env, "Push subscriptions", { formula, max: 200 });
+  let sent = 0;
+  const gone = [];
+  await Promise.all(subs.map(async (r) => {
+    const endpoint = String(r.fields["Endpoint"] || "");
+    if (!okEndpoint(endpoint)) return;
+    const res = await fetch(endpoint, { method: "POST", headers: { TTL: "3600", Urgency: "high", Authorization: await vapidAuth(env, endpoint), "Content-Length": "0" } });
+    if (res.status === 404 || res.status === 410) gone.push(r.id);
+    else if (res.ok) sent++;
+    else console.log("Push failed", res.status, await res.text());
+  }));
+  if (gone.length) await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Push%20subscriptions?${gone.slice(0, 10).map((id) => "records[]=" + id).join("&")}`,
+    { method: "DELETE", headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` } });
+  return sent;
+}
+// For Make: GET talay.io/api/push?key=PUSH_KEY&center=<slug>
+export async function handlePush(request, env, ctx) {
+  const url = new URL(request.url);
+  const out = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+  if (!env.PUSH_KEY || url.searchParams.get("key") !== env.PUSH_KEY) return out({ error: "forbidden" }, 403);
+  const slug = String(url.searchParams.get("center") || "").toLowerCase();
+  if (!/^[a-z0-9-]{1,60}$/.test(slug)) return out({ error: "center missing" }, 400);
+  await forget(env, [`conv/${slug}/open`]).catch(() => {});
+  return out({ ok: true, sent: await pushToCenter(env, slug) });
 }
 
 // ---------- Weekly summary e-mail ----------
@@ -1889,6 +2001,12 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
       <div class="switch"><span class="pill" id="miaState">…</span><button class="ghost" id="miaToggle" type="button">…</button></div>
       <div class="smsg" id="miaMsg"></div>
     </div>
+    <div class="scard">
+      <h3>Notifications on this device</h3>
+      <p class="d">Get a notification as soon as ${esc(center.assistant)} hands a conversation to your team, even when the zone is closed. Turn it on separately on every phone or computer. On an iPhone, first add the zone to your home screen (Share → Add to Home Screen) and open it from there.</p>
+      <div class="switch"><span class="pill" id="pushState">…</span><button class="btn" id="pushOn" type="button">Turn on notifications</button><button class="ghost" id="pushTest" type="button" hidden>Send a test</button><button class="ghost" id="pushOff" type="button" hidden>Turn off</button></div>
+      <div class="smsg" id="pushMsg"></div>
+    </div>
     <div class="lock" id="adminNote" hidden>Only an admin of your dive center can change prices, office hours, the alert email and the team. You can still pause ${esc(center.assistant)}.</div>
     <div class="scard adm">
       <h3>Products and prices</h3>
@@ -2447,6 +2565,53 @@ function zoneClient(cfg) {
   function fmtSec(s) { if (s == null) return "–"; if (s < 60) return s + " s"; return Math.floor(s / 60) + " min " + (s % 60) + " s"; }
   function pct(a, b) { return b ? Math.round(a / b * 100) + "%" : "–"; }
   $("#period").onchange = function () { loadDash(); };
+  // ---- Push notifications on this device
+  (function () {
+    var state = $("#pushState"), on = $("#pushOn"), test = $("#pushTest"), off = $("#pushOff"), msg = $("#pushMsg");
+    if (!state) return;
+    var supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+    function show(t, err) { msg.textContent = t || ""; msg.classList.toggle("err", !!err); }
+    function urlKey(b) { var s = b.replace(/-/g, "+").replace(/_/g, "/"); s += "===".slice((s.length + 3) % 4); var r = atob(s), a = new Uint8Array(r.length); for (var i = 0; i < r.length; i++) a[i] = r.charCodeAt(i); return a; }
+    function setUi(active) {
+      state.textContent = active ? "On for this device" : (supported ? "Off" : "Not available here");
+      state.classList.toggle("on", !!active);
+      on.hidden = !!active || !supported; test.hidden = !active; off.hidden = !active;
+    }
+    if (!supported) {
+      setUi(false);
+      show(/iPhone|iPad/.test(navigator.userAgent) ? "On iPhone: add the zone to your home screen first (Share → Add to Home Screen), then open it from there." : "This browser doesn't support notifications.", false);
+      return;
+    }
+    setUi(false);
+    navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (s) { setUi(!!s && Notification.permission === "granted"); }).catch(function () { setUi(false); });
+    on.onclick = function () {
+      show("");
+      on.disabled = true;
+      Notification.requestPermission().then(function (perm) {
+        if (perm !== "granted") throw new Error("Notifications are blocked. Allow them for talay.io in your browser or phone settings.");
+        return api("push-key");
+      }).then(function (d) {
+        if (!d.key) throw new Error("Notifications are not set up yet. Contact Talay.");
+        return navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlKey(d.key) }); });
+      }).then(function (sub) {
+        return post("push-subscribe", { endpoint: sub.endpoint });
+      }).then(function () { setUi(true); show("Done. Tap “Send a test” to check."); })
+        .catch(function (e) { show(e.message || "Something went wrong. Try again.", true); })
+        .then(function () { on.disabled = false; });
+    };
+    test.onclick = function () {
+      show("Sending…");
+      post("push-test", {}).then(function () { show("Sent. It can take a few seconds."); }).catch(function (e) { show(e.message, true); });
+    };
+    off.onclick = function () {
+      navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (s) {
+        if (!s) return;
+        var ep = s.endpoint;
+        return s.unsubscribe().then(function () { return post("push-unsubscribe", { endpoint: ep }); });
+      }).then(function () { setUi(false); show("Turned off for this device."); }).catch(function (e) { show(e.message, true); });
+    };
+  })();
+
   // ---- Milestones
   var MS_LABEL = {
     divers: function (v) { return v.toLocaleString("en-US") + " divers booked through Talay"; },
