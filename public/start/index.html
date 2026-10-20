@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Set up Talay for your dive centre</title>
+<meta name="description" content="Tell us how your dive centre works, so Talay can answer your divers with your own prices, times and policies.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%230A2029'/%3E%3Cpath d='M12 50A38 38 0 0 0 88 50Z' fill='%23E8B04B'/%3E%3Ccircle cx='50' cy='50' r='38' fill='none' stroke='%23F4F0E6' stroke-width='10'/%3E%3Cpath d='M6 50h88' stroke='%23F4F0E6' stroke-width='10' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root{--deep:#09262F;--deep-2:#14404D;--sand:#E0A84A;--sand-2:#F3D9A6;--paper:#F4F0E6;--paper-2:#FBF8F1;--muted:#55646A;--soft:#9FB2B8;--line:#E2DACB;--ok:#1F7A55;--bad:#B3261E}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--deep);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:820px;margin:0 auto;padding:0 16px}
+a{color:inherit}
+header{background:radial-gradient(700px 320px at 90% -10%,#1C5262 0%,transparent 62%),var(--deep);color:var(--paper);padding:28px 0 40px}
+.brand{font-weight:800;font-size:17px;margin-bottom:26px;display:flex;align-items:center;gap:10px}
+h1{font-size:clamp(30px,5vw,44px);line-height:1.08;letter-spacing:-.02em;margin:0 0 14px;font-weight:800}
+h1 em{font-style:normal;color:var(--sand)}
+.lead{color:#C9D4D7;margin:0 0 18px;max-width:620px}
+.promise{display:flex;flex-wrap:wrap;gap:8px;padding:0;margin:0;list-style:none}
+.promise li{font-size:13.5px;font-weight:600;background:rgba(244,240,230,.08);border:1px solid rgba(244,240,230,.16);border-radius:999px;padding:5px 12px}
+.bar{position:sticky;top:0;z-index:5;background:var(--paper);border-bottom:1px solid var(--line)}
+.bar .wrap{display:flex;align-items:center;gap:12px;padding-top:10px;padding-bottom:10px}
+.track{flex:1;height:6px;background:var(--line);border-radius:6px;overflow:hidden}
+.fill{height:100%;width:0;background:var(--sand);transition:width .3s}
+.bar small{color:var(--muted);font-size:13px;white-space:nowrap}
+section{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px 20px;margin:20px 0}
+section h2{font-size:22px;margin:0 0 4px;display:flex;gap:10px;align-items:center}
+.n{width:30px;height:30px;border-radius:50%;background:var(--sand);display:grid;place-items:center;font-size:14px;font-weight:800;flex:none}
+.why{color:var(--muted);font-size:15px;margin:0 0 18px}
+.f{margin:0 0 18px}
+.f:last-child{margin-bottom:0}
+.f > label,.f > .lbl{display:block;font-weight:650;font-size:15.5px;margin-bottom:6px}
+.req{color:var(--bad);font-weight:700}
+.help{display:block;color:var(--muted);font-size:13.5px;font-weight:400;margin-top:2px}
+input[type=text],input[type=email],input[type=tel],input[type=url],input[type=number],textarea,select{width:100%;font:inherit;font-size:16px;color:var(--deep);background:var(--paper-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+textarea{min-height:78px;resize:vertical}
+input:focus,textarea:focus,select:focus{outline:3px solid var(--sand-2);border-color:var(--sand)}
+[aria-invalid=true]{border-color:var(--bad)!important;background:#FFF5F4!important}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opts label{display:flex;align-items:center;gap:7px;background:var(--paper-2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:15px;cursor:pointer}
+.opts input{accent-color:var(--deep);margin:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.prod{border:1px solid var(--line);border-radius:14px;padding:14px;margin:0 0 12px;background:var(--paper-2)}
+.prod > .top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.prod > .top b{font-size:16px}
+.prod .body{margin-top:12px}
+.prod.off .body{display:none}
+.prod .f{margin-bottom:12px}
+.prod .f > label{font-size:14px}
+.prod input,.prod textarea{background:#fff}
+.btn{display:inline-flex;align-items:center;gap:10px;border-radius:999px;padding:14px 26px;font-weight:700;font-size:16px;border:0;cursor:pointer;background:var(--deep);color:var(--paper)}
+.btn[disabled]{opacity:.6;cursor:default}
+.status{margin:12px 0 0;font-weight:600;color:var(--bad)}
+.saved{color:var(--muted);font-size:13.5px;margin-top:10px}
+.done{text-align:center;padding:40px 20px}
+.done h2{justify-content:center;font-size:28px}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+footer{color:var(--muted);font-size:14px;padding:10px 0 40px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+@media (max-width:640px){.grid2{grid-template-columns:1fr}section{padding:18px 14px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="brand">Talay</div>
+    <h1>Set up Talay for <em>your</em> dive centre</h1>
+    <p class="lead">Tell us how your centre works. Your assistant then answers divers with your own prices, times and rules, day and night, under your name. It takes about 20 minutes. Your answers are saved on this device, so you can stop and come back later.</p>
+    <ul class="promise">
+      <li>Free to use</li><li>Nothing changes in your system</li><li>Switch it on or off anytime</li><li>Keep taking bookings as before</li>
+    </ul>
+  </div>
+</header>
+<div class="bar"><div class="wrap"><div class="track"><div class="fill" id="fill"></div></div><small id="progress">0% done</small></div></div>
+
+<main class="wrap">
+  <form id="intake" novalidate>
+    <div id="sections"></div>
+    <div class="hp" aria-hidden="true"><label>Website <input type="text" name="website_hp" tabindex="-1" autocomplete="off"></label></div>
+    <section>
+      <div class="f" id="ts"></div>
+      <button class="btn" id="submit" type="submit">Send to Talay</button>
+      <p class="status" id="status" role="status"></p>
+      <p class="saved" id="saved"></p>
+    </section>
+  </form>
+  <section class="done" id="done" hidden>
+    <h2>Thank you! 🎉</h2>
+    <p>We've received everything. We'll set up your assistant and send you a test number, so you can try it yourself before anything goes live.</p>
+    <p class="why">Questions? WhatsApp Jonas on <a href="https://wa.me/32456953907">+32 456 95 39 07</a> or email <a href="mailto:info@talay.io">info@talay.io</a>.</p>
+  </section>
+</main>
+<footer class="wrap">
+  <span>Questions? <a href="https://wa.me/32456953907" target="_blank" rel="noopener">WhatsApp Jonas</a> · <a href="mailto:info@talay.io">info@talay.io</a></span>
+  <span><a href="/privacy/">Privacy</a> · <a href="https://talay.io">talay.io</a></span>
+</footer>
+
+<script>
+const TURNSTILE_SITEKEY = "0x4AAAAAAFXZnn0VWocS_nWR";  // Cloudflare Turnstile site key (public, same as the homepage)
+const STORE = "talay-intake-v1";
+
+// The questions. Keys are stable: the Airtable conversion depends on them, so never rename a key.
+// type: text, email, tel, url, number, area (textarea), one (radio), many (checkboxes)
+const SECTIONS = [
+  { id: "centre", title: "Your centre", why: "This is how your assistant introduces your centre.", fields: [
+    { k: "centre_name", label: "Name of your dive centre", req: true, ph: "e.g. Blue Turtle Divers" },
+    { k: "contact_name", label: "Your name", req: true },
+    { k: "contact_role", label: "Your role", type: "one", opts: ["Owner", "Manager", "Other"] },
+    { k: "contact_email", label: "Your email", type: "email", req: true },
+    { k: "contact_whatsapp", label: "Your WhatsApp number", type: "tel", req: true, ph: "+66 81 234 5678" },
+    { k: "area", label: "Where on Koh Tao are you?", type: "one", opts: ["Mae Haad", "Sairee", "Chalok Baan Kao", "Tanote", "Other"] },
+    { k: "meeting_point", label: "Where should divers come to?", req: true, type: "area", help: "Written the way you'd explain it to a diver.", ph: "e.g. our shop on Sairee Beach, next to the 7-Eleven at the north end" },
+    { k: "opening_hours", label: "Shop opening hours", ph: "e.g. every day 7:00 to 19:00" },
+    { k: "agency", label: "Which courses do you teach?", type: "many", opts: ["SSI", "PADI", "RAID", "Other"] },
+    { k: "agency_level", label: "Your agency rating, if any", ph: "e.g. SSI Diamond Training Centre, PADI 5 Star IDC" },
+    { k: "trust", label: "Why do divers trust you?", type: "area", help: "One or two facts we may share, like years on the island or divers trained.", ph: "e.g. on Koh Tao since 2008, more than 20,000 divers trained" },
+    { k: "website_url", label: "Website", type: "url", ph: "https://" },
+    { k: "instagram", label: "Instagram", ph: "@yourcentre" },
+    { k: "maps_url", label: "Google Maps link to your shop", type: "url", help: "Open your shop in Google Maps, tap Share, copy the link." },
+    { k: "review_url", label: "Google review link", type: "url", help: "Google Business Profile → Ask for reviews → copy link. Leave empty if you don't know." },
+    { k: "logo_note", label: "Logo", type: "one", opts: ["Take it from our website or Instagram", "I'll email it to info@talay.io"] },
+  ]},
+  { id: "team", title: "Your team", why: "When a diver needs a person, your assistant passes the chat to your team and sends an alert.", fields: [
+    { k: "alert_emails", label: "Who gets the alert when a diver needs a person?", req: true, type: "area", help: "One or more email addresses.", ph: "e.g. desk@yourcentre.com" },
+    { k: "staff_emails", label: "Team members who may see and answer the chats", type: "area", help: "Email addresses. They log in at talay.io/zone with a code, no password." },
+    { k: "admin_emails", label: "Who may change prices and settings?", type: "area", help: "Usually the owner or manager." },
+    { k: "emergency_phone", label: "Your emergency phone number (reachable 24/7)", type: "tel", req: true, help: "Only shared in a real emergency, next to the Thai emergency number 1669." },
+    { k: "team_languages", label: "Languages your team teaches in", type: "many", opts: ["English", "Thai", "German", "French", "Dutch", "Spanish", "Italian", "Portuguese", "Chinese", "Swedish", "Other"] },
+    { k: "instructor_countries", label: "Where are your instructors from?", ph: "e.g. Thailand, England, Germany, Sweden" },
+    { k: "choose_instructor", label: "Can a diver ask for a specific instructor?", type: "one", opts: ["Yes, by name", "Only a language or country, not a name", "No"] },
+    { k: "private_lessons", label: "Private lessons or a private guide?", type: "one", opts: ["Yes, on request", "No"] },
+  ]},
+  { id: "whatsapp", title: "WhatsApp", why: "Divers keep writing to the number they already know. We help you connect it; nothing changes for your divers.", fields: [
+    { k: "wa_number", label: "The WhatsApp number divers write to today", type: "tel", req: true },
+    { k: "wa_setup", label: "How does your team use that number now?", type: "one", req: true, opts: ["WhatsApp Business app on a phone", "Through a tool (respond.io, WATI, Zoko, …)", "Normal WhatsApp app", "I don't know"] },
+    { k: "wa_tool", label: "Which tool, if any?", ph: "e.g. respond.io" },
+    { k: "meta_access", label: "Do you have a Facebook / Meta Business account for the centre?", type: "one", opts: ["Yes, and I have admin access", "Yes, someone else manages it", "No", "I don't know"] },
+    { k: "wa_choice", label: "Where should your assistant answer?", type: "one", opts: ["On our existing number (team keeps using it too)", "On a new number, just for enquiries", "Let's discuss"] },
+    { k: "channels_later", label: "Other channels you'd like later", type: "many", opts: ["Instagram", "Facebook Messenger", "Website form", "Email", "LINE"] },
+  ]},
+  { id: "products", title: "Courses and prices", why: "Your assistant only quotes the prices you give here. Untick what you don't offer; switch online booking off for anything you want to handle yourself.", products: true },
+  { id: "schedule", title: "Times and schedule", why: "The questions divers ask most: when do I start, and when do I need to be there?", fields: [
+    { k: "orientation", label: "Is there an orientation the day before a course starts?", type: "one", opts: ["Yes", "No"] },
+    { k: "orientation_time", label: "If yes: what time, and for which courses?", ph: "e.g. 17:00 at the shop, for Try Dive and Open Water" },
+    { k: "ow_day1", label: "Open Water: what time on day 1, and what happens each day?", type: "area", ph: "e.g. day 1 8:00 pool, day 2 and 3 boat at 6:30" },
+    { k: "dsd_day", label: "Try dive / Basic Diver: what does the day look like?", type: "area", ph: "e.g. pool in the morning, 2 sea dives in the afternoon, max 12 m" },
+    { k: "boat_times", label: "Fun dive boats: check-in times", req: true, ph: "e.g. morning 6:30, afternoon 11:30" },
+    { k: "boat_extra", label: "Other trips", type: "many", opts: ["Night dive", "Sunset dive", "Sail Rock day trip", "None"] },
+    { k: "boat_extra_note", label: "Times and who can join", ph: "e.g. night dive Tue and Fri at 17:30, Advanced divers" },
+    { k: "start_days", label: "Courses start on", type: "one", opts: ["Any day", "Certain days only"] },
+    { k: "start_days_note", label: "If certain days: which?" },
+    { k: "cutoff_fun", label: "Latest time to book fun dives for tomorrow", ph: "e.g. 15:00" },
+    { k: "cutoff_course", label: "Latest time to book a course starting tomorrow", ph: "e.g. 16:00" },
+    { k: "daily_limit", label: "Is there a maximum of online bookings per day?", ph: "e.g. no limit, or max 8 Open Water students per day" },
+  ]},
+  { id: "rules", title: "Rules and policies", why: "Divers ask about this all the time. Sensitive questions (medical, pregnancy, under 18, complaints) always go to your team.", fields: [
+    { k: "reschedule", label: "Moving or cancelling a booking", type: "one", req: true, opts: ["Moving is free (up to the day before); the online deposit stays valid, no refund", "Something else (describe below)"] },
+    { k: "reschedule_note", label: "Your own rule, if different", type: "area" },
+    { k: "weather", label: "If you cancel because of the weather", type: "one", opts: ["New date for free, deposit back if no date fits during the stay", "Something else (describe below)"] },
+    { k: "weather_note", label: "Your own rule, if different" },
+    { k: "pay_shop", label: "How can divers pay the rest at the shop?", type: "many", opts: ["Cash (THB)", "Card", "Bank transfer", "Other"] },
+    { k: "card_fee", label: "Card surcharge at the shop (%)", type: "number", ph: "e.g. 3" },
+    { k: "min_age", label: "Minimum age for diving", type: "number", ph: "10" },
+    { k: "minor_rule", label: "Anything special for children or under 18s?", ph: "e.g. 10-14 Junior, parent's permission under 18" },
+    { k: "swim_test", label: "Swimming requirement for the Open Water", ph: "e.g. float 10 minutes and swim 200 m, any style" },
+    { k: "glasses", label: "Prescription masks available?", type: "one", opts: ["Yes, free", "Yes, for a fee", "No"] },
+    { k: "insurance", label: "Dive insurance included?", ph: "e.g. yes, 30 days for all our dives" },
+    { k: "discounts", label: "Discounts you always give", type: "area", help: "Only standard ones your assistant may mention. Everything else goes to your team.", ph: "e.g. Advanced straight after Open Water: 9,900 instead of 11,000" },
+  ]},
+  { id: "shop", title: "Your shop and extras", why: "Small details that win the booking at 2 am. Leave empty what you don't have.", fields: [
+    { k: "accommodation", label: "Accommodation", type: "area", help: "Included with a course? How many nights, what kind of room, can a partner stay? Price for other divers?", ph: "e.g. 3 free nights in a fan room with the Open Water; other divers 500 THB/night" },
+    { k: "facilities", label: "At the shop", type: "many", opts: ["Free wifi", "Showers", "Lockers", "Luggage storage", "Restaurant", "Bar", "Pool on site", "Changing rooms"] },
+    { k: "food", label: "Food and drinks", ph: "e.g. water, fruit and snacks on the boat; lunch not included" },
+    { k: "boats", label: "Your boats", ph: "e.g. 2 large boats with toilet and shade, max 20 divers" },
+    { k: "group_size", label: "Group sizes", ph: "e.g. max 4 divers per guide, 4 students per instructor, 2 on a try dive" },
+    { k: "gear", label: "Gear", type: "area", ph: "e.g. all gear and a dive computer included, 3 mm shorty, no discount for own gear" },
+    { k: "nitrox", label: "Nitrox", type: "one", opts: ["Yes, extra charge", "Yes, free for certified divers", "No"] },
+    { k: "photos", label: "Photographer or video", ph: "e.g. yes, from 1,500 THB per dive; own camera after Advanced or 40 dives" },
+    { k: "non_divers", label: "Can non-divers come on the boat?", ph: "e.g. yes, 500 THB" },
+    { k: "snorkel", label: "Snorkelling on your boats?", ph: "e.g. yes, 600 THB with gear; or no" },
+    { k: "pickup", label: "Pick-up", ph: "e.g. free pick-up from the pier and Sairee; or no pick-up" },
+    { k: "travel", label: "Help with ferries or travel?", ph: "e.g. we book Lomprayah ferries at the desk" },
+    { k: "elearning", label: "Online theory before arrival", ph: "e.g. yes, SSI app, we send the link after booking" },
+    { k: "sites", label: "Dive sites you visit most", ph: "e.g. Chumphon Pinnacle, Twins, Japanese Gardens, Sail Rock" },
+    { k: "other_courses", label: "Other courses you offer", type: "area", help: "Rescue, Divemaster, specialties, freediving… Your team handles these; your assistant just knows you offer them." },
+  ]},
+  { id: "awkward", title: "The awkward questions", why: "Every centre gets questions no template covers. Tell us yours, so your assistant never answers them wrongly.", fields: [
+    { k: "awkward", label: "2 or 3 tricky questions divers ask you, and how you answer them", type: "area", ph: "e.g. 'My ferry arrives at 9, can I start later?' We say: …" },
+    { k: "never_say", label: "Anything your assistant should never say or promise?", type: "area" },
+    { k: "tone", label: "How do you talk to divers?", type: "one", opts: ["Friendly with emojis", "Friendly, few emojis", "Short and professional"] },
+  ]},
+  { id: "billing", title: "Statement details", why: "For the monthly overview of bookings made through Talay. You don't pay anything for using Talay.", fields: [
+    { k: "legal_name", label: "Company name", ph: "e.g. Blue Turtle Co., Ltd." },
+    { k: "address", label: "Company address", type: "area" },
+    { k: "tax_id", label: "Tax ID (optional)" },
+    { k: "consent", label: "Confirm", type: "many", req: true, opts: ["This information is correct, and Talay may use it to answer divers on our behalf. We can switch it off at any time."] },
+  ]},
+];
+
+const PRODUCTS = [
+  { code: "DSD", name: "Try dive (Basic Diver / Discover Scuba)", dur: "1 day" },
+  { code: "OW", name: "Open Water", dur: "3 days" },
+  { code: "AOW", name: "Advanced Open Water", dur: "2 days" },
+  { code: "AD", name: "Adventure Diver", dur: "1 day" },
+  { code: "FUN", name: "Fun dive trip (2 dives)", dur: "half a day" },
+  { code: "FUN10", name: "10 fun dives package", dur: "flexible" },
+  { code: "REF", name: "Refresher / Scuba Review", dur: "1 day" },
+  { code: "DDS", name: "Deep Diving Specialty", dur: "2 days" },
+];
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function fieldHtml(f, prefix = "") {
+  const name = prefix + f.k, id = "q-" + name, t = f.type || "text";
+  const req = f.req ? ' <span class="req">*</span>' : "";
+  const help = f.help ? `<span class="help">${esc(f.help)}</span>` : "";
+  const ph = f.ph ? ` placeholder="${esc(f.ph)}"` : "";
+  if (t === "one" || t === "many") {
+    const it = t === "one" ? "radio" : "checkbox";
+    const opts = f.opts.map(o => `<label><input type="${it}" name="${name}" value="${esc(o)}"${f.req ? " data-req" : ""}> ${esc(o)}</label>`).join("");
+    return `<div class="f" data-group="${name}"><span class="lbl">${esc(f.label)}${req}${help}</span><div class="opts">${opts}</div></div>`;
+  }
+  if (t === "area") return `<div class="f"><label for="${id}">${esc(f.label)}${req}${help}</label><textarea id="${id}" name="${name}"${ph}${f.req ? " required" : ""}></textarea></div>`;
+  return `<div class="f"><label for="${id}">${esc(f.label)}${req}${help}</label><input id="${id}" name="${name}" type="${t}"${ph}${f.req ? " required" : ""}${t === "number" ? ' inputmode="decimal" min="0"' : ""}></div>`;
+}
+
+function productHtml(p) {
+  const pre = "p_" + p.code + "_";
+  return `<div class="prod" data-code="${p.code}">
+    <div class="top"><b>${esc(p.name)}</b>
+      <div class="opts"><label><input type="checkbox" name="${pre}offer" value="yes" checked> We offer this</label><label><input type="checkbox" name="${pre}online" value="yes" checked> Bookable online</label></div></div>
+    <div class="body"><div class="grid2">
+      ${fieldHtml({ k: "price", label: "Price (THB)", type: "number", ph: "e.g. 11000" }, pre)}
+      ${fieldHtml({ k: "name", label: "Name you use", ph: p.name }, pre)}
+      ${fieldHtml({ k: "duration", label: "Duration", ph: p.dur }, pre)}
+      ${fieldHtml({ k: "checkin", label: "Check-in time", ph: "e.g. 8:00" }, pre)}
+    </div>
+    ${fieldHtml({ k: "included", label: "What's included", ph: "e.g. all gear, dive computer, certification, learning materials" }, pre)}</div>
+  </div>`;
+}
+
+$("#sections").innerHTML = SECTIONS.map((s, i) => `<section id="s-${s.id}"><h2><span class="n">${i + 1}</span>${esc(s.title)}</h2><p class="why">${esc(s.why)}</p>${
+  s.products ? PRODUCTS.map(productHtml).join("") + fieldHtml({ k: "price_notes", label: "Anything else about prices?", type: "area", ph: "e.g. prices go up 10% from 1 December" }) : s.fields.map(f => fieldHtml(f)).join("")
+}</section>`).join("");
+
+const form = $("#intake");
+
+// Product cards: hide details when not offered
+form.querySelectorAll(".prod").forEach(card => {
+  const offer = card.querySelector('input[name$="_offer"]');
+  const sync = () => card.classList.toggle("off", !offer.checked);
+  offer.addEventListener("change", sync); card._sync = sync;
+});
+
+// Collect answers: one value per key, checkboxes joined into a list
+function collect() {
+  const out = {};
+  form.querySelectorAll("input,textarea,select").forEach(el => {
+    if (!el.name || el.name === "website_hp" || el.name === "cf-turnstile-response") return;
+    if (el.type === "radio") { if (el.checked) out[el.name] = el.value; else if (!(el.name in out)) out[el.name] = ""; return; }
+    if (el.type === "checkbox") { out[el.name] = out[el.name] || []; if (el.checked) out[el.name].push(el.value); return; }
+    out[el.name] = el.value.trim();
+  });
+  return out;
+}
+function restore(data) {
+  form.querySelectorAll("input,textarea,select").forEach(el => {
+    if (!(el.name in data)) return;
+    const v = data[el.name];
+    if (el.type === "radio") el.checked = v === el.value;
+    else if (el.type === "checkbox") el.checked = Array.isArray(v) && v.includes(el.value);
+    else el.value = v;
+  });
+  form.querySelectorAll(".prod").forEach(c => c._sync());
+}
+
+// Progress and autosave on this device
+const countable = SECTIONS.filter(s => s.fields).flatMap(s => s.fields.map(f => f.k));
+function progress(d) {
+  const filled = countable.filter(k => Array.isArray(d[k]) ? d[k].length : d[k]).length;
+  const pct = Math.round(filled / countable.length * 100);
+  $("#fill").style.width = pct + "%";
+  $("#progress").textContent = pct + "% done";
+}
+let saveTimer;
+form.addEventListener("input", () => {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    const d = collect(); progress(d);
+    try { localStorage.setItem(STORE, JSON.stringify(d)); $("#saved").textContent = "Saved on this device at " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + "."; } catch {}
+  }, 400);
+});
+try { const old = JSON.parse(localStorage.getItem(STORE) || "null"); if (old) { restore(old); progress(old); $("#saved").textContent = "We restored the answers you saved on this device."; } } catch {}
+
+// Turnstile (same set-up as the homepage form)
+let tsWidget = null;
+if (TURNSTILE_SITEKEY) {
+  window.onTalayTurnstile = () => { tsWidget = window.turnstile.render("#ts", { sitekey: TURNSTILE_SITEKEY, appearance: "interaction-only" }); };
+  const s = document.createElement("script");
+  s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTalayTurnstile";
+  s.async = true; s.defer = true; document.head.appendChild(s);
+}
+async function getToken() {
+  for (let i = 0; i < 25; i++) {
+    const tok = (window.turnstile && tsWidget !== null) ? window.turnstile.getResponse(tsWidget) : "";
+    if (tok) return tok;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  return "";
+}
+
+const emailOk = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+const phoneOk = v => /^[+0-9 ()\-.]{6,40}$/.test(v);
+function check() {
+  let first = null;
+  form.querySelectorAll("[required]").forEach(el => {
+    const v = el.value.trim();
+    let ok = v.length > 0;
+    if (ok && el.type === "email") ok = emailOk(v);
+    if (ok && el.type === "tel") ok = phoneOk(v);
+    el.setAttribute("aria-invalid", ok ? "false" : "true");
+    if (!ok && !first) first = el;
+  });
+  form.querySelectorAll("[data-group]").forEach(g => {
+    if (!g.querySelector("[data-req]")) return;
+    const ok = !!g.querySelector("input:checked");
+    g.querySelector(".opts").setAttribute("aria-invalid", ok ? "false" : "true");
+    if (!ok && !first) first = g.querySelector("input");
+  });
+  return first;
+}
+
+const button = $("#submit"), status = $("#status");
+form.addEventListener("submit", async e => {
+  e.preventDefault();
+  status.textContent = "";
+  const bad = check();
+  if (bad) {
+    status.textContent = "A few required answers are missing or not valid (marked in red).";
+    bad.scrollIntoView({ behavior: "smooth", block: "center" }); bad.focus({ preventScroll: true });
+    return;
+  }
+  button.disabled = true; button.textContent = "Sending…";
+  const answers = collect();
+  const body = { answers, website: form.website_hp.value, form_version: 1 };
+  if (TURNSTILE_SITEKEY) {
+    body.turnstile = await getToken();
+    if (!body.turnstile) { status.textContent = "Complete the security check above the button, then send again."; button.disabled = false; button.textContent = "Send to Talay"; return; }
+  }
+  try {
+    const res = await fetch("/api/intake", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok || !out.ok) throw new Error(out.error || "send");
+    try { localStorage.removeItem(STORE); } catch {}
+    form.hidden = true; $("#done").hidden = false; window.scrollTo({ top: 0, behavior: "smooth" });
+  } catch (err) {
+    status.textContent = String(err.message) === "rate" ? "Too many attempts from this connection. Try again in an hour, or WhatsApp us."
+      : "Your answers did not go through. They're still saved here: send again, or WhatsApp us.";
+    if (TURNSTILE_SITEKEY && window.turnstile && tsWidget !== null) window.turnstile.reset(tsWidget);
+    button.disabled = false; button.textContent = "Send to Talay";
+  }
+});
+</script>
+</body>
+</html>
