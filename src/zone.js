@@ -258,12 +258,16 @@ async function centersFor(env, email) {
       id: r.id,
       slug: String(first(r.fields["Slug"]) || "").toLowerCase(),
       name: first(r.fields["Name"]) || "Dive center",
+      channel: Number(first(r.fields["Channel ID"])) || 0, // respond.io channel = this center's WhatsApp number
       assistant: first(r.fields["Assistant name"]) || "Mia",
       admin: splitEmails(r.fields["Admin emails"]).includes(email),
       logo: first(r.fields["Logo"])?.thumbnails?.large?.url || first(r.fields["Logo"])?.url || "",
     }))
     .filter((c) => /^[a-z0-9-]{1,60}$/.test(c.slug));
 }
+
+// Exact match on the linked Center: FIND on the name would also match "Simple Life Divers" for "Simple Life".
+const ofCenter = (center) => `ARRAYJOIN({Center}) & '' = '${q(center.name)}'`;
 
 
 // ---------- Cache ----------
@@ -289,7 +293,7 @@ async function forget(env, keys) {
   await Promise.all(keys.map((k) => caches.default.delete(new Request(CACHE_HOST + env.AIRTABLE_BASE + "/" + k))));
 }
 const forgetConversation = (env, center, id) => forget(env, [
-  `conv/${center.slug}/open`, `conv/${center.slug}/all`, `chat/${center.slug}/${id}`, `lead/${id}`,
+  `conv/${center.slug}/open`, `conv/${center.slug}/all`, `chat/${center.slug}/${id}`, `lead/${center.slug}/${id}`,
 ]);
 
 // ---------- API ----------
@@ -304,28 +308,30 @@ function langCode(v) {
   return ["en", "fr", "de", "es", "nl"].includes(two) ? two : "en";
 }
 
-async function leadsFor(env, ids) {
+async function leadsFor(env, center, ids) {
   const map = {};
+  // One respond.io contact can talk to several centers: a lead is contact + center.
   // Leads change rarely between messages: keep each one 5 minutes in the cache.
+  const key = (id) => new Request(CACHE_HOST + env.AIRTABLE_BASE + "/lead/" + center.slug + "/" + id);
   const missing = [];
   await Promise.all(ids.map(async (id) => {
-    const hit = await caches.default.match(new Request(CACHE_HOST + env.AIRTABLE_BASE + "/lead/" + id));
+    const hit = await caches.default.match(key(id));
     if (hit) { const r = await hit.json(); if (r) map[id] = r; } else missing.push(id);
   }));
-  const fetched = await leadsFetch(env, missing);
+  const fetched = await leadsFetch(env, center, missing);
   await Promise.all(missing.map((id) => caches.default.put(
-    new Request(CACHE_HOST + env.AIRTABLE_BASE + "/lead/" + id),
+    key(id),
     new Response(JSON.stringify(fetched[id] || null), { headers: { "Content-Type": "application/json", "Cache-Control": "max-age=300" } }),
   )));
   return Object.assign(map, fetched);
 }
 
-async function leadsFetch(env, ids) {
+async function leadsFetch(env, center, ids) {
   const map = {};
   for (let i = 0; i < ids.length; i += 40) {
     const part = ids.slice(i, i + 40);
     const recs = await at(env, "Leads", {
-      formula: `OR(${part.map((id) => `{External ID} & '' = '${q(id)}'`).join(",")})`,
+      formula: `AND(${ofCenter(center)}, OR(${part.map((id) => `{External ID} & '' = '${q(id)}'`).join(",")}))`,
     });
     for (const r of recs) {
       const id = String(first(r.fields["External ID"]) || "");
@@ -374,7 +380,7 @@ async function conversations(env, center, view) {
 
   let list = [...byContact.values()];
   if (view !== "all") list = list.filter((c) => c.lastCustomer);
-  const leads = await leadsFor(env, list.map((c) => c.id));
+  const leads = await leadsFor(env, center, list.map((c) => c.id));
   const now = Date.now();
 
   list = list.map((c) => {
@@ -416,7 +422,7 @@ async function chat(env, center, id) {
     max: 300,
   });
   if (!rows.length) return { error: "Unknown conversation" };
-  const leads = await leadsFor(env, [id]);
+  const leads = await leadsFor(env, center, [id]);
   const messages = rows.map((r) => ({
     text: r.fields["Text"] || "", dir: r.fields["Direction"] || "", at: r.fields["Sent at"] || r.createdTime,
   }));
@@ -431,7 +437,7 @@ async function chat(env, center, id) {
     if (!/^\+?[0-9 ]{6,20}$/.test(c)) return [];
     const flat = c.replace(/\s+/g, "");
     const rows = await at(env, "Bookings", {
-      formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), OR({Payer phone} & '' = '${q(c)}', SUBSTITUTE({Payer phone} & '', ' ', '') = '${q(flat)}'))`,
+      formula: `AND(${ofCenter(center)}, OR({Payer phone} & '' = '${q(c)}', SUBSTITUTE({Payer phone} & '', ' ', '') = '${q(flat)}'))`,
       fields: ["Ref", "Activity date", "P name", "Group size", "Deposit paid THB", "Balance at shop", "Total value THB", "Status", "Refunded THB", "Manage token"],
       sort: [{ field: "Activity date", direction: "desc" }], max: 20,
     }).catch(() => []);
@@ -484,7 +490,8 @@ async function reply(request, env, center) {
   const res = await fetch(`https://api.respond.io/v2/contact/${encodeURIComponent(contact)}/message`, {
     method: "POST",
     headers: { Authorization: `Bearer ${env.RESPONDIO_TOKEN}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ message: { type: "text", text: msg } }),
+    // Send from this center's own number; without channelId respond.io uses the contact's last channel.
+    body: JSON.stringify({ ...(center.channel ? { channelId: center.channel } : {}), message: { type: "text", text: msg } }),
   });
   if (!res.ok) {
     console.error("respond.io", res.status, await res.text());
@@ -537,8 +544,8 @@ const LINK_TEXT = {
 async function products(env, center, id) {
   if (!okId(id)) return { error: "Bad request" };
   const [recs, leads] = await Promise.all([
-    at(env, "Products", { formula: `FIND('${q(center.slug)}', ARRAYJOIN({C slug}))` }),
-    leadsFor(env, [id]),
+    at(env, "Products", { formula: `ARRAYJOIN({C slug}) & '' = '${q(center.slug)}'` }),
+    leadsFor(env, center, [id]),
   ]);
   const f = leads[id]?.fields || {};
   const lang = langCode(first(f["Language"]));
@@ -569,7 +576,7 @@ async function bookings(env, center) {
   const now = Date.now();
   const from = thaiDate(now - 31 * DAY), to = thaiDate(now + 91 * DAY);
   const recs = await at(env, "Bookings", {
-    formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ` +
+    formula: `AND(${ofCenter(center)}, ` +
       `IS_AFTER({Activity date}, DATETIME_PARSE('${from}', 'YYYY-MM-DD')), ` +
       `IS_BEFORE({Activity date}, DATETIME_PARSE('${to}', 'YYYY-MM-DD')))`,
     fields: ["Ref", "Activity date", "P name", "Group size", "Payer name", "Payer phone", "Total value THB",
@@ -584,7 +591,7 @@ async function bookings(env, center) {
   for (let i = 0; i < phones.length; i += 40) {
     const part = phones.slice(i, i + 40);
     const leads = await at(env, "Leads", {
-      formula: `OR(${part.map((p) => `{Contact} & '' = '${q(p)}'`).join(",")})`,
+      formula: `AND(${ofCenter(center)}, OR(${part.map((p) => `{Contact} & '' = '${q(p)}'`).join(",")}))`,
       fields: ["Contact", "External ID"],
     });
     for (const l of leads) {
@@ -680,8 +687,8 @@ async function dashboard(env, center, period) {
   const iso = (ms) => new Date(ms).toISOString();
   const inPeriod = `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE(CREATED_TIME(), DATETIME_PARSE('${iso(end)}'))`;
   const [leads, books, linkMsgs, sessions] = await Promise.all([
-    at(env, "Leads", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${inPeriod})`, max: 5000 }),
-    at(env, "Bookings", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${inPeriod})`, max: 5000 }),
+    at(env, "Leads", { formula: `AND(${ofCenter(center)}, ${inPeriod})`, max: 5000 }),
+    at(env, "Bookings", { formula: `AND(${ofCenter(center)}, ${inPeriod})`, max: 5000 }),
     at(env, "Chat", {
       formula: `AND({Center} = '${q(center.slug)}', FIND('talay.io/b/', {Text}), {Direction} != 'Customer', IS_AFTER({Sent at}, DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE({Sent at}, DATETIME_PARSE('${iso(end)}')))`,
       fields: ["Contact ID"], max: 5000,
@@ -728,8 +735,8 @@ async function dashboard(env, center, period) {
         const len = end - start, ps = start - len, pe = start;
         const inPrev = `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${iso(ps - 1000)}')), IS_BEFORE(CREATED_TIME(), DATETIME_PARSE('${iso(pe)}'))`;
         const [pl, pb] = await Promise.all([
-          at(env, "Leads", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${inPrev})`, fields: ["Status", "Response seconds", "Outside hours"], max: 5000 }),
-          at(env, "Bookings", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${inPrev})`, fields: ["Status", "Group size", "Total value THB", "Balance at shop"], max: 5000 }),
+          at(env, "Leads", { formula: `AND(${ofCenter(center)}, ${inPrev})`, fields: ["Status", "Response seconds", "Outside hours"], max: 5000 }),
+          at(env, "Bookings", { formula: `AND(${ofCenter(center)}, ${inPrev})`, fields: ["Status", "Group size", "Total value THB", "Balance at shop"], max: 5000 }),
         ]);
         const pLive = pb.filter((b) => !cx(b));
         const pResp = pl.map((l) => n(l.fields["Response seconds"])).filter((x) => x > 0 && x < 3600);
@@ -842,7 +849,7 @@ function parseStay(text, createdMs) {
 }
 async function arriving(env, center) {
   const leads = await at(env, "Leads", {
-    formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), IS_AFTER(CREATED_TIME(), DATEADD(NOW(), -60, 'days')))`,
+    formula: `AND(${ofCenter(center)}, IS_AFTER(CREATED_TIME(), DATEADD(NOW(), -60, 'days')))`,
     max: 3000,
   });
   const today = thaiDate(Date.now());
@@ -881,8 +888,8 @@ const MS_STEPS = {
 };
 async function milestones(env, center) {
   const [books, leads] = await Promise.all([
-    at(env, "Bookings", { formula: `FIND('${q(center.name)}', ARRAYJOIN({Center}))`, fields: ["Group size", "Total value THB", "Status"], max: 10000 }),
-    at(env, "Leads", { formula: `FIND('${q(center.name)}', ARRAYJOIN({Center}))`, fields: ["Status"], max: 20000 }),
+    at(env, "Bookings", { formula: `${ofCenter(center)}`, fields: ["Group size", "Total value THB", "Status"], max: 10000 }),
+    at(env, "Leads", { formula: `${ofCenter(center)}`, fields: ["Status"], max: 20000 }),
   ]);
   const n = (v) => Number(first(v)) || 0;
   const live = books.filter((b) => !/cancel|refund/i.test(String(first(b.fields["Status"]) || "")))
@@ -1028,8 +1035,8 @@ async function weekStats(env, center, start, end) {
   const iso = (ms) => new Date(ms).toISOString();
   const inP = `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE(CREATED_TIME(), DATETIME_PARSE('${iso(end)}'))`;
   const [leads, books, arr] = await Promise.all([
-    at(env, "Leads", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${inP})`, max: 5000 }),
-    at(env, "Bookings", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${inP})`, max: 5000 }),
+    at(env, "Leads", { formula: `AND(${ofCenter(center)}, ${inP})`, max: 5000 }),
+    at(env, "Bookings", { formula: `AND(${ofCenter(center)}, ${inP})`, max: 5000 }),
     arriving(env, center).catch(() => ({ items: [] })),
   ]);
   const n = (v) => Number(first(v)) || 0;
@@ -1106,8 +1113,8 @@ async function dayStats(env, center) {
   const win = (field) => `IS_AFTER(${field}, DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE(${field}, DATETIME_PARSE('${iso(now + 60000)}'))`;
   const [msgs, leads, books] = await Promise.all([
     at(env, "Chat", { formula: `AND({Center} = '${q(center.slug)}', ${win("{Sent at}")})`, fields: ["Direction", "Contact ID"], max: 3000 }),
-    at(env, "Leads", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${win("CREATED_TIME()")})`, fields: ["Handed over", "Handover at"], max: 2000 }),
-    at(env, "Bookings", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${win("CREATED_TIME()")})`, fields: ["Group size", "Total value THB", "Status"], max: 1000 }),
+    at(env, "Leads", { formula: `AND(${ofCenter(center)}, ${win("CREATED_TIME()")})`, fields: ["Handed over", "Handover at"], max: 2000 }),
+    at(env, "Bookings", { formula: `AND(${ofCenter(center)}, ${win("CREATED_TIME()")})`, fields: ["Group size", "Total value THB", "Status"], max: 1000 }),
   ]);
   const n = (v) => Number(first(v)) || 0;
   const people = new Set(msgs.filter((m) => m.fields["Direction"] === "Customer").map((m) => String(m.fields["Contact ID"] || "")));
@@ -1149,8 +1156,8 @@ async function overnight(env, center) {
   const win = (field) => `IS_AFTER(${field}, DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE(${field}, DATETIME_PARSE('${iso(end)}'))`;
   const [msgs, leads, books] = await Promise.all([
     at(env, "Chat", { formula: `AND({Center} = '${q(center.slug)}', ${win("{Sent at}")})`, fields: ["Direction", "Contact ID"], max: 3000 }),
-    at(env, "Leads", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${win("CREATED_TIME()")})`, max: 2000 }),
-    at(env, "Bookings", { formula: `AND(FIND('${q(center.name)}', ARRAYJOIN({Center})), ${win("CREATED_TIME()")})`, max: 1000 }),
+    at(env, "Leads", { formula: `AND(${ofCenter(center)}, ${win("CREATED_TIME()")})`, max: 2000 }),
+    at(env, "Bookings", { formula: `AND(${ofCenter(center)}, ${win("CREATED_TIME()")})`, max: 1000 }),
   ]);
   const n = (v) => Number(first(v)) || 0;
   const people = new Set(msgs.filter((m) => m.fields["Direction"] === "Customer").map((m) => String(m.fields["Contact ID"] || "")));
@@ -1232,13 +1239,13 @@ async function unfinished(env, center) {
   const refs = [...new Set(items.map((i) => i.ref).filter((r) => /^[A-Za-z0-9_-]{1,64}$/.test(r)))];
   const byRef = {};
   // The lead code in booking links is the respond.io Contact ID (Leads → External ID).
-  const direct = await leadsFor(env, refs.filter(okId));
+  const direct = await leadsFor(env, center, refs.filter(okId));
   for (const [id, rec] of Object.entries(direct)) byRef[id] = rec.fields;
   const rest = refs.filter((r) => !byRef[r]);
   for (let i = 0; i < rest.length; i += 30) {
     const part = rest.slice(i, i + 30);
     const leads = await at(env, "Leads", {
-      formula: `OR(${part.map((r) => `FIND('c=${q(r)}&', {Booking link} & '&')`).join(",")})`,
+      formula: `AND(${ofCenter(center)}, OR(${part.map((r) => `FIND('c=${q(r)}&', {Booking link} & '&')`).join(",")}))`,
       fields: ["Name", "Contact", "External ID", "Language", "Last message at", "Booking link", "Status"],
     });
     for (const l of leads) {
