@@ -1558,14 +1558,21 @@ async function saveProduct(env, center, email, b) {
 // ---------- Pages ----------
 
 // ---------- Superadmin: talay.io/zone/admin ----------
-// One page for Talay itself: every center side by side (today, this week, this month),
-// booking value and commission, response times, Mia on/paused with a button, and a link
-// into each center's zone. Only for SUPERADMIN_EMAILS (default jonas@talay.io).
+// One page for Talay itself: every center side by side (today, this week, this month, each
+// against the same stretch of the period before), booking value and commission, response
+// times, a health check (failed replies, divers left without an answer), Mia on/paused with
+// a button, and a link into each center's zone. Only for SUPERADMIN_EMAILS (default
+// jonas@talay.io). Centers → "Type" (Demo, Test, Pilot, Live) is optional: Demo and Test
+// centers are left out of the totals unless "Ook demo/test" is ticked.
+
+const ADMIN_CACHE = "admin/overview/v2";
+const SORRY = /^sorry, something went wrong on our side/i; // v2 error handler (HTTP 3 → Respond.io 13)
+const WAIT_MIN = 15; // a diver's message without any answer for this long counts as waiting
 
 async function handleAdmin(request, env, url, p, email) {
   if (p === "/zone/admin") return html(adminApp(email));
   if (p === "/zone/admin/api/overview") {
-    return json(await cached(env, "admin/overview/v1", 120, () => adminOverview(env), url.searchParams.get("fresh") === "1"));
+    return json(await cached(env, ADMIN_CACHE, 120, () => adminOverview(env), url.searchParams.get("fresh") === "1"));
   }
   if (p === "/zone/admin/api/pause" && request.method === "POST") {
     const body = await readBody(request);
@@ -1578,97 +1585,152 @@ async function handleAdmin(request, env, url, p, email) {
     });
     if (!res.ok) { console.error("admin pause", res.status, await res.text()); return json({ error: "Opslaan lukte niet. Probeer opnieuw." }, 502); }
     await logChange(env, center, email, describe({ action: "mia", paused: !!body.paused }));
-    await forget(env, ["admin/overview/v1"]);
+    await forget(env, [ADMIN_CACHE]);
     return json({ ok: true, paused: !!body.paused });
   }
   return json({ error: "Not found" }, 404);
 }
 
-async function adminOverview(env) {
-  const TZ = 7 * 3600 * 1000, now = Date.now(), t = new Date(now + TZ);
+// Periods in Koh Tao time. "prev" is the same stretch of the period before: yesterday until
+// this time, last week until this weekday and time, last month until this day and time.
+function adminPeriods(now) {
+  const TZ = 7 * 3600 * 1000, t = new Date(now + TZ);
   const today = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) - TZ;
-  const week = today - ((t.getUTCDay() + 6) % 7) * DAY; // Monday, Koh Tao time
+  const week = today - ((t.getUTCDay() + 6) % 7) * DAY;
   const month = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), 1) - TZ;
-  const from = Math.min(week, month, now - 7 * DAY);
-  const since = `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${new Date(from - 1000).toISOString()}'))`;
-  const [centerRecs, leads, books] = await Promise.all([
+  const prevMonth = Date.UTC(t.getUTCFullYear(), t.getUTCMonth() - 1, 1) - TZ;
+  return {
+    today: { start: today, end: now, prev: [today - DAY, now - DAY] },
+    week: { start: week, end: now, prev: [week - 7 * DAY, now - 7 * DAY] },
+    month: { start: month, end: now, prev: [prevMonth, Math.min(prevMonth + (now - month), month)] },
+  };
+}
+
+async function adminOverview(env) {
+  const now = Date.now();
+  const P = adminPeriods(now);
+  const from = Math.min(P.month.prev[0], P.week.prev[0], now - 7 * DAY);
+  const iso = (ms) => new Date(ms).toISOString();
+  const [centerRecs, leads, books, msgs] = await Promise.all([
     at(env, "Centers", { sort: [{ field: "Name" }] }),
-    at(env, "Leads", { formula: since, max: 20000 }),
-    at(env, "Bookings", { formula: since, max: 20000 }),
+    at(env, "Leads", { formula: `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${iso(from - 1000)}'))`, max: 20000 }),
+    at(env, "Bookings", { formula: `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${iso(from - 1000)}'))`, max: 20000 }),
+    at(env, "Chat", {
+      formula: `IS_AFTER({Sent at}, DATETIME_PARSE('${iso(now - DAY)}'))`,
+      fields: ["Direction", "Contact ID", "Center", "Sent at", "Text"], sort: [{ field: "Sent at" }], max: 5000,
+    }).catch(() => null),
   ]);
   const n = (v) => Number(first(v)) || 0;
   const s = (f, k) => String(first(f[k]) || "");
   const ms = (v) => Date.parse(first(v) || "") || 0;
+  const made = (r) => Date.parse(r.createdTime) || 0;
   const cx = (b) => /cancel|refund/i.test(s(b.fields, "Status"));
   const handed = (l) => n(l.fields["Handed over"]) || first(l.fields["Handover at"]);
+  const median = (a) => { if (!a.length) return null; a = a.slice().sort((x, y) => x - y); const m = a.length >> 1; return Math.round(a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2); };
+  // Seconds from the diver's first message to the first answer (Leads → First message at /
+  // First reply at), else the older "Response seconds".
+  const firstReply = (l) => {
+    const d = (ms(l.fields["First reply at"]) - ms(l.fields["First message at"])) / 1000;
+    return d > 0 && d < 7 * 86400 ? d : (n(l.fields["Response seconds"]) || null);
+  };
 
   // A record belongs to a center through the linked Center (record id), else the C slug lookup.
   const owner = (r, c) => (Array.isArray(r.fields["Center"]) && r.fields["Center"].includes(c.id)) ||
     String(first(r.fields["C slug"]) || "").toLowerCase() === c.slug;
 
-  const stats = (ls, bs, start) => {
-    const L = ls.filter((l) => Date.parse(l.createdTime) >= start);
-    const B = bs.filter((b) => Date.parse(b.createdTime) >= start && !cx(b));
+  const stats = (ls, bs, a, b) => {
+    const L = ls.filter((l) => made(l) >= a && made(l) < b);
+    const B = bs.filter((x) => made(x) >= a && made(x) < b && !cx(x));
+    const booked = L.filter((l) => /booked/i.test(s(l.fields, "Status")));
     return {
       conversations: L.length,
       handedOver: L.filter(handed).length,
       bookings: B.length,
-      divers: B.reduce((a, b) => a + (n(b.fields["Group size"]) || 1), 0),
-      value: B.reduce((a, b) => a + n(b.fields["Total value THB"]), 0),
-      commission: B.reduce((a, b) => a + (n(b.fields["Commission THB"]) || n(b.fields["Deposit paid THB"])), 0),
-    };
-  };
-  const quality = (ls) => {
-    const resp = ls.map((l) => n(l.fields["Response seconds"])).filter((x) => x > 0 && x < 3600);
-    const team = ls.map((l) => (ms(l.fields["Human took over at"]) - ms(l.fields["Handover at"])) / 60000)
-      .filter((x) => x > 0 && x < 7 * 24 * 60).sort((a, b) => a - b);
-    const booked = ls.filter((l) => /booked/i.test(s(l.fields, "Status")));
-    return {
-      miaSeconds: resp.length ? Math.round(resp.reduce((a, b) => a + b, 0) / resp.length) : null,
-      teamMinutes: team.length ? Math.round(team[Math.floor(team.length / 2)]) : null,
-      teamCount: team.length,
-      conversion: ls.length ? Math.round((booked.length / ls.length) * 1000) / 10 : 0,
-      outsideHours: ls.reduce((a, l) => a + n(l.fields["Outside hours"]), 0),
+      divers: B.reduce((t, x) => t + (n(x.fields["Group size"]) || 1), 0),
+      value: B.reduce((t, x) => t + n(x.fields["Total value THB"]), 0),
+      commission: B.reduce((t, x) => t + (n(x.fields["Commission THB"]) || n(x.fields["Deposit paid THB"])), 0),
+      outsideHours: L.reduce((t, l) => t + n(l.fields["Outside hours"]), 0),
       afterFollowUp: booked.filter((l) => n(l.fields["Follow-ups sent"]) > 0).length,
+      booked: booked.length,
+      replySeconds: median(L.map(firstReply).filter(Boolean)),
+      team: L.map((l) => (ms(l.fields["Human took over at"]) - ms(l.fields["Handover at"])) / 60000)
+        .filter((x) => x > 0 && x < 7 * 24 * 60),
     };
   };
+  const periodStats = (ls, bs) => {
+    const out = {};
+    for (const [k, p] of Object.entries(P)) {
+      const cur = stats(ls, bs, p.start, p.end + 1), prev = stats(ls, bs, p.prev[0], p.prev[1] + 1);
+      cur.teamMinutes = median(cur.team); cur.teamCount = cur.team.length; delete cur.team;
+      delete prev.team;
+      out[k] = { ...cur, prev };
+    }
+    return out;
+  };
+
+  const byContact = {};
+  leads.forEach((l) => { const id = s(l.fields, "External ID"); if (id) byContact[id] = l; });
 
   const centers = centerRecs.map((r) => {
     const f = r.fields;
     const c = { id: r.id, slug: String(first(f["Slug"]) || "").toLowerCase() };
     const ls = leads.filter((l) => owner(l, c));
     const bs = books.filter((b) => owner(b, c));
-    const open = ls.filter((l) => handed(l) && Date.parse(l.createdTime) >= now - 7 * DAY &&
+    const type = s(f, "Type");
+    const paused = !!f["Mia paused"];
+
+    // Health from the last 24 hours of Chat.
+    let health = null;
+    if (msgs) {
+      const mine = msgs.filter((m) => String(m.fields["Center"] || "").toLowerCase() === c.slug);
+      const mia = mine.filter((m) => m.fields["Direction"] === "Mia");
+      const lastBy = {};
+      mine.forEach((m) => { const id = String(m.fields["Contact ID"] || ""); if (id) lastBy[id] = m; });
+      const waiting = Object.entries(lastBy).filter(([id, m]) => {
+        const l = byContact[id];
+        return m.fields["Direction"] === "Customer" && ms(m.fields["Sent at"]) < now - WAIT_MIN * 60000 &&
+          !(l && (l.fields["Human took over"] || l.fields["Opted out"]));
+      }).map(([id, m]) => ({
+        name: byContact[id] ? s(byContact[id].fields, "Name") : "",
+        text: String(m.fields["Text"] || "").slice(0, 90),
+        at: first(m.fields["Sent at"]) || "",
+      })).sort((a, b) => a.at.localeCompare(b.at));
+      const lastMia = mia.reduce((a, m) => Math.max(a, ms(m.fields["Sent at"])), 0);
+      health = {
+        errors: mia.filter((m) => SORRY.test(String(m.fields["Text"] || "").trim())).length,
+        replies: mia.length,
+        divers: new Set(mine.filter((m) => m.fields["Direction"] === "Customer").map((m) => String(m.fields["Contact ID"] || ""))).size,
+        waiting: waiting.length, waitingList: waiting.slice(0, 5),
+        lastMia: lastMia ? new Date(lastMia).toISOString() : null,
+      };
+    }
+    const open = ls.filter((l) => handed(l) && made(l) >= now - 7 * DAY &&
       !l.fields["Opted out"] && !l.fields["Human took over"] && !first(l.fields["Human took over at"]) &&
       !/booked|lost|closed|spam/i.test(s(l.fields, "Status"))).length;
-    const last = ls.reduce((a, l) => Math.max(a, Date.parse(l.createdTime) || 0), 0);
+    const last = ls.reduce((a, l) => Math.max(a, made(l)), 0);
     return {
       slug: c.slug, name: s(f, "Name") || c.slug || "Center zonder naam",
       assistant: s(f, "Assistant name") || "Mia", channel: n(f["Channel ID"]) || null,
-      paused: !!f["Mia paused"], staff: splitEmails(f["Staff emails"]).length,
+      type, test: /demo|test/i.test(type),
+      paused, staff: splitEmails(f["Staff emails"]).length,
       validSlug: /^[a-z0-9-]{1,60}$/.test(c.slug),
-      today: stats(ls, bs, today), week: stats(ls, bs, week), month: stats(ls, bs, month),
-      quality: quality(ls.filter((l) => Date.parse(l.createdTime) >= month)),
-      openHandovers: open, lastConversation: last ? new Date(last).toISOString() : null,
+      periods: periodStats(ls, bs),
+      health, openHandovers: open, lastConversation: last ? new Date(last).toISOString() : null,
     };
   });
 
-  const total = {};
-  for (const k of ["today", "week", "month"]) {
-    total[k] = {};
-    for (const m of ["conversations", "handedOver", "bookings", "divers", "value", "commission"]) {
-      total[k][m] = centers.reduce((a, c) => a + c[k][m], 0);
-    }
+  // Median first-reply time over all centers, and over the real ones only (median can't be summed).
+  const replyAll = {}, replyLive = {};
+  const testIds = new Set(centerRecs.filter((r) => /demo|test/i.test(s(r.fields, "Type"))).map((r) => r.id));
+  const testSlugs = new Set(centers.filter((c) => c.test).map((c) => c.slug));
+  const isTest = (l) => (Array.isArray(l.fields["Center"]) && l.fields["Center"].some((id) => testIds.has(id))) ||
+    testSlugs.has(String(first(l.fields["C slug"]) || "").toLowerCase());
+  for (const [k, p] of Object.entries(P)) {
+    const L = leads.filter((l) => made(l) >= p.start);
+    replyAll[k] = median(L.map(firstReply).filter(Boolean));
+    replyLive[k] = median(L.filter((l) => !isTest(l)).map(firstReply).filter(Boolean));
   }
-  total.openHandovers = centers.reduce((a, c) => a + c.openHandovers, 0);
-  total.live = centers.filter((c) => !c.paused).length;
-  const monthLeads = leads.filter((l) => Date.parse(l.createdTime) >= month);
-  total.quality = quality(monthLeads);
-  return {
-    updated: new Date(now).toISOString(),
-    periods: { today: new Date(today).toISOString(), week: new Date(week).toISOString(), month: new Date(month).toISOString() },
-    centers, total,
-  };
+  return { updated: new Date(now).toISOString(), healthOk: !!msgs, waitMin: WAIT_MIN, centers, reply: { all: replyAll, live: replyLive } };
 }
 
 function adminApp(email) {
@@ -1677,8 +1739,8 @@ function adminApp(email) {
 <link rel="icon" type="image/png" href="/zone/icon-192.png">
 <meta name="theme-color" content="#0A2029">
 <style>
-:root{--deep:#0A2029;--paper:#F4F0E6;--card:#fff;--muted:#55646A;--line:#E2DACB;--ok:#1F7A55;--okbg:#E3F2EA;--warn:#B4561B;--warnbg:#FBEADF;--sand:#DCA44A;color-scheme:light}
-@media (prefers-color-scheme:dark){:root{--deep:#F4F0E6;--paper:#0B1A20;--card:#122A33;--muted:#9FB2B8;--line:#1F3D48;--ok:#3FB37F;--okbg:#173B2E;--warn:#E69A5B;--warnbg:#3D2A1C;color-scheme:dark}}
+:root{--deep:#0A2029;--paper:#F4F0E6;--card:#fff;--muted:#55646A;--line:#E2DACB;--ok:#1F7A55;--okbg:#E3F2EA;--warn:#B4561B;--warnbg:#FBEADF;--bad:#B3261E;--badbg:#FBE4E1;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--deep:#F4F0E6;--paper:#0B1A20;--card:#122A33;--muted:#9FB2B8;--line:#1F3D48;--ok:#3FB37F;--okbg:#173B2E;--warn:#E69A5B;--warnbg:#3D2A1C;--bad:#F2847A;--badbg:#45201D;color-scheme:dark}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--deep);font-family:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
 header{display:flex;align-items:center;gap:12px;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 12px;background:#0A2029;color:#F4F0E6}
@@ -1692,27 +1754,33 @@ main{max-width:1100px;margin:0 auto;padding:18px 16px 48px}
 .tabs button.on{background:#0A2029;color:#F4F0E6}
 @media (prefers-color-scheme:dark){.tabs button.on{background:#F4F0E6;color:#0A2029}}
 .bar .sp{flex:1}.upd{color:var(--muted);font-size:13px}
-.btn{font:inherit;font-size:13.5px;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--deep);padding:7px 12px;border-radius:9px;cursor:pointer}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;color:var(--muted)}
+.btn{font:inherit;font-size:13.5px;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--deep);padding:7px 12px;border-radius:9px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
 .btn:disabled{opacity:.55;cursor:default}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:22px}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.health{border-radius:14px;padding:12px 14px;margin-bottom:14px;font-size:14px}
+.health.ok{background:var(--okbg);color:var(--ok)}.health.bad{background:var(--badbg);color:var(--bad)}.health.warn{background:var(--warnbg);color:var(--warn)}
+.health b{display:block;font-size:15px}.health ul{margin:6px 0 0;padding-left:18px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:22px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;min-width:0}
 .kpi span{display:block;color:var(--muted);font-size:12.5px}.kpi b{font-size:22px;font-variant-numeric:tabular-nums}
-.kpi.alert b{color:var(--warn)}.kpi b small{font-size:13px;font-weight:500}
+.kpi b small{font-size:13px;font-weight:500;color:var(--muted)}
+.d{display:block;font-size:12px;color:var(--muted)}.d.up{color:var(--ok)}.d.down{color:var(--warn)}
 h2{font-size:15px;margin:0 0 10px;color:var(--muted);font-weight:600}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
 @media (max-width:400px){.grid{grid-template-columns:1fr}}
 .c{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:12px;min-width:0}
-.c.paused{border-color:var(--warn)}
+.c.paused{border-color:var(--warn)}.c.alarm{border-color:var(--bad)}
 .top{display:flex;align-items:flex-start;gap:10px}.top .nm{flex:1;min-width:0}
 .top b{font-size:16.5px;display:block;overflow-wrap:anywhere}.top small{color:var(--muted);font-size:12.5px}
-.pill{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.pills{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.pill{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(--paper);color:var(--muted)}
 .pill.on{background:var(--okbg);color:var(--ok)}.pill.off{background:var(--warnbg);color:var(--warn)}
 .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 10px}
 .nums div span{display:block;color:var(--muted);font-size:12px}.nums div b{font-size:18px;font-variant-numeric:tabular-nums}
 .meta{display:grid;grid-template-columns:1fr auto;gap:3px 10px;font-size:13.5px;border-top:1px solid var(--line);padding-top:10px}
 .meta span{color:var(--muted)}.meta b{font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
-.meta b.warn{color:var(--warn)}
-.acts{display:flex;gap:8px;flex-wrap:wrap}.acts a{text-decoration:none;display:inline-flex;align-items:center}
+.meta b.warn{color:var(--warn)}.meta b.bad{color:var(--bad)}.meta b.ok{color:var(--ok)}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
 .err{background:var(--warnbg);color:var(--warn);padding:10px 12px;border-radius:10px;margin-bottom:12px}
 .muted{color:var(--muted)}
 </style></head><body>
@@ -1721,66 +1789,114 @@ h2{font-size:15px;margin:0 0 10px;color:var(--muted);font-weight:600}
 <main>
 <div class="bar"><div class="tabs" role="tablist">
 <button data-p="today" class="on">Vandaag</button><button data-p="week">Deze week</button><button data-p="month">Deze maand</button></div>
+<label class="chk" id="testWrap" hidden><input type="checkbox" id="withTest"> Ook demo/test</label>
 <span class="sp"></span><span class="upd" id="upd"></span><button class="btn" id="refresh" type="button">Vernieuwen</button></div>
 <div id="err"></div>
+<div id="health"></div>
 <div class="kpis" id="kpis"><div class="kpi"><span>Laden…</span><b>–</b></div></div>
 <h2 id="h2">Per center</h2>
 <div class="grid" id="grid"></div>
 </main>
 <script>
 (function () {
-  var data = null, per = "today";
+  var data = null, per = "today", withTest = false;
+  try { per = localStorage.getItem("adm.per") || "today"; withTest = localStorage.getItem("adm.test") === "1"; } catch (x) {}
   var $ = function (s) { return document.querySelector(s); };
   var e = function (v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
   var nf = new Intl.NumberFormat("nl-BE");
   var thb = function (v) { return "฿ " + nf.format(Math.round(v || 0)); };
-  var secs = function (v) { return v == null ? "–" : v < 60 ? v + " s" : Math.round(v / 6) / 10 + " min"; };
+  var secs = function (v) { return v == null ? "–" : v < 60 ? Math.round(v) + " s" : v < 3600 ? Math.round(v / 6) / 10 + " min" : Math.round(v / 360) / 10 + " u"; };
   var mins = function (v) { return v == null ? "–" : v < 60 ? v + " min" : Math.round(v / 6) / 10 + " u"; };
-  var when = function (iso) {
+  var ago = function (iso) {
     if (!iso) return "nog geen";
     var d = (Date.now() - Date.parse(iso)) / 60000;
-    if (d < 60) return Math.max(1, Math.round(d)) + " min geleden";
+    if (d < 1) return "net nu";
+    if (d < 60) return Math.round(d) + " min geleden";
     if (d < 48 * 60) return Math.round(d / 60) + " u geleden";
     return Math.round(d / 1440) + " dagen geleden";
   };
   var label = { today: "vandaag", week: "deze week", month: "deze maand" };
+  var prevLabel = { today: "gisteren", week: "vorige week", month: "vorige maand" };
+  var KEYS = ["conversations", "handedOver", "bookings", "divers", "value", "commission", "outsideHours", "afterFollowUp", "booked"];
 
-  function kpi(name, value, cls) { return '<div class="kpi' + (cls ? " " + cls : "") + '"><span>' + name + "</span><b>" + value + "</b></div>"; }
+  function delta(cur, prev, money) {
+    var diff = cur - prev, cls = diff > 0 ? "up" : diff < 0 ? "down" : "";
+    return '<span class="d ' + cls + '">' + (diff > 0 ? "▲ " : diff < 0 ? "▼ " : "") + prevLabel[per] + ": " + (money ? thb(prev) : nf.format(prev)) + "</span>";
+  }
+  function kpi(name, value, d, cls) { return '<div class="kpi' + (cls ? " " + cls : "") + '"><span>' + name + "</span><b>" + value + "</b>" + (d || "") + "</div>"; }
+  var counted = function () { return data.centers.filter(function (c) { return withTest || !c.test; }); };
+  function sum(list, which) {
+    var t = {}; KEYS.forEach(function (k) { t[k] = 0; });
+    list.forEach(function (c) { var x = which === "prev" ? c.periods[per].prev : c.periods[per]; KEYS.forEach(function (k) { t[k] += x[k] || 0; }); });
+    return t;
+  }
+
+  function renderHealth() {
+    if (!data.healthOk) { $("#health").innerHTML = '<div class="health warn"><b>Systeemcheck niet beschikbaar</b>De tabel Chat kon niet gelezen worden.</div>'; return; }
+    var live = data.centers.filter(function (c) { return c.health; });
+    var errs = live.filter(function (c) { return c.health.errors; });
+    var wait = live.filter(function (c) { return c.health.waiting && !c.paused; });
+    if (!errs.length && !wait.length) {
+      var replies = live.reduce(function (a, c) { return a + c.health.replies; }, 0);
+      $("#health").innerHTML = '<div class="health ok"><b>Alles draait</b>Geen foutmeldingen en geen duikers zonder antwoord in de laatste 24 uur (' + nf.format(replies) + " antwoorden van Mia).</div>";
+      return;
+    }
+    var h = "";
+    if (errs.length) h += '<div class="health bad"><b>Mia stuurde het sorry-bericht</b>' +
+      errs.map(function (c) { return e(c.name) + ": " + c.health.errors + "×"; }).join(" · ") +
+      " in de laatste 24 uur. Kijk eerst naar het API-tegoed en de Make-scenario's (inbound v2).</div>";
+    if (wait.length) h += '<div class="health warn"><b>Duikers zonder antwoord (langer dan ' + data.waitMin + " min)</b><ul>" +
+      wait.map(function (c) {
+        return c.health.waitingList.map(function (w) {
+          return "<li>" + e(c.name) + ": " + e(w.name || "duiker") + " · “" + e(w.text) + "” · " + ago(w.at) + "</li>";
+        }).join("");
+      }).join("") + '</ul><span class="muted">Een “bedankt” of “ok” zonder antwoord is normaal.</span></div>';
+    $("#health").innerHTML = h;
+  }
 
   function render() {
     if (!data) return;
-    var t = data.total, p = t[per];
+    $("#testWrap").hidden = !data.centers.some(function (c) { return c.test; });
+    $("#withTest").checked = withTest;
+    renderHealth();
+    var list = counted(), t = sum(list), pv = sum(list, "prev");
+    var open = list.reduce(function (a, c) { return a + c.openHandovers; }, 0);
+    var reply = (withTest || !data.centers.some(function (c) { return c.test; }) ? data.reply.all : data.reply.live)[per];
     $("#kpis").innerHTML =
-      kpi("Gesprekken", nf.format(p.conversations)) +
-      kpi("Overdrachten", nf.format(p.handedOver)) +
-      kpi("Boekingen", nf.format(p.bookings) + ' <small class="muted">' + nf.format(p.divers) + " duikers</small>") +
-      kpi("Boekingswaarde", thb(p.value)) +
-      kpi("Commissie Talay", thb(p.commission)) +
-      kpi("Open overdrachten (7 d)", nf.format(t.openHandovers), t.openHandovers ? "alert" : "") +
-      kpi("Centra actief", t.live + " / " + data.centers.length) +
-      kpi("Antwoordtijd Mia (maand)", secs(t.quality.miaSeconds));
+      kpi("Nieuwe gesprekken", nf.format(t.conversations), delta(t.conversations, pv.conversations)) +
+      kpi("Boekingen", nf.format(t.bookings) + " <small>" + nf.format(t.divers) + " duikers</small>", delta(t.bookings, pv.bookings)) +
+      kpi("Boekingswaarde", thb(t.value), delta(t.value, pv.value, true)) +
+      kpi("Commissie Talay", thb(t.commission), delta(t.commission, pv.commission, true)) +
+      kpi("Overdrachten", nf.format(t.handedOver) + (open ? " <small>" + open + " open</small>" : ""), delta(t.handedOver, pv.handedOver)) +
+      kpi("Eerste antwoord (mediaan)", secs(reply), '<span class="d">' + label[per] + "</span>");
     $("#h2").textContent = "Per center, " + label[per];
     $("#grid").innerHTML = data.centers.map(function (c) {
-      var x = c[per], q = c.quality;
-      return '<section class="c' + (c.paused ? " paused" : "") + '">' +
+      var x = c.periods[per], h = c.health || {};
+      var alarm = h.errors > 0;
+      var conv = x.conversations ? Math.round(x.booked / x.conversations * 1000) / 10 : null;
+      return '<section class="c' + (alarm ? " alarm" : c.paused ? " paused" : "") + '">' +
         '<div class="top"><div class="nm"><b>' + e(c.name) + "</b><small>" + e(c.slug) + (c.channel ? " · kanaal " + e(c.channel) : " · geen kanaal") + " · " + c.staff + " team</small></div>" +
-        '<span class="pill ' + (c.paused ? "off" : "on") + '">' + e(c.assistant) + (c.paused ? " gepauzeerd" : " actief") + "</span></div>" +
+        '<div class="pills"><span class="pill ' + (c.paused ? "off" : "on") + '">' + e(c.assistant) + (c.paused ? " gepauzeerd" : " actief") + "</span>" +
+        (c.type ? '<span class="pill">' + e(c.type) + "</span>" : "") + "</div></div>" +
         '<div class="nums">' +
-          "<div><span>Gesprekken</span><b>" + nf.format(x.conversations) + "</b></div>" +
-          "<div><span>Overdrachten</span><b>" + nf.format(x.handedOver) + "</b></div>" +
-          "<div><span>Boekingen</span><b>" + nf.format(x.bookings) + "</b></div>" +
+          "<div><span>Gesprekken</span><b>" + nf.format(x.conversations) + "</b>" + delta(x.conversations, x.prev.conversations) + "</div>" +
+          "<div><span>Boekingen</span><b>" + nf.format(x.bookings) + "</b>" + delta(x.bookings, x.prev.bookings) + "</div>" +
           "<div><span>Duikers</span><b>" + nf.format(x.divers) + "</b></div>" +
           "<div><span>Waarde</span><b>" + thb(x.value) + "</b></div>" +
           "<div><span>Commissie</span><b>" + thb(x.commission) + "</b></div>" +
+          "<div><span>Overdrachten</span><b>" + nf.format(x.handedOver) + "</b></div>" +
         "</div>" +
         '<div class="meta">' +
-          "<span>Antwoordtijd " + e(c.assistant) + " (maand)</span><b>" + secs(q.miaSeconds) + "</b>" +
-          "<span>Reactie team na overdracht (mediaan)</span><b>" + mins(q.teamMinutes) + (q.teamCount ? ' <small class="muted">(' + q.teamCount + ")</small>" : "") + "</b>" +
-          "<span>Conversie (maand)</span><b>" + nf.format(q.conversion) + " %</b>" +
-          "<span>Buiten kantooruren (maand)</span><b>" + nf.format(q.outsideHours) + "</b>" +
-          "<span>Geboekt na follow-up (maand)</span><b>" + nf.format(q.afterFollowUp) + "</b>" +
+          "<span>Eerste antwoord (mediaan)</span><b>" + secs(x.replySeconds) + "</b>" +
+          "<span>Reactie team na overdracht</span><b>" + mins(x.teamMinutes) + (x.teamCount ? ' <small class="muted">(' + x.teamCount + ")</small>" : "") + "</b>" +
+          "<span>Conversie</span><b>" + (conv == null ? "–" : nf.format(conv) + " %") + "</b>" +
+          "<span>Buiten kantooruren</span><b>" + nf.format(x.outsideHours) + "</b>" +
+          "<span>Geboekt na follow-up</span><b>" + nf.format(x.afterFollowUp) + "</b>" +
           "<span>Open overdrachten (7 d)</span><b" + (c.openHandovers ? ' class="warn"' : "") + ">" + nf.format(c.openHandovers) + "</b>" +
-          "<span>Laatste gesprek</span><b>" + when(c.lastConversation) + "</b>" +
+          (c.health ?
+            "<span>Laatste antwoord " + e(c.assistant) + "</span><b>" + ago(h.lastMia) + "</b>" +
+            "<span>Fouten / zonder antwoord (24 u)</span><b class=\\"" + (h.errors ? "bad" : h.waiting ? "warn" : "ok") + "\\">" + h.errors + " / " + h.waiting + "</b>" : "") +
+          "<span>Laatste nieuw gesprek</span><b>" + ago(c.lastConversation) + "</b>" +
         "</div>" +
         '<div class="acts">' +
           (c.validSlug ? '<a class="btn" href="/zone?center=' + encodeURIComponent(c.slug) + '">Open zone</a>' : '<span class="muted">Slug ongeldig: niet zichtbaar in de zone</span>') +
@@ -1801,12 +1917,15 @@ h2{font-size:15px;margin:0 0 10px;color:var(--muted);font-weight:600}
   }
 
   document.querySelectorAll(".tabs button").forEach(function (b) {
+    b.classList.toggle("on", b.getAttribute("data-p") === per);
     b.onclick = function () {
       per = b.getAttribute("data-p");
+      try { localStorage.setItem("adm.per", per); } catch (x) {}
       document.querySelectorAll(".tabs button").forEach(function (o) { o.classList.toggle("on", o === b); });
       render();
     };
   });
+  $("#withTest").onchange = function () { withTest = this.checked; try { localStorage.setItem("adm.test", withTest ? "1" : ""); } catch (x) {} render(); };
   $("#refresh").onclick = function () { load(true); };
   $("#grid").addEventListener("click", function (ev) {
     var b = ev.target.closest("button[data-slug]");
