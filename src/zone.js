@@ -43,14 +43,15 @@ export async function handleZone(request, env, ctx) {
     const email = await accessEmail(request, env);
     if (!email) return text("Please sign in again: open talay.io/zone.", 401);
 
-    const superadmin = isSuperadmin(env, email);
+    const role = await hqRole(env, email); // Talay HQ: "owner", "staff" or null
+    const superadmin = !!role;
     const p0 = url.pathname.replace(/\/+$/, "");
     if (p0 === "/zone/admin" || p0.startsWith("/zone/admin/")) {
       if (!superadmin) return html(noAccess(email), 403);
-      return await handleAdmin(request, env, url, p0, email);
+      return await handleAdmin(request, env, url, p0, email, role);
     }
 
-    // The superadmin sees every center in the zone, as an admin of each.
+    // Talay HQ sees every center in the zone, as an admin of each.
     const centers = superadmin ? await allCenters(env) : await centersFor(env, email);
     if (!centers.length) {
       return html(noAccess(email), 403);
@@ -280,9 +281,6 @@ function centerOut(r, admin) {
     logo: first(r.fields["Logo"])?.thumbnails?.large?.url || first(r.fields["Logo"])?.url || "",
   };
 }
-
-// Talay itself (Jonas). Cloudflare variable SUPERADMIN_EMAILS overrides the default.
-const isSuperadmin = (env, email) => splitEmails(env.SUPERADMIN_EMAILS || "jonas@talay.io").includes(email);
 
 // Exact match on the linked Center: FIND on the name would also match "Simple Life Divers" for "Simple Life".
 const ofCenter = (center) => `ARRAYJOIN({Center}) & '' = '${q(center.name)}'`;
@@ -1557,48 +1555,98 @@ async function saveProduct(env, center, email, b) {
 
 // ---------- Pages ----------
 
-// ---------- Superadmin: talay.io/zone/admin ----------
-// One page for Talay itself: every center side by side (today, this week, this month, each
-// against the same stretch of the period before), booking value and commission, response
-// times, a health check (failed replies, divers left without an answer), Mia on/paused with
-// a button, and a link into each center's zone. Only for SUPERADMIN_EMAILS (default
-// jonas@talay.io). Centers → "Type" (Demo, Test, Pilot, Live) is optional: Demo and Test
-// centers are left out of the totals unless "Ook demo/test" is ticked.
+// ---------- Talay HQ: talay.io/zone/admin ----------
+// The back office for Talay itself, across all centers: overview with health check and
+// numbers, one inbox over every center, search, a page per center, bookings, commission
+// (CSV for invoicing), sign-ups from talay.io/start, system status and the HQ team.
+//
+// Who gets in: SUPERADMIN_EMAILS (Cloudflare variable, default jonas@talay.io) as Owner,
+// plus Airtable table "HQ team" (Email, Name, Role = Owner | Staff). Owners manage the team;
+// everyone in HQ can see everything and pause or resume an assistant. They also need to be
+// allowed by the Cloudflare Access policy of /zone.
+// Optional Centers field "Type" (Demo, Test, Pilot, Live): Demo and Test centers stay out
+// of the totals unless "Ook demo/test" is ticked.
 
-const ADMIN_CACHE = "admin/overview/v2";
+const ADMIN_CACHE = "admin/overview/v3";
 const SORRY = /^sorry, something went wrong on our side/i; // v2 error handler (HTTP 3 → Respond.io 13)
 const WAIT_MIN = 15; // a diver's message without any answer for this long counts as waiting
+const HQ_ROLES = ["Owner", "Staff"];
+const TZ_MS = 7 * 3600 * 1000;
+const isoT = (ms) => new Date(ms).toISOString();
 
-async function handleAdmin(request, env, url, p, email) {
-  if (p === "/zone/admin") return html(adminApp(email));
-  if (p === "/zone/admin/api/overview") {
-    return json(await cached(env, ADMIN_CACHE, 120, () => adminOverview(env), url.searchParams.get("fresh") === "1"));
+// "owner", "staff" or null. Kept for a minute per address, so zone requests stay cheap.
+async function hqRole(env, email) {
+  if (splitEmails(env.SUPERADMIN_EMAILS || "jonas@talay.io").includes(email)) return "owner";
+  const r = await cached(env, `hq/role/${encodeURIComponent(email)}`, 60, async () => {
+    try {
+      const recs = await at(env, "HQ team", { formula: `LOWER(TRIM({Email} & '')) = '${q(email)}'`, max: 1 });
+      if (!recs.length) return { role: null };
+      return { role: /owner/i.test(String(first(recs[0].fields["Role"]) || "")) ? "owner" : "staff" };
+    } catch (e) { return { role: null }; } // table not made yet
+  });
+  return r.role;
+}
+
+async function handleAdmin(request, env, url, p, email, role) {
+  if (p === "/zone/admin") return html(adminApp(email, role));
+  const fresh = url.searchParams.get("fresh") === "1";
+  const get = request.method === "GET";
+  if (get && p === "/zone/admin/api/overview") return json(await cached(env, ADMIN_CACHE, 120, () => adminOverview(env), fresh));
+  if (get && p === "/zone/admin/api/inbox") return json(await adminInbox(env, fresh));
+  if (get && p === "/zone/admin/api/search") return json(await adminSearch(env, url.searchParams.get("q")));
+  if (get && p === "/zone/admin/api/center") {
+    const slug = String(url.searchParams.get("slug") || "").toLowerCase();
+    if (!/^[a-z0-9-]{1,60}$/.test(slug)) return json({ error: "Onbekend center." }, 400);
+    return json(await cached(env, `admin/center/${slug}`, 60, () => adminCenter(env, slug), fresh));
   }
-  if (p === "/zone/admin/api/pause" && request.method === "POST") {
+  if (get && p === "/zone/admin/api/bookings") {
+    const m = /^\d{4}-\d{2}$/.test(url.searchParams.get("month") || "") ? url.searchParams.get("month") : thaiMonth(Date.now());
+    return json(await cached(env, `admin/book/${m}`, 60, () => adminBookings(env, m), fresh));
+  }
+  if (get && p === "/zone/admin/api/intake") return json(await adminIntake(env));
+  if (get && p === "/zone/admin/api/team") return json(await adminTeam(env));
+  if (request.method === "POST") {
     const body = await readBody(request);
-    const center = body && (await allCenters(env)).find((c) => c.slug === String(body.slug || "").toLowerCase());
-    if (!center) return json({ error: "Onbekend center." }, 400);
-    const res = await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Centers/${center.id}`, {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ fields: { "Mia paused": !!body.paused }, typecast: true }),
-    });
-    if (!res.ok) { console.error("admin pause", res.status, await res.text()); return json({ error: "Opslaan lukte niet. Probeer opnieuw." }, 502); }
-    await logChange(env, center, email, describe({ action: "mia", paused: !!body.paused }));
-    await forget(env, [ADMIN_CACHE]);
-    return json({ ok: true, paused: !!body.paused });
+    if (!body) return json({ error: "Bad request" }, 400);
+    if (p === "/zone/admin/api/pause") return await adminPause(env, email, body);
+    if (p === "/zone/admin/api/intake") return await adminIntakeStatus(env, body);
+    if (p === "/zone/admin/api/team") {
+      if (role !== "owner") return json({ error: "Alleen een eigenaar kan het team aanpassen." }, 403);
+      return await adminTeamChange(env, email, body);
+    }
   }
   return json({ error: "Not found" }, 404);
+}
+
+const thaiMonth = (ms) => new Date(ms + TZ_MS).toISOString().slice(0, 7);
+async function atPatch(env, table, id, fields) {
+  const res = await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/${encodeURIComponent(table)}/${id}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ fields, typecast: true }),
+  });
+  if (!res.ok) throw new Error(`Airtable PATCH ${table}: ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+async function adminPause(env, email, body) {
+  const center = (await allCenters(env)).find((c) => c.slug === String(body.slug || "").toLowerCase());
+  if (!center) return json({ error: "Onbekend center." }, 400);
+  try { await atPatch(env, "Centers", center.id, { "Mia paused": !!body.paused }); }
+  catch (e) { console.error("admin pause", e); return json({ error: "Opslaan lukte niet. Probeer opnieuw." }, 502); }
+  await logChange(env, center, email, describe({ action: "mia", paused: !!body.paused }));
+  await forget(env, [ADMIN_CACHE, `admin/center/${center.slug}`]);
+  return json({ ok: true, paused: !!body.paused });
 }
 
 // Periods in Koh Tao time. "prev" is the same stretch of the period before: yesterday until
 // this time, last week until this weekday and time, last month until this day and time.
 function adminPeriods(now) {
-  const TZ = 7 * 3600 * 1000, t = new Date(now + TZ);
-  const today = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) - TZ;
+  const t = new Date(now + TZ_MS);
+  const today = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) - TZ_MS;
   const week = today - ((t.getUTCDay() + 6) % 7) * DAY;
-  const month = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), 1) - TZ;
-  const prevMonth = Date.UTC(t.getUTCFullYear(), t.getUTCMonth() - 1, 1) - TZ;
+  const month = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), 1) - TZ_MS;
+  const prevMonth = Date.UTC(t.getUTCFullYear(), t.getUTCMonth() - 1, 1) - TZ_MS;
   return {
     today: { start: today, end: now, prev: [today - DAY, now - DAY] },
     week: { start: week, end: now, prev: [week - 7 * DAY, now - 7 * DAY] },
@@ -1606,54 +1654,66 @@ function adminPeriods(now) {
   };
 }
 
+const num = (v) => Number(first(v)) || 0;
+const str = (f, k) => String(first(f[k]) ?? "");
+const msOf = (v) => Date.parse(first(v) || "") || 0;
+const madeAt = (r) => Date.parse(r.createdTime) || 0;
+const cancelled = (b) => /cancel|refund/i.test(str(b.fields, "Status"));
+const handedOver = (l) => num(l.fields["Handed over"]) || first(l.fields["Handover at"]);
+const median = (a) => {
+  if (!a.length) return null;
+  a = a.slice().sort((x, y) => x - y);
+  const m = a.length >> 1;
+  return Math.round(a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2);
+};
+// Seconds from the diver's first message to the first answer (Leads → First message at /
+// First reply at), else the older "Response seconds".
+const firstReply = (l) => {
+  const d = (msOf(l.fields["First reply at"]) - msOf(l.fields["First message at"])) / 1000;
+  return d > 0 && d < 7 * 86400 ? d : (num(l.fields["Response seconds"]) || null);
+};
+const commissionOf = (b) => num(b.fields["Commission THB"]) || num(b.fields["Deposit paid THB"]);
+// A record belongs to a center through the linked Center (record id), else the C slug lookup.
+const ownedBy = (r, c) => (Array.isArray(r.fields["Center"]) && r.fields["Center"].includes(c.id)) ||
+  String(first(r.fields["C slug"]) || "").toLowerCase() === c.slug;
+const centerMeta = (r) => {
+  const f = r.fields, type = str(f, "Type");
+  return {
+    id: r.id, slug: str(f, "Slug").toLowerCase(), name: str(f, "Name") || str(f, "Slug") || "Center zonder naam",
+    type, test: /demo|test/i.test(type), assistant: str(f, "Assistant name") || "Mia",
+  };
+};
+
 async function adminOverview(env) {
   const now = Date.now();
   const P = adminPeriods(now);
-  const from = Math.min(P.month.prev[0], P.week.prev[0], now - 7 * DAY);
-  const iso = (ms) => new Date(ms).toISOString();
+  const from = Math.min(P.month.prev[0], P.week.prev[0], now - 30 * DAY);
   const [centerRecs, leads, books, msgs] = await Promise.all([
     at(env, "Centers", { sort: [{ field: "Name" }] }),
-    at(env, "Leads", { formula: `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${iso(from - 1000)}'))`, max: 20000 }),
-    at(env, "Bookings", { formula: `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${iso(from - 1000)}'))`, max: 20000 }),
+    at(env, "Leads", { formula: `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${isoT(from - 1000)}'))`, max: 20000 }),
+    at(env, "Bookings", { formula: `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${isoT(from - 1000)}'))`, max: 20000 }),
     at(env, "Chat", {
-      formula: `IS_AFTER({Sent at}, DATETIME_PARSE('${iso(now - DAY)}'))`,
+      formula: `IS_AFTER({Sent at}, DATETIME_PARSE('${isoT(now - DAY)}'))`,
       fields: ["Direction", "Contact ID", "Center", "Sent at", "Text"], sort: [{ field: "Sent at" }], max: 5000,
     }).catch(() => null),
   ]);
-  const n = (v) => Number(first(v)) || 0;
-  const s = (f, k) => String(first(f[k]) || "");
-  const ms = (v) => Date.parse(first(v) || "") || 0;
-  const made = (r) => Date.parse(r.createdTime) || 0;
-  const cx = (b) => /cancel|refund/i.test(s(b.fields, "Status"));
-  const handed = (l) => n(l.fields["Handed over"]) || first(l.fields["Handover at"]);
-  const median = (a) => { if (!a.length) return null; a = a.slice().sort((x, y) => x - y); const m = a.length >> 1; return Math.round(a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2); };
-  // Seconds from the diver's first message to the first answer (Leads → First message at /
-  // First reply at), else the older "Response seconds".
-  const firstReply = (l) => {
-    const d = (ms(l.fields["First reply at"]) - ms(l.fields["First message at"])) / 1000;
-    return d > 0 && d < 7 * 86400 ? d : (n(l.fields["Response seconds"]) || null);
-  };
-
-  // A record belongs to a center through the linked Center (record id), else the C slug lookup.
-  const owner = (r, c) => (Array.isArray(r.fields["Center"]) && r.fields["Center"].includes(c.id)) ||
-    String(first(r.fields["C slug"]) || "").toLowerCase() === c.slug;
 
   const stats = (ls, bs, a, b) => {
-    const L = ls.filter((l) => made(l) >= a && made(l) < b);
-    const B = bs.filter((x) => made(x) >= a && made(x) < b && !cx(x));
-    const booked = L.filter((l) => /booked/i.test(s(l.fields, "Status")));
+    const L = ls.filter((l) => madeAt(l) >= a && madeAt(l) < b);
+    const B = bs.filter((x) => madeAt(x) >= a && madeAt(x) < b && !cancelled(x));
+    const booked = L.filter((l) => /booked/i.test(str(l.fields, "Status")));
     return {
       conversations: L.length,
-      handedOver: L.filter(handed).length,
+      handedOver: L.filter(handedOver).length,
       bookings: B.length,
-      divers: B.reduce((t, x) => t + (n(x.fields["Group size"]) || 1), 0),
-      value: B.reduce((t, x) => t + n(x.fields["Total value THB"]), 0),
-      commission: B.reduce((t, x) => t + (n(x.fields["Commission THB"]) || n(x.fields["Deposit paid THB"])), 0),
-      outsideHours: L.reduce((t, l) => t + n(l.fields["Outside hours"]), 0),
-      afterFollowUp: booked.filter((l) => n(l.fields["Follow-ups sent"]) > 0).length,
+      divers: B.reduce((t, x) => t + (num(x.fields["Group size"]) || 1), 0),
+      value: B.reduce((t, x) => t + num(x.fields["Total value THB"]), 0),
+      commission: B.reduce((t, x) => t + commissionOf(x), 0),
+      outsideHours: L.reduce((t, l) => t + num(l.fields["Outside hours"]), 0),
+      afterFollowUp: booked.filter((l) => num(l.fields["Follow-ups sent"]) > 0).length,
       booked: booked.length,
       replySeconds: median(L.map(firstReply).filter(Boolean)),
-      team: L.map((l) => (ms(l.fields["Human took over at"]) - ms(l.fields["Handover at"])) / 60000)
+      team: L.map((l) => (msOf(l.fields["Human took over at"]) - msOf(l.fields["Handover at"])) / 60000)
         .filter((x) => x > 0 && x < 7 * 24 * 60),
     };
   };
@@ -1661,25 +1721,27 @@ async function adminOverview(env) {
     const out = {};
     for (const [k, p] of Object.entries(P)) {
       const cur = stats(ls, bs, p.start, p.end + 1), prev = stats(ls, bs, p.prev[0], p.prev[1] + 1);
-      cur.teamMinutes = median(cur.team); cur.teamCount = cur.team.length; delete cur.team;
-      delete prev.team;
+      cur.teamMinutes = median(cur.team); cur.teamCount = cur.team.length; delete cur.team; delete prev.team;
       out[k] = { ...cur, prev };
     }
     return out;
   };
+  // Last 30 days, one entry per Koh Tao day: [new conversations, bookings, booking value].
+  const day0 = P.today.start - 29 * DAY;
+  const daily = (ls, bs) => {
+    const d = Array.from({ length: 30 }, () => [0, 0, 0]);
+    ls.forEach((l) => { const i = Math.floor((madeAt(l) - day0) / DAY); if (i >= 0 && i < 30) d[i][0]++; });
+    bs.forEach((b) => { if (cancelled(b)) return; const i = Math.floor((madeAt(b) - day0) / DAY); if (i >= 0 && i < 30) { d[i][1]++; d[i][2] += num(b.fields["Total value THB"]); } });
+    return d;
+  };
 
   const byContact = {};
-  leads.forEach((l) => { const id = s(l.fields, "External ID"); if (id) byContact[id] = l; });
+  leads.forEach((l) => { const id = str(l.fields, "External ID"); if (id) byContact[id] = l; });
 
   const centers = centerRecs.map((r) => {
-    const f = r.fields;
-    const c = { id: r.id, slug: String(first(f["Slug"]) || "").toLowerCase() };
-    const ls = leads.filter((l) => owner(l, c));
-    const bs = books.filter((b) => owner(b, c));
-    const type = s(f, "Type");
-    const paused = !!f["Mia paused"];
-
-    // Health from the last 24 hours of Chat.
+    const f = r.fields, c = centerMeta(r);
+    const ls = leads.filter((l) => ownedBy(l, c));
+    const bs = books.filter((b) => ownedBy(b, c));
     let health = null;
     if (msgs) {
       const mine = msgs.filter((m) => String(m.fields["Center"] || "").toLowerCase() === c.slug);
@@ -1688,121 +1750,447 @@ async function adminOverview(env) {
       mine.forEach((m) => { const id = String(m.fields["Contact ID"] || ""); if (id) lastBy[id] = m; });
       const waiting = Object.entries(lastBy).filter(([id, m]) => {
         const l = byContact[id];
-        return m.fields["Direction"] === "Customer" && ms(m.fields["Sent at"]) < now - WAIT_MIN * 60000 &&
+        return m.fields["Direction"] === "Customer" && msOf(m.fields["Sent at"]) < now - WAIT_MIN * 60000 &&
           !(l && (l.fields["Human took over"] || l.fields["Opted out"]));
-      }).map(([id, m]) => ({
-        name: byContact[id] ? s(byContact[id].fields, "Name") : "",
-        text: String(m.fields["Text"] || "").slice(0, 90),
-        at: first(m.fields["Sent at"]) || "",
-      })).sort((a, b) => a.at.localeCompare(b.at));
-      const lastMia = mia.reduce((a, m) => Math.max(a, ms(m.fields["Sent at"])), 0);
+      });
+      const latest = (list) => { const t = list.reduce((a, m) => Math.max(a, msOf(m.fields["Sent at"])), 0); return t ? isoT(t) : null; };
       health = {
         errors: mia.filter((m) => SORRY.test(String(m.fields["Text"] || "").trim())).length,
         replies: mia.length,
         divers: new Set(mine.filter((m) => m.fields["Direction"] === "Customer").map((m) => String(m.fields["Contact ID"] || ""))).size,
-        waiting: waiting.length, waitingList: waiting.slice(0, 5),
-        lastMia: lastMia ? new Date(lastMia).toISOString() : null,
+        waiting: waiting.length,
+        lastMia: latest(mia),
+        lastCustomer: latest(mine.filter((m) => m.fields["Direction"] === "Customer")),
       };
     }
-    const open = ls.filter((l) => handed(l) && made(l) >= now - 7 * DAY &&
+    const open = ls.filter((l) => handedOver(l) && madeAt(l) >= now - 7 * DAY &&
       !l.fields["Opted out"] && !l.fields["Human took over"] && !first(l.fields["Human took over at"]) &&
-      !/booked|lost|closed|spam/i.test(s(l.fields, "Status"))).length;
-    const last = ls.reduce((a, l) => Math.max(a, made(l)), 0);
+      !/booked|lost|closed|spam/i.test(str(l.fields, "Status"))).length;
+    const last = ls.reduce((a, l) => Math.max(a, madeAt(l)), 0);
     return {
-      slug: c.slug, name: s(f, "Name") || c.slug || "Center zonder naam",
-      assistant: s(f, "Assistant name") || "Mia", channel: n(f["Channel ID"]) || null,
-      type, test: /demo|test/i.test(type),
-      paused, staff: splitEmails(f["Staff emails"]).length,
-      validSlug: /^[a-z0-9-]{1,60}$/.test(c.slug),
-      periods: periodStats(ls, bs),
-      health, openHandovers: open, lastConversation: last ? new Date(last).toISOString() : null,
+      ...c, channel: num(f["Channel ID"]) || null, paused: !!f["Mia paused"],
+      staff: splitEmails(f["Staff emails"]).length, admins: splitEmails(f["Admin emails"]).length,
+      validSlug: /^[a-z0-9-]{1,60}$/.test(c.slug), logo: first(f["Logo"])?.thumbnails?.small?.url || "",
+      periods: periodStats(ls, bs), daily: daily(ls, bs),
+      health, openHandovers: open, lastConversation: last ? isoT(last) : null,
     };
   });
 
-  // Median first-reply time over all centers, and over the real ones only (median can't be summed).
-  const replyAll = {}, replyLive = {};
-  const testIds = new Set(centerRecs.filter((r) => /demo|test/i.test(s(r.fields, "Type"))).map((r) => r.id));
+  // Median first-reply time over all centers and over the real ones only (medians can't be summed).
+  const testIds = new Set(centers.filter((c) => c.test).map((c) => c.id));
   const testSlugs = new Set(centers.filter((c) => c.test).map((c) => c.slug));
   const isTest = (l) => (Array.isArray(l.fields["Center"]) && l.fields["Center"].some((id) => testIds.has(id))) ||
     testSlugs.has(String(first(l.fields["C slug"]) || "").toLowerCase());
+  const reply = { all: {}, live: {} };
   for (const [k, p] of Object.entries(P)) {
-    const L = leads.filter((l) => made(l) >= p.start);
-    replyAll[k] = median(L.map(firstReply).filter(Boolean));
-    replyLive[k] = median(L.filter((l) => !isTest(l)).map(firstReply).filter(Boolean));
+    const L = leads.filter((l) => madeAt(l) >= p.start);
+    reply.all[k] = median(L.map(firstReply).filter(Boolean));
+    reply.live[k] = median(L.filter((l) => !isTest(l)).map(firstReply).filter(Boolean));
   }
-  return { updated: new Date(now).toISOString(), healthOk: !!msgs, waitMin: WAIT_MIN, centers, reply: { all: replyAll, live: replyLive } };
+
+  // Latest changes made in the zones (Centers → Change log), newest first.
+  const activity = [];
+  centerRecs.forEach((r) => {
+    const name = str(r.fields, "Name");
+    String(r.fields["Change log"] || "").split("\n").slice(0, 30).forEach((line) => {
+      const m = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}) \(Thai time\) ([^:]+): (.*)$/);
+      if (m) activity.push({ at: m[1], who: m[2], what: m[3], center: name });
+    });
+  });
+  activity.sort((a, b) => b.at.localeCompare(a.at));
+
+  return {
+    updated: isoT(now), day0: isoT(day0), healthOk: !!msgs, waitMin: WAIT_MIN,
+    centers, reply, activity: activity.slice(0, 40), system: adminSystem(env),
+  };
 }
 
-function adminApp(email) {
+function adminSystem(env) {
+  const key = String(env.STRIPE_SECRET_KEY || "");
+  return {
+    stripe: !key ? "missing" : /^(sk|rk)_live_/.test(key) ? "live" : "test",
+    push: !!env.VAPID_PRIVATE, respondio: !!env.RESPONDIO_TOKEN, accessAud: !!env.ACCESS_AUD,
+    base: String(env.AIRTABLE_BASE || ""),
+  };
+}
+
+// Every conversation across the centers that the team can still answer (customer wrote in
+// the last 24 h), built from the same per-center lists the zone uses (and caches).
+async function adminInbox(env, fresh) {
+  const centers = (await at(env, "Centers", { sort: [{ field: "Name" }] })).map(centerMeta)
+    .filter((c) => /^[a-z0-9-]{1,60}$/.test(c.slug));
+  const now = Date.now();
+  const lists = await Promise.all(centers.map((c) =>
+    cached(env, `conv/${c.slug}/open`, 20, () => conversations(env, c, "open"), fresh)
+      .then((d) => d.conversations.map((x) => ({ ...x, slug: c.slug, center: c.name, test: c.test })))
+      .catch(() => [])));
+  const items = lists.flat().map((x) => {
+    const waiting = x.previewDir === "Customer" && Date.parse(x.lastAt) < now - WAIT_MIN * 60000 && !x.teamActive;
+    const { hay, ...rest } = x;
+    return { ...rest, waiting };
+  });
+  items.sort((a, b) => (b.needsYou - a.needsYou) || (b.waiting - a.waiting) || (Date.parse(b.lastAt) - Date.parse(a.lastAt)));
+  return { items, updated: isoT(now), waitMin: WAIT_MIN };
+}
+
+// Divers (name, phone, contact id) and bookings (ref, payer) across all centers.
+async function adminSearch(env, raw) {
+  const term = String(raw || "").trim().toLowerCase().slice(0, 60);
+  if (term.length < 2) return { leads: [], bookings: [] };
+  const digits = term.replace(/\D/g, "");
+  const t = q(term);
+  const leadF = [`FIND('${t}', LOWER({Name} & ''))`, `{External ID} & '' = '${t}'`];
+  if (digits.length >= 4) leadF.push(`FIND('${digits}', REGEX_REPLACE({Contact} & '', '[^0-9]', ''))`);
+  const [centerRecs, leads, books] = await Promise.all([
+    at(env, "Centers"),
+    at(env, "Leads", { formula: `OR(${leadF.join(", ")})`, max: 30 }),
+    at(env, "Bookings", { formula: `OR(FIND('${t}', LOWER({Ref} & '')), FIND('${t}', LOWER({Payer name} & '')))`, max: 30 }),
+  ]);
+  const centers = centerRecs.map(centerMeta);
+  const of = (r) => centers.find((c) => ownedBy(r, c)) || { slug: "", name: "?" };
+  return {
+    leads: leads.sort((a, b) => madeAt(b) - madeAt(a)).slice(0, 25).map((l) => {
+      const f = l.fields, c = of(l);
+      return {
+        id: str(f, "External ID"), name: str(f, "Name"), contact: str(f, "Contact"), status: str(f, "Status"),
+        language: str(f, "Language"), created: l.createdTime, slug: c.slug, center: c.name,
+      };
+    }),
+    bookings: books.sort((a, b) => madeAt(b) - madeAt(a)).slice(0, 25).map((b) => bookingOut(b, of(b))),
+  };
+}
+
+function bookingOut(b, c) {
+  const f = b.fields;
+  return {
+    ref: str(f, "Ref"), created: b.createdTime, date: str(f, "Activity date"), product: str(f, "P name"),
+    name: str(f, "Payer name"), divers: num(f["Group size"]) || 1, total: num(f["Total value THB"]),
+    commission: commissionOf(b), refunded: num(f["Refunded THB"]), status: str(f, "Status") || "Confirmed",
+    cancelled: cancelled(b), slug: c.slug, center: c.name, test: !!c.test,
+  };
+}
+
+async function adminCenter(env, slug) {
+  const c = (await allCenters(env)).find((x) => x.slug === slug);
+  if (!c) return { error: "Onbekend center." };
+  const now = Date.now();
+  const since = `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${isoT(now - 30 * DAY)}'))`;
+  const [f, set, leads, books] = await Promise.all([
+    centerRecord(env, c),
+    settings(env, c),
+    at(env, "Leads", { formula: `AND(${ofCenter(c)}, ${since})`, max: 1000 }),
+    at(env, "Bookings", { formula: `AND(${ofCenter(c)}, ${since})`, max: 1000 }),
+  ]);
+  return {
+    slug, name: c.name, assistant: c.assistant, channel: c.channel, type: str(f, "Type"),
+    paused: !!f["Mia paused"], logo: c.logo,
+    settings: { staff: set.staff, admins: set.admins, alert: set.alert, hours: set.hoursText, info: set.info },
+    products: set.products,
+    leads: leads.sort((a, b) => madeAt(b) - madeAt(a)).slice(0, 30).map((l) => {
+      const x = l.fields;
+      return {
+        id: str(x, "External ID"), name: str(x, "Name") || str(x, "Contact"), language: str(x, "Language"),
+        status: str(x, "Status"), created: l.createdTime, handover: !!handedOver(l), team: !!x["Human took over"],
+        outside: !!num(x["Outside hours"]), reply: firstReply(l),
+      };
+    }),
+    bookings: books.sort((a, b) => madeAt(b) - madeAt(a)).slice(0, 30).map((b) => bookingOut(b, c)),
+    log: String(f["Change log"] || "").split("\n").filter(Boolean).slice(0, 25),
+  };
+}
+
+// All bookings made in one month (Koh Tao time), for the bookings list and commission.
+async function adminBookings(env, month) {
+  const { start, end, label, months } = periodRange(month);
+  const [centerRecs, books] = await Promise.all([
+    at(env, "Centers"),
+    at(env, "Bookings", {
+      formula: `AND(IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${isoT(start - 1000)}')), IS_BEFORE(CREATED_TIME(), DATETIME_PARSE('${isoT(end)}')))`,
+      max: 20000,
+    }),
+  ]);
+  const centers = centerRecs.map(centerMeta);
+  const of = (r) => centers.find((c) => ownedBy(r, c)) || { slug: "", name: "Zonder center", test: false };
+  return {
+    month, label, months, system: adminSystem(env),
+    centers: centers.map((c) => ({ slug: c.slug, name: c.name, test: c.test })),
+    bookings: books.sort((a, b) => madeAt(b) - madeAt(a)).map((b) => bookingOut(b, of(b))),
+  };
+}
+
+// Sign-ups from talay.io/start (Airtable table "Intake"). Missing table = not set up yet.
+async function adminIntake(env) {
+  try {
+    const recs = await at(env, "Intake", { max: 200 });
+    return {
+      items: recs.sort((a, b) => madeAt(b) - madeAt(a)).map((r) => {
+        const f = r.fields;
+        return {
+          id: r.id, centre: str(f, "Centre"), name: str(f, "Name"), email: str(f, "Email"),
+          whatsapp: str(f, "WhatsApp"), status: str(f, "Status") || "New", summary: str(f, "Summary"),
+          received: str(f, "Received") || r.createdTime,
+        };
+      }),
+    };
+  } catch (e) {
+    if (/NOT_FOUND|404|INVALID_PERMISSIONS|403/.test(String(e.message))) return { missing: true, items: [] };
+    throw e;
+  }
+}
+async function adminIntakeStatus(env, body) {
+  const status = ["New", "In progress", "Live", "Declined"].find((s) => s === body.status);
+  if (!status || !/^rec[A-Za-z0-9]{10,20}$/.test(String(body.id || ""))) return json({ error: "Bad request" }, 400);
+  try { await atPatch(env, "Intake", body.id, { Status: status }); }
+  catch (e) { console.error("intake", e); return json({ error: "Opslaan lukte niet." }, 502); }
+  return json({ ok: true, status });
+}
+
+async function adminTeam(env) {
+  const owners = splitEmails(env.SUPERADMIN_EMAILS || "jonas@talay.io");
+  let rows = [], missing = false;
+  try { rows = await at(env, "HQ team", { max: 200 }); } catch (e) { missing = true; }
+  const members = rows.map((r) => ({
+    id: r.id, email: str(r.fields, "Email").trim().toLowerCase(), name: str(r.fields, "Name"),
+    role: /owner/i.test(str(r.fields, "Role")) ? "Owner" : "Staff", added: r.createdTime,
+  })).filter((m) => m.email);
+  return { owners, members, missing };
+}
+async function adminTeamChange(env, email, b) {
+  const EMAILRE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]{2,}$/;
+  const role = HQ_ROLES.find((r) => r === b.role) || "Staff";
+  try {
+    if (b.action === "add") {
+      const e = String(b.email || "").trim().toLowerCase();
+      if (!EMAILRE.test(e)) return json({ error: "Geef één geldig e-mailadres." }, 400);
+      const { members } = await adminTeam(env);
+      if (members.some((m) => m.email === e)) return json({ error: "Dit adres staat al in het team." }, 400);
+      await atWrite(env, "HQ team", "POST", [{ fields: { Email: e, Name: String(b.name || "").slice(0, 80), Role: role } }]);
+    } else if (b.action === "role" && /^rec[A-Za-z0-9]{10,20}$/.test(String(b.id || ""))) {
+      await atPatch(env, "HQ team", b.id, { Role: role });
+    } else if (b.action === "remove" && /^rec[A-Za-z0-9]{10,20}$/.test(String(b.id || ""))) {
+      const res = await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/${encodeURIComponent("HQ team")}/${b.id}`, {
+        method: "DELETE", headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` },
+      });
+      if (!res.ok) throw new Error(`Airtable DELETE: ${res.status}`);
+    } else {
+      return json({ error: "Onbekende actie." }, 400);
+    }
+  } catch (e) {
+    console.error("hq team", e);
+    if (/NOT_FOUND|404/.test(String(e.message))) return json({ error: "De tabel HQ team bestaat nog niet in Airtable." }, 500);
+    return json({ error: "Opslaan lukte niet. Probeer opnieuw." }, 502);
+  }
+  return json({ ok: true });
+}
+
+const HQ_ICONS = {
+  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>',
+  inbox: '<path d="M3 13h5l1.5 3h5L16 13h5"/><path d="M5 5h14l2 8v6H3v-6z"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  centers: '<path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-7h6v7"/>',
+  bookings: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  money: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
+  intake: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 14h6M9 18h4"/>',
+  system: '<path d="M22 12h-4l-3 8-6-16-3 8H2"/>',
+  team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
+  zone: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+  out: '<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 17l5-5-5-5M15 12H3"/>',
+  refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
+};
+const hqIcon = (k) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${HQ_ICONS[k]}</svg>`;
+
+function adminApp(email, role) {
+  const nav = [
+    ["overzicht", "Overzicht", "home"], ["inbox", "Inbox", "inbox"], ["zoeken", "Zoeken", "search"],
+    ["centra", "Centra", "centers"], ["boekingen", "Boekingen", "bookings"], ["commissie", "Commissie", "money"],
+    ["aanmeldingen", "Aanmeldingen", "intake"], ["systeem", "Systeem", "system"],
+  ];
+  if (role === "owner") nav.push(["team", "Team", "team"]);
+  const cfg = { email, role, icons: HQ_ICONS };
   return `<!doctype html><html lang="nl"><head>${HEAD}
-<title>Alle centra · Talay</title>
+<title>Talay HQ</title>
 <link rel="icon" type="image/png" href="/zone/icon-192.png">
-<meta name="theme-color" content="#0A2029">
+<meta name="theme-color" content="#09262F">
 <style>
-:root{--deep:#0A2029;--paper:#F4F0E6;--card:#fff;--muted:#55646A;--line:#E2DACB;--ok:#1F7A55;--okbg:#E3F2EA;--warn:#B4561B;--warnbg:#FBEADF;--bad:#B3261E;--badbg:#FBE4E1;color-scheme:light}
-@media (prefers-color-scheme:dark){:root{--deep:#F4F0E6;--paper:#0B1A20;--card:#122A33;--muted:#9FB2B8;--line:#1F3D48;--ok:#3FB37F;--okbg:#173B2E;--warn:#E69A5B;--warnbg:#3D2A1C;--bad:#F2847A;--badbg:#45201D;color-scheme:dark}}
+:root{--deep:#09262F;--paper:#F7F3EA;--paper-2:#FBF8F2;--card:#fff;--muted:#5B6B70;--line:#E7E0D3;--ok:#23855A;--okbg:#E2F1E8;--warn:#B4561B;--warnbg:#FBEADF;--bad:#B3261E;--badbg:#FBE4E1;--sand:#DCA44A;--side:#09262F;--side-2:#103540;--bar:#2E7686;--shadow:0 1px 2px rgba(9,38,47,.05),0 4px 16px -8px rgba(9,38,47,.12);color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--deep:#F2EEE4;--paper:#0A1E25;--paper-2:#0E252D;--card:#12303A;--muted:#9DB0B5;--line:#1F3E48;--ok:#46B884;--okbg:#173B2E;--warn:#E8A06A;--warnbg:#3D2A1C;--bad:#F2847A;--badbg:#45201D;--side:#061519;--side-2:#0D2C35;--bar:#6FB8C6;--shadow:0 1px 2px rgba(0,0,0,.25);color-scheme:dark}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--deep);font-family:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
-header{display:flex;align-items:center;gap:12px;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 12px;background:#0A2029;color:#F4F0E6}
-header b{font-size:17px}header small{display:block;color:#B7C7CB;font-size:12.5px}
-header .sp{flex:1}header a{color:#B7C7CB;font-size:13.5px;text-decoration:none;padding:6px 8px;border-radius:8px}
-header a:hover{background:rgba(247,243,234,.08);color:#F7F3EA}
-main{max-width:1100px;margin:0 auto;padding:18px 16px 48px}
-.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
-.tabs{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:3px}
-.tabs button{font:inherit;font-size:14px;border:0;background:none;color:var(--muted);padding:7px 13px;border-radius:8px;cursor:pointer}
-.tabs button.on{background:#0A2029;color:#F4F0E6}
-@media (prefers-color-scheme:dark){.tabs button.on{background:#F4F0E6;color:#0A2029}}
-.bar .sp{flex:1}.upd{color:var(--muted);font-size:13px}
-.chk{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;color:var(--muted)}
-.btn{font:inherit;font-size:13.5px;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--deep);padding:7px 12px;border-radius:9px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
-.btn:disabled{opacity:.55;cursor:default}
-.health{border-radius:14px;padding:12px 14px;margin-bottom:14px;font-size:14px}
-.health.ok{background:var(--okbg);color:var(--ok)}.health.bad{background:var(--badbg);color:var(--bad)}.health.warn{background:var(--warnbg);color:var(--warn)}
-.health b{display:block;font-size:15px}.health ul{margin:6px 0 0;padding-left:18px}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:22px}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;min-width:0}
-.kpi span{display:block;color:var(--muted);font-size:12.5px}.kpi b{font-size:22px;font-variant-numeric:tabular-nums}
+html{background:var(--paper)}
+body{margin:0;background:var(--paper);color:var(--deep);font-family:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;letter-spacing:-.003em}
+a{color:inherit}
+button,input,select,textarea{font:inherit;color:inherit}
+::selection{background:rgba(220,164,74,.35)}
+/* shell */
+.side{background:var(--side);color:#F7F3EA;display:flex;flex-direction:column}
+.brand{display:flex;align-items:center;gap:11px;padding:20px 20px 18px}
+.brand svg{flex:none}
+.brand b{display:block;font-size:15px;font-weight:700;letter-spacing:-.01em}
+.brand small{display:block;font-size:12px;color:#93A9AE}
+.nav{display:flex;flex-direction:column;gap:2px;padding:4px 12px}
+.nav a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;color:#A9BDC1;text-decoration:none;font-size:14.5px;font-weight:600}
+.nav a:hover{background:rgba(247,243,234,.06);color:#F7F3EA}
+.nav a.on{background:rgba(220,164,74,.14);color:#F7F3EA}
+.nav a.on svg{color:var(--sand)}
+.nav .count{margin-left:auto;min-width:20px;padding:0 6px;border-radius:999px;background:var(--sand);color:#09262F;font-size:12px;font-weight:700;line-height:20px;text-align:center}
+.nav .dot{margin-left:auto;width:8px;height:8px;border-radius:50%;background:#F2847A}
+.tools{margin-top:auto;display:flex;flex-direction:column;gap:2px;padding:12px 12px 16px;border-top:1px solid rgba(247,243,234,.08)}
+.tools a,.tools label{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:9px;color:#B7C7CB;font-size:13.5px;text-decoration:none;cursor:pointer}
+.tools a:hover,.tools label:hover{background:rgba(247,243,234,.07);color:#F7F3EA}
+.nav a.mob,.top .chk.mob{display:none}
+.tools .who{font-size:12px;color:#7F979C;padding:6px 12px 0;overflow-wrap:anywhere}
+main{min-width:0}
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:20px 28px 0}
+.top h1{margin:0;font-size:24px;font-weight:700;letter-spacing:-.02em;flex:1;min-width:0}
+.top .upd{font-size:13px;color:var(--muted)}
+.gsearch{position:relative}
+.gsearch input{width:240px;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:8px 12px 8px 34px}
+.gsearch svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted)}
+.page{padding:16px 28px 48px;max-width:1240px}
+@media (min-width:861px){
+ body{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh;background:linear-gradient(90deg,var(--side) 236px,var(--paper) 236px)}
+ .side{position:sticky;top:0;height:100vh;overflow-y:auto}
+}
+@media (max-width:860px){
+ .side{position:sticky;top:0;z-index:5}
+ .brand{padding:calc(12px + env(safe-area-inset-top,0px)) 16px 8px}
+ .nav{flex-direction:row;overflow-x:auto;scrollbar-width:none;padding:0 10px 8px}
+ .nav::-webkit-scrollbar{display:none}
+ .nav a{flex:none;padding:7px 11px;font-size:14px}
+ .nav a .count{margin-left:6px}.nav a .dot{margin-left:6px}
+ .tools{display:none}
+ .nav a.mob{display:flex}
+ .t td{white-space:nowrap}
+ .top .chk.mob{display:inline-flex}
+ .top{padding:16px 16px 0}.top h1{font-size:21px}
+ .gsearch{display:none}
+ .page{padding:12px 16px 40px}
+}
+/* controls */
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:16px}
+.bar .sp{flex:1}
+.seg{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:3px;box-shadow:var(--shadow)}
+.seg button{border:0;background:none;color:var(--muted);padding:6px 12px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600}
+.seg button.on{background:var(--side);color:#F7F3EA}
+.btn{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--deep);padding:7px 12px;border-radius:9px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn:hover{border-color:var(--deep)}
+.btn.primary{background:var(--sand);border-color:var(--sand);color:#09262F}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:default}
+select.in,input.in{border:1px solid var(--line);background:var(--card);border-radius:9px;padding:7px 10px;font-size:14px;max-width:100%}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;color:var(--muted);cursor:pointer}
+/* blocks */
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);min-width:0}
+.card>h2,.sec>h2{font-size:14px;font-weight:700;margin:0;padding:14px 16px 0;display:flex;align-items:center;gap:8px}
+.sec{margin-top:22px}
+.sec>h2{padding:0 0 10px;font-size:15px}
+.card.sec>h2{padding:14px 16px 0;font-size:14px}
+.sec>h2 a{margin-left:auto;font-size:13px;font-weight:600;color:var(--muted)}
+.pad{padding:14px 16px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+@media (max-width:900px){.grid2{grid-template-columns:1fr}}
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+@media (max-width:1180px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:560px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{padding:13px 14px}
+.kpi span{display:block;color:var(--muted);font-size:12.5px}
+.kpi b{display:block;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em;margin-top:2px;overflow-wrap:anywhere}
 .kpi b small{font-size:13px;font-weight:500;color:var(--muted)}
-.d{display:block;font-size:12px;color:var(--muted)}.d.up{color:var(--ok)}.d.down{color:var(--warn)}
-h2{font-size:15px;margin:0 0 10px;color:var(--muted);font-weight:600}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
-@media (max-width:400px){.grid{grid-template-columns:1fr}}
-.c{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:12px;min-width:0}
-.c.paused{border-color:var(--warn)}.c.alarm{border-color:var(--bad)}
-.top{display:flex;align-items:flex-start;gap:10px}.top .nm{flex:1;min-width:0}
-.top b{font-size:16.5px;display:block;overflow-wrap:anywhere}.top small{color:var(--muted);font-size:12.5px}
-.pills{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
-.pill{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(--paper);color:var(--muted)}
-.pill.on{background:var(--okbg);color:var(--ok)}.pill.off{background:var(--warnbg);color:var(--warn)}
-.nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 10px}
-.nums div span{display:block;color:var(--muted);font-size:12px}.nums div b{font-size:18px;font-variant-numeric:tabular-nums}
-.meta{display:grid;grid-template-columns:1fr auto;gap:3px 10px;font-size:13.5px;border-top:1px solid var(--line);padding-top:10px}
-.meta span{color:var(--muted)}.meta b{font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
-.meta b.warn{color:var(--warn)}.meta b.bad{color:var(--bad)}.meta b.ok{color:var(--ok)}
-.acts{display:flex;gap:8px;flex-wrap:wrap}
-.err{background:var(--warnbg);color:var(--warn);padding:10px 12px;border-radius:10px;margin-bottom:12px}
+.d{display:block;font-size:12px;color:var(--muted);margin-top:2px}.d.up{color:var(--ok)}.d.down{color:var(--warn)}
+.alert{border-radius:14px;padding:12px 16px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start;font-size:14px}
+.alert.ok{background:var(--okbg);color:var(--ok)}.alert.warn{background:var(--warnbg);color:var(--warn)}.alert.bad{background:var(--badbg);color:var(--bad)}
+.alert b{display:block;font-size:14.5px}
+.alert .x{flex:1;min-width:0}
+.alert a{font-weight:700}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap;background:var(--paper);color:var(--muted);border:1px solid var(--line)}
+.pill.ok{background:var(--okbg);color:var(--ok);border-color:transparent}.pill.warn{background:var(--warnbg);color:var(--warn);border-color:transparent}.pill.bad{background:var(--badbg);color:var(--bad);border-color:transparent}
+.pill.sand{background:var(--sand);color:#09262F;border-color:transparent}
 .muted{color:var(--muted)}
+.empty{padding:22px 16px;color:var(--muted);text-align:center}
+.err{background:var(--warnbg);color:var(--warn);padding:10px 12px;border-radius:10px;margin-bottom:12px}
+.skel{height:120px;border-radius:16px;background:linear-gradient(90deg,var(--card),var(--paper-2),var(--card));background-size:200% 100%;animation:sk 1.2s infinite linear;border:1px solid var(--line)}
+@keyframes sk{to{background-position:-200% 0}}
+/* tables */
+.tw{overflow-x:auto}
+table.t{width:100%;border-collapse:collapse;font-size:14px}
+.t th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.t td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+.t tr:last-child td{border-bottom:0}
+.t .n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.t tr.link{cursor:pointer}.t tr.link:hover td{background:var(--paper-2)}
+.t tfoot td{font-weight:700;border-top:2px solid var(--line)}
+.t .nm b{display:block}.t .nm small{color:var(--muted)}
+.strike{text-decoration:line-through;color:var(--muted)}
+/* chart */
+.chart{position:relative;padding:8px 16px 12px}
+.chart svg{display:block;width:100%;height:150px;overflow:visible}
+.chart .axis{font-size:11px;fill:var(--muted)}
+.chart .tot{font-size:13px;color:var(--muted);padding:0 16px}
+.chart .tot b{color:var(--deep);font-size:18px}
+.tip{position:fixed;pointer-events:none;background:var(--side);color:#F7F3EA;border-radius:9px;padding:6px 10px;font-size:12.5px;z-index:20;box-shadow:0 6px 20px rgba(0,0,0,.2);display:none;white-space:nowrap}
+.tip b{display:block;font-size:14px}
+/* lists */
+.rows{display:flex;flex-direction:column}
+.row{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-bottom:1px solid var(--line);text-decoration:none;color:inherit}
+.row:last-child{border-bottom:0}
+a.row:hover{background:var(--paper-2)}
+.row .x{flex:1;min-width:0}
+.row .l1{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.row .l1 b{font-weight:700}
+.row .pv{color:var(--muted);font-size:14px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.row .tm{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 12px;cursor:pointer}
+.chip.on{background:var(--side);color:#F7F3EA;border-color:var(--side)}
+.chip .c{margin-left:6px;opacity:.8}
+/* center cards */
+.cc{padding:16px;display:flex;flex-direction:column;gap:12px;text-decoration:none;color:inherit}
+.cc:hover{border-color:var(--muted)}
+.cc .hd{display:flex;gap:10px;align-items:flex-start}
+.cc .hd .x{flex:1;min-width:0}
+.cc .hd b{font-size:16.5px;display:block}
+.cc .hd small{color:var(--muted);font-size:12.5px}
+.av{flex:none;width:38px;height:38px;border-radius:50%;background:var(--paper);border:1px solid var(--line);display:grid;place-items:center;font-weight:700;color:var(--muted);overflow:hidden}
+.av img{width:100%;height:100%;object-fit:cover}
+.mini{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mini span{display:block;font-size:12px;color:var(--muted)}.mini b{font-variant-numeric:tabular-nums}
+.dl{display:grid;grid-template-columns:minmax(120px,auto) 1fr;gap:6px 14px;font-size:14px}
+.dl dt{color:var(--muted)}.dl dd{margin:0;overflow-wrap:anywhere}
+.log{font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted);max-height:320px;overflow:auto}
+.form{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.form input.in{flex:1;min-width:160px}
+.back{display:inline-flex;align-items:center;gap:6px;color:var(--muted);text-decoration:none;font-size:14px;margin-bottom:6px}
+.big{width:100%;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:12px 14px;font-size:16px;box-shadow:var(--shadow)}
+.sum{white-space:pre-wrap;font-size:13.5px;color:var(--muted);margin-top:8px;max-height:0;overflow:hidden}
+.sum.open{max-height:none}
 </style></head><body>
-<header><div><b>Talay · alle centra</b><small>Superadmin</small></div><span class="sp"></span>
-<a href="/zone">Zone</a><a href="/cdn-cgi/access/logout" title="${esc(email)}">Afmelden</a></header>
+<aside class="side">
+  <div class="brand"><svg width="30" height="30" viewBox="0 0 100 100" aria-hidden="true"><path d="M 12 50 A 38 38 0 0 0 88 50 Z" fill="#DCA44A"/><circle cx="50" cy="50" r="38" fill="none" stroke="#F7F3EA" stroke-width="10"/><line x1="6" y1="50" x2="94" y2="50" stroke="#F7F3EA" stroke-width="10" stroke-linecap="round"/></svg>
+  <span><b>Talay HQ</b><small>${role === "owner" ? "Eigenaar" : "Medewerker"}</small></span></div>
+  <nav class="nav" id="nav">${nav.map(([k, label, ic]) => `<a href="#/${k}" data-k="${k}">${hqIcon(ic)}<span>${label}</span><span class="count" id="n-${k}" hidden></span></a>`).join("")}<a class="mob" href="/zone">${hqIcon("zone")}<span>Klantenzone</span></a><a class="mob" href="/cdn-cgi/access/logout">${hqIcon("out")}<span>Afmelden</span></a></nav>
+  <div class="tools">
+    <label><input type="checkbox" id="withTest"> Ook demo/test meetellen</label>
+    <a href="/zone">${hqIcon("zone")} Klantenzone</a>
+    <a href="/cdn-cgi/access/logout">${hqIcon("out")} Afmelden</a>
+    <div class="who">${esc(email)}</div>
+  </div>
+</aside>
 <main>
-<div class="bar"><div class="tabs" role="tablist">
-<button data-p="today" class="on">Vandaag</button><button data-p="week">Deze week</button><button data-p="month">Deze maand</button></div>
-<label class="chk" id="testWrap" hidden><input type="checkbox" id="withTest"> Ook demo/test</label>
-<span class="sp"></span><span class="upd" id="upd"></span><button class="btn" id="refresh" type="button">Vernieuwen</button></div>
-<div id="err"></div>
-<div id="health"></div>
-<div class="kpis" id="kpis"><div class="kpi"><span>Laden…</span><b>–</b></div></div>
-<h2 id="h2">Per center</h2>
-<div class="grid" id="grid"></div>
+  <div class="top"><h1 id="title">Overzicht</h1><span class="upd" id="upd"></span><label class="chk mob"><input type="checkbox" id="withTest2"> Ook demo/test</label>
+  <form class="gsearch" id="gs"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" id="gq" placeholder="Zoek duiker, nummer of ref" aria-label="Zoeken"></form>
+  <button class="btn" id="refresh" type="button" title="Vernieuwen">${hqIcon("refresh")}<span>Vernieuwen</span></button></div>
+  <div class="page" id="page"><div class="skel"></div></div>
 </main>
-<script>
-(function () {
-  var data = null, per = "today", withTest = false;
-  try { per = localStorage.getItem("adm.per") || "today"; withTest = localStorage.getItem("adm.test") === "1"; } catch (x) {}
-  var $ = function (s) { return document.querySelector(s); };
-  var e = function (v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+<div class="tip" id="tip"></div>
+<script>var __name = function (f) { return f; }; // Wrangler adds __name(...) calls when bundling
+(${hqClient.toString()})(${JSON.stringify(cfg).replace(/</g, "\\u003c")});</script>
+</body></html>`;
+}
+
+function hqClient(cfg) {
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var esc = function (v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
   var nf = new Intl.NumberFormat("nl-BE");
   var thb = function (v) { return "฿ " + nf.format(Math.round(v || 0)); };
   var secs = function (v) { return v == null ? "–" : v < 60 ? Math.round(v) + " s" : v < 3600 ? Math.round(v / 6) / 10 + " min" : Math.round(v / 360) / 10 + " u"; };
@@ -1815,134 +2203,500 @@ h2{font-size:15px;margin:0 0 10px;color:var(--muted);font-weight:600}
     if (d < 48 * 60) return Math.round(d / 60) + " u geleden";
     return Math.round(d / 1440) + " dagen geleden";
   };
-  var label = { today: "vandaag", week: "deze week", month: "deze maand" };
-  var prevLabel = { today: "gisteren", week: "vorige week", month: "vorige maand" };
-  var KEYS = ["conversations", "handedOver", "bookings", "divers", "value", "commission", "outsideHours", "afterFollowUp", "booked"];
+  var date = function (iso, time) {
+    if (!iso) return "";
+    var o = { day: "numeric", month: "short" };
+    if (time) { o.hour = "2-digit"; o.minute = "2-digit"; }
+    return new Date(iso).toLocaleString("nl-BE", o);
+  };
+  var icon = function (k, s) { return '<svg width="' + (s || 16) + '" height="' + (s || 16) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + cfg.icons[k] + "</svg>"; };
+  var store = { get: function (k, d) { try { var v = localStorage.getItem("hq." + k); return v == null ? d : v; } catch (e) { return d; } },
+    set: function (k, v) { try { localStorage.setItem("hq." + k, v); } catch (e) {} } };
 
+  var state = { per: store.get("per", "today"), withTest: store.get("test", "") === "1", ov: null, cache: {} };
+  var LABEL = { today: "vandaag", week: "deze week", month: "deze maand" };
+  var PREV = { today: "gisteren", week: "vorige week", month: "vorige maand" };
+
+  function api(path, opt) {
+    return fetch("/zone/admin/api/" + path, Object.assign({ credentials: "same-origin" }, opt || {})).then(function (r) {
+      if (r.status === 401) { location.reload(); throw new Error("auth"); }
+      return r.json().then(function (j) { if (!r.ok || j.error) throw new Error(j.error || "Er ging iets mis."); return j; });
+    });
+  }
+  function post(path, body) { return api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); }
+  // Cached GET per page, so switching pages is instant; Vernieuwen fetches fresh.
+  function load(key, path, fresh) {
+    var c = state.cache[key];
+    if (c && !fresh && Date.now() - c.t < 60000) return Promise.resolve(c.v);
+    return api(path + (fresh ? (path.indexOf("?") > -1 ? "&" : "?") + "fresh=1" : "")).then(function (v) { state.cache[key] = { t: Date.now(), v: v }; return v; });
+  }
+  function overview(fresh) {
+    return load("ov", "overview", fresh).then(function (d) { state.ov = d; badges(); return d; });
+  }
+
+  // ---------- helpers for the pages ----------
+  var page = $("#page");
+  function setPage(title, h) { $("#title").textContent = title; page.innerHTML = h; }
+  function fail(e) { if (e && e.message === "auth") return; page.innerHTML = '<div class="err">' + esc(e && e.message || "Laden lukte niet.") + "</div>"; }
+  function counted(list) { return list.filter(function (c) { return state.withTest || !c.test; }); }
+  function hasTest() { return state.ov && state.ov.centers.some(function (c) { return c.test; }); }
+  function kpi(name, value, extra) { return '<div class="card kpi"><span>' + name + "</span><b>" + value + "</b>" + (extra || "") + "</div>"; }
   function delta(cur, prev, money) {
     var diff = cur - prev, cls = diff > 0 ? "up" : diff < 0 ? "down" : "";
-    return '<span class="d ' + cls + '">' + (diff > 0 ? "▲ " : diff < 0 ? "▼ " : "") + prevLabel[per] + ": " + (money ? thb(prev) : nf.format(prev)) + "</span>";
+    return '<span class="d ' + cls + '">' + (diff > 0 ? "▲ " : diff < 0 ? "▼ " : "") + PREV[state.per] + ": " + (money ? thb(prev) : nf.format(prev)) + "</span>";
   }
-  function kpi(name, value, d, cls) { return '<div class="kpi' + (cls ? " " + cls : "") + '"><span>' + name + "</span><b>" + value + "</b>" + (d || "") + "</div>"; }
-  var counted = function () { return data.centers.filter(function (c) { return withTest || !c.test; }); };
+  function seg() {
+    return '<div class="seg" id="seg">' + ["today", "week", "month"].map(function (k) {
+      return '<button type="button" data-p="' + k + '" class="' + (state.per === k ? "on" : "") + '">' + { today: "Vandaag", week: "Deze week", month: "Deze maand" }[k] + "</button>";
+    }).join("") + "</div>";
+  }
+  function bindSeg(again) {
+    $$("#seg button").forEach(function (b) {
+      b.onclick = function () { state.per = b.getAttribute("data-p"); store.set("per", state.per); again(); };
+    });
+  }
+  function miaPill(c) { return '<span class="pill ' + (c.paused ? "warn" : "ok") + '">' + esc(c.assistant) + (c.paused ? " gepauzeerd" : " actief") + "</span>"; }
+  function typePill(t) { return t ? '<span class="pill">' + esc(t) + "</span>" : ""; }
+  function avatar(c) { return '<span class="av">' + (c.logo ? '<img src="' + esc(c.logo) + '" alt="">' : esc((c.name || "?").charAt(0))) + "</span>"; }
+  function zoneLink(slug, id) { return "/zone?center=" + encodeURIComponent(slug) + (id ? "&c=" + encodeURIComponent(id) : ""); }
   function sum(list, which) {
-    var t = {}; KEYS.forEach(function (k) { t[k] = 0; });
-    list.forEach(function (c) { var x = which === "prev" ? c.periods[per].prev : c.periods[per]; KEYS.forEach(function (k) { t[k] += x[k] || 0; }); });
+    var keys = ["conversations", "handedOver", "bookings", "divers", "value", "commission", "booked"], t = {};
+    keys.forEach(function (k) { t[k] = 0; });
+    list.forEach(function (c) { var x = which === "prev" ? c.periods[state.per].prev : c.periods[state.per]; keys.forEach(function (k) { t[k] += x[k] || 0; }); });
     return t;
   }
+  function pause(c, btn, done) {
+    var to = !c.paused;
+    if (to && !confirm(c.assistant + " pauzeren voor " + c.name + "? Dan antwoordt ze niemand meer tot je haar weer aanzet.")) return;
+    btn.disabled = true;
+    post("pause", { slug: c.slug, paused: to }).then(function (d) {
+      c.paused = d.paused;
+      if (state.ov) state.ov.centers.forEach(function (x) { if (x.slug === c.slug) x.paused = d.paused; });
+      delete state.cache["c:" + c.slug];
+      done();
+    }).catch(function (e) { btn.disabled = false; alert(e.message); });
+  }
+  function csv(name, rows) {
+    var text = rows.map(function (r) { return r.map(function (v) { v = String(v == null ? "" : v); return /[";\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(";"); }).join("\r\n");
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob(["\ufeff" + text], { type: "text/csv;charset=utf-8" }));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  }
 
-  function renderHealth() {
-    if (!data.healthOk) { $("#health").innerHTML = '<div class="health warn"><b>Systeemcheck niet beschikbaar</b>De tabel Chat kon niet gelezen worden.</div>'; return; }
-    var live = data.centers.filter(function (c) { return c.health; });
-    var errs = live.filter(function (c) { return c.health.errors; });
-    var wait = live.filter(function (c) { return c.health.waiting && !c.paused; });
-    if (!errs.length && !wait.length) {
-      var replies = live.reduce(function (a, c) { return a + c.health.replies; }, 0);
-      $("#health").innerHTML = '<div class="health ok"><b>Alles draait</b>Geen foutmeldingen en geen duikers zonder antwoord in de laatste 24 uur (' + nf.format(replies) + " antwoorden van Mia).</div>";
-      return;
-    }
+  // ---------- bar chart (one series, hover tooltip) ----------
+  var charts = {};
+  function chart(id, values, fmt, day0) {
+    charts[id] = { values: values, fmt: fmt, day0: day0 };
+    var max = Math.max.apply(null, values.concat([1])), n = values.length, W = 600, H = 150, pb = 18;
+    var bw = W / n, h = "";
+    values.forEach(function (v, i) {
+      var bh = v ? Math.max(3, (v / max) * (H - pb - 6)) : 0, x = i * bw + 1, w = Math.max(2, bw - 2);
+      if (bh) h += '<path d="M' + x + "," + (H - pb) + "V" + (H - pb - bh + 3) + "q0,-3 3,-3h" + (w - 6) + "q3,0 3,3V" + (H - pb) + 'Z" fill="var(--bar)"/>';
+      h += '<rect x="' + (i * bw) + '" y="0" width="' + bw + '" height="' + H + '" fill="transparent" data-i="' + i + '" tabindex="-1"/>';
+    });
+    h += '<line x1="0" x2="' + W + '" y1="' + (H - pb) + '" y2="' + (H - pb) + '" stroke="var(--line)"/>';
+    var d0 = new Date(day0), dN = new Date(Date.parse(day0) + (n - 1) * 864e5);
+    h += '<text class="axis" x="0" y="' + (H - 3) + '">' + esc(date(d0.toISOString())) + "</text>";
+    h += '<text class="axis" x="' + W + '" y="' + (H - 3) + '" text-anchor="end">vandaag</text>';
+    return '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" data-chart="' + id + '" role="img" aria-label="Staafdiagram per dag, laatste ' + n + ' dagen">' + h + "</svg>";
+  }
+  document.addEventListener("pointermove", function (e) {
+    var tip = $("#tip"), t = e.target;
+    var svg = t && t.closest ? t.closest("svg[data-chart]") : null;
+    if (!svg || !t.hasAttribute("data-i")) { tip.style.display = "none"; return; }
+    var c = charts[svg.getAttribute("data-chart")], i = +t.getAttribute("data-i");
+    var d = new Date(Date.parse(c.day0) + i * 864e5 + 12 * 36e5);
+    tip.innerHTML = "<b>" + esc(c.fmt(c.values[i])) + "</b>" + esc(d.toLocaleDateString("nl-BE", { weekday: "short", day: "numeric", month: "short" }));
+    tip.style.display = "block";
+    var x = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 8);
+    tip.style.left = x + "px"; tip.style.top = (e.clientY - tip.offsetHeight - 10) + "px";
+  });
+
+  // ---------- nav badges ----------
+  function badges() {
+    var ov = state.ov; if (!ov) return;
+    var sysBad = ov.centers.some(function (c) { return c.health && (c.health.errors || (c.health.waiting && !c.paused)); }) || !ov.healthOk;
+    var n = $("#n-systeem"); if (n) { n.hidden = !sysBad; n.className = "dot"; n.textContent = ""; }
+  }
+  function inboxBadge(items) {
+    var n = $("#n-inbox"); if (!n) return;
+    var k = items.filter(function (x) { return (x.needsYou || x.waiting) && (state.withTest || !x.test); }).length;
+    n.hidden = !k; n.textContent = k;
+  }
+
+  // ---------- Overzicht ----------
+  function pOverview(fresh) {
+    if (!state.ov) setPage("Overzicht", '<div class="skel"></div>');
+    overview(fresh).then(function (ov) {
+      if (route().k !== "overzicht") return;
+      var list = counted(ov.centers), t = sum(list), pv = sum(list, "prev");
+      var open = list.reduce(function (a, c) { return a + c.openHandovers; }, 0);
+      var reply = (state.withTest || !hasTest() ? ov.reply.all : ov.reply.live)[state.per];
+      var daily = Array.from({ length: 30 }, function () { return [0, 0, 0]; });
+      list.forEach(function (c) { c.daily.forEach(function (d, i) { daily[i][0] += d[0]; daily[i][1] += d[1]; daily[i][2] += d[2]; }); });
+      var conv30 = daily.reduce(function (a, d) { return a + d[0]; }, 0), val30 = daily.reduce(function (a, d) { return a + d[2]; }, 0);
+
+      var h = '<div class="bar">' + seg() + '<span class="sp"></span>' + "" + "</div>";
+      h += healthBox(ov, false);
+      h += '<div class="kpis">' +
+        kpi("Nieuwe gesprekken", nf.format(t.conversations), delta(t.conversations, pv.conversations)) +
+        kpi("Boekingen", nf.format(t.bookings) + " <small>" + nf.format(t.divers) + " duikers</small>", delta(t.bookings, pv.bookings)) +
+        kpi("Boekingswaarde", thb(t.value), delta(t.value, pv.value, true)) +
+        kpi("Commissie Talay", thb(t.commission), delta(t.commission, pv.commission, true)) +
+        kpi("Overdrachten", nf.format(t.handedOver) + (open ? " <small>" + open + " open</small>" : ""), delta(t.handedOver, pv.handedOver)) +
+        kpi("Eerste antwoord", secs(reply), '<span class="d">mediaan, ' + LABEL[state.per] + "</span>") + "</div>";
+      h += '<div class="grid2 sec">' +
+        '<div class="card"><h2>Nieuwe gesprekken per dag</h2><div class="chart"><div class="tot"><b>' + nf.format(conv30) + "</b> in 30 dagen</div>" +
+          chart("conv", daily.map(function (d) { return d[0]; }), function (v) { return nf.format(v) + " gesprekken"; }, ov.day0) + "</div></div>" +
+        '<div class="card"><h2>Boekingswaarde per dag</h2><div class="chart"><div class="tot"><b>' + thb(val30) + "</b> in 30 dagen</div>" +
+          chart("val", daily.map(function (d) { return d[2]; }), thb, ov.day0) + "</div></div></div>";
+      h += '<div class="sec"><h2>Centra, ' + LABEL[state.per] + ' <a href="#/centra">Alle centra →</a></h2><div class="card tw"><table class="t"><thead><tr><th>Center</th><th>Assistent</th><th class="n">Gesprekken</th><th class="n">Boekingen</th><th class="n">Waarde</th><th class="n">Commissie</th><th class="n">Eerste antwoord</th><th>Signalen</th></tr></thead><tbody>' +
+        ov.centers.map(function (c) {
+          var x = c.periods[state.per], hl = c.health || {}, sig = [];
+          if (hl.errors) sig.push('<span class="pill bad">' + hl.errors + " fout" + (hl.errors > 1 ? "en" : "") + "</span>");
+          if (hl.waiting && !c.paused) sig.push('<span class="pill warn">' + hl.waiting + " wacht</span>");
+          if (c.openHandovers) sig.push('<span class="pill sand">' + c.openHandovers + " overdracht</span>");
+          return '<tr class="link' + (c.test && !state.withTest ? " muted" : "") + '" data-href="#/centra/' + esc(c.slug) + '"><td class="nm"><b>' + esc(c.name) + "</b><small>" + esc(c.type || c.slug) + "</small></td><td>" + miaPill(c) + '</td><td class="n">' + nf.format(x.conversations) +
+            '</td><td class="n">' + nf.format(x.bookings) + '</td><td class="n">' + thb(x.value) + '</td><td class="n">' + thb(x.commission) + '</td><td class="n">' + secs(x.replySeconds) + "</td><td>" + (sig.join(" ") || '<span class="muted">–</span>') + "</td></tr>";
+        }).join("") + "</tbody></table></div></div>";
+      if (ov.activity.length) h += '<div class="sec"><h2>Laatste wijzigingen in de zones <a href="#/systeem">Alles →</a></h2><div class="card rows">' + ov.activity.slice(0, 6).map(actRow).join("") + "</div></div>";
+      setPage("Overzicht", h);
+      bindSeg(pOverview);
+      $$("tr[data-href]").forEach(function (r) { r.onclick = function () { location.hash = r.getAttribute("data-href"); }; });
+    }).catch(fail);
+  }
+  function actRow(a) {
+    return '<div class="row"><div class="x"><div class="l1"><b>' + esc(a.center) + '</b><span class="muted">' + esc(a.who) + "</span></div><div class=\"pv\">" + esc(a.what) + '</div></div><span class="tm">' + esc(a.at.slice(5).replace("-", "/")) + "</span></div>";
+  }
+  function healthBox(ov, full) {
+    if (!ov.healthOk) return '<div class="alert warn"><div class="x"><b>Systeemcheck niet beschikbaar</b>De tabel Chat kon niet gelezen worden.</div></div>';
+    var errs = ov.centers.filter(function (c) { return c.health && c.health.errors; });
+    var wait = ov.centers.filter(function (c) { return c.health && c.health.waiting && !c.paused; });
+    var paused = ov.centers.filter(function (c) { return c.paused && !c.test; });
     var h = "";
-    if (errs.length) h += '<div class="health bad"><b>Mia stuurde het sorry-bericht</b>' +
-      errs.map(function (c) { return e(c.name) + ": " + c.health.errors + "×"; }).join(" · ") +
-      " in de laatste 24 uur. Kijk eerst naar het API-tegoed en de Make-scenario's (inbound v2).</div>";
-    if (wait.length) h += '<div class="health warn"><b>Duikers zonder antwoord (langer dan ' + data.waitMin + " min)</b><ul>" +
-      wait.map(function (c) {
-        return c.health.waitingList.map(function (w) {
-          return "<li>" + e(c.name) + ": " + e(w.name || "duiker") + " · “" + e(w.text) + "” · " + ago(w.at) + "</li>";
-        }).join("");
-      }).join("") + '</ul><span class="muted">Een “bedankt” of “ok” zonder antwoord is normaal.</span></div>';
-    $("#health").innerHTML = h;
+    if (errs.length) h += '<div class="alert bad"><div class="x"><b>' + esc(ov.centers[0] && errs[0].assistant || "Mia") + ' stuurde het sorry-bericht</b>' +
+      errs.map(function (c) { return esc(c.name) + ": " + c.health.errors + "×"; }).join(" · ") + " in de laatste 24 uur. Kijk eerst naar het API-tegoed van Anthropic en Make (inbound v2).</div></div>";
+    if (wait.length) h += '<div class="alert warn"><div class="x"><b>Duikers zonder antwoord</b>' +
+      wait.map(function (c) { return esc(c.name) + ": " + c.health.waiting; }).join(" · ") + " (langer dan " + ov.waitMin + ' min). <a href="#/inbox">Open de inbox →</a></div></div>';
+    if (paused.length && full) h += '<div class="alert warn"><div class="x"><b>Gepauzeerd</b>' + paused.map(function (c) { return esc(c.name); }).join(", ") + "</div></div>";
+    if (!h) {
+      var replies = ov.centers.reduce(function (a, c) { return a + (c.health ? c.health.replies : 0); }, 0);
+      h = '<div class="alert ok"><div class="x"><b>Alles draait</b>Geen foutmeldingen en geen duikers zonder antwoord in de laatste 24 uur · ' + nf.format(replies) + " antwoorden verstuurd.</div></div>";
+    }
+    return h;
   }
 
-  function render() {
-    if (!data) return;
-    $("#testWrap").hidden = !data.centers.some(function (c) { return c.test; });
-    $("#withTest").checked = withTest;
-    renderHealth();
-    var list = counted(), t = sum(list), pv = sum(list, "prev");
-    var open = list.reduce(function (a, c) { return a + c.openHandovers; }, 0);
-    var reply = (withTest || !data.centers.some(function (c) { return c.test; }) ? data.reply.all : data.reply.live)[per];
-    $("#kpis").innerHTML =
-      kpi("Nieuwe gesprekken", nf.format(t.conversations), delta(t.conversations, pv.conversations)) +
-      kpi("Boekingen", nf.format(t.bookings) + " <small>" + nf.format(t.divers) + " duikers</small>", delta(t.bookings, pv.bookings)) +
-      kpi("Boekingswaarde", thb(t.value), delta(t.value, pv.value, true)) +
-      kpi("Commissie Talay", thb(t.commission), delta(t.commission, pv.commission, true)) +
-      kpi("Overdrachten", nf.format(t.handedOver) + (open ? " <small>" + open + " open</small>" : ""), delta(t.handedOver, pv.handedOver)) +
-      kpi("Eerste antwoord (mediaan)", secs(reply), '<span class="d">' + label[per] + "</span>");
-    $("#h2").textContent = "Per center, " + label[per];
-    $("#grid").innerHTML = data.centers.map(function (c) {
-      var x = c.periods[per], h = c.health || {};
-      var alarm = h.errors > 0;
-      var conv = x.conversations ? Math.round(x.booked / x.conversations * 1000) / 10 : null;
-      return '<section class="c' + (alarm ? " alarm" : c.paused ? " paused" : "") + '">' +
-        '<div class="top"><div class="nm"><b>' + e(c.name) + "</b><small>" + e(c.slug) + (c.channel ? " · kanaal " + e(c.channel) : " · geen kanaal") + " · " + c.staff + " team</small></div>" +
-        '<div class="pills"><span class="pill ' + (c.paused ? "off" : "on") + '">' + e(c.assistant) + (c.paused ? " gepauzeerd" : " actief") + "</span>" +
-        (c.type ? '<span class="pill">' + e(c.type) + "</span>" : "") + "</div></div>" +
-        '<div class="nums">' +
-          "<div><span>Gesprekken</span><b>" + nf.format(x.conversations) + "</b>" + delta(x.conversations, x.prev.conversations) + "</div>" +
-          "<div><span>Boekingen</span><b>" + nf.format(x.bookings) + "</b>" + delta(x.bookings, x.prev.bookings) + "</div>" +
-          "<div><span>Duikers</span><b>" + nf.format(x.divers) + "</b></div>" +
-          "<div><span>Waarde</span><b>" + thb(x.value) + "</b></div>" +
-          "<div><span>Commissie</span><b>" + thb(x.commission) + "</b></div>" +
-          "<div><span>Overdrachten</span><b>" + nf.format(x.handedOver) + "</b></div>" +
-        "</div>" +
-        '<div class="meta">' +
-          "<span>Eerste antwoord (mediaan)</span><b>" + secs(x.replySeconds) + "</b>" +
-          "<span>Reactie team na overdracht</span><b>" + mins(x.teamMinutes) + (x.teamCount ? ' <small class="muted">(' + x.teamCount + ")</small>" : "") + "</b>" +
-          "<span>Conversie</span><b>" + (conv == null ? "–" : nf.format(conv) + " %") + "</b>" +
-          "<span>Buiten kantooruren</span><b>" + nf.format(x.outsideHours) + "</b>" +
-          "<span>Geboekt na follow-up</span><b>" + nf.format(x.afterFollowUp) + "</b>" +
-          "<span>Open overdrachten (7 d)</span><b" + (c.openHandovers ? ' class="warn"' : "") + ">" + nf.format(c.openHandovers) + "</b>" +
-          (c.health ?
-            "<span>Laatste antwoord " + e(c.assistant) + "</span><b>" + ago(h.lastMia) + "</b>" +
-            "<span>Fouten / zonder antwoord (24 u)</span><b class=\\"" + (h.errors ? "bad" : h.waiting ? "warn" : "ok") + "\\">" + h.errors + " / " + h.waiting + "</b>" : "") +
-          "<span>Laatste nieuw gesprek</span><b>" + ago(c.lastConversation) + "</b>" +
-        "</div>" +
-        '<div class="acts">' +
-          (c.validSlug ? '<a class="btn" href="/zone?center=' + encodeURIComponent(c.slug) + '">Open zone</a>' : '<span class="muted">Slug ongeldig: niet zichtbaar in de zone</span>') +
-          '<button class="btn" type="button" data-slug="' + e(c.slug) + '" data-paused="' + (c.paused ? "1" : "") + '">' +
-            (c.paused ? e(c.assistant) + " weer aanzetten" : e(c.assistant) + " pauzeren") + "</button>" +
-        "</div></section>";
-    }).join("") || '<p class="muted">Nog geen centra in Airtable.</p>';
-    $("#upd").textContent = "Bijgewerkt " + new Date(data.updated).toLocaleTimeString("nl-BE", { hour: "2-digit", minute: "2-digit" });
+  // ---------- Inbox ----------
+  var inboxFilter = store.get("inbox", "all"), inboxCenter = "";
+  function pInbox(fresh) {
+    if (!state.cache.inbox) setPage("Inbox", '<div class="skel"></div>');
+    load("inbox", "inbox", fresh).then(function (d) {
+      inboxBadge(d.items);
+      if (route().k !== "inbox") return;
+      var all = d.items.filter(function (x) { return state.withTest || !x.test; });
+      var need = all.filter(function (x) { return x.needsYou; }), wait = all.filter(function (x) { return x.waiting && !x.needsYou; });
+      var list = inboxFilter === "need" ? need : inboxFilter === "wait" ? wait : all;
+      if (inboxCenter) list = list.filter(function (x) { return x.slug === inboxCenter; });
+      var centers = {}; all.forEach(function (x) { centers[x.slug] = x.center; });
+      var h = '<div class="bar"><div class="chips">' +
+        [["all", "Alle open gesprekken", all.length], ["need", "Team nodig", need.length], ["wait", "Zonder antwoord", wait.length]].map(function (f) {
+          return '<button class="chip' + (inboxFilter === f[0] ? " on" : "") + '" data-f="' + f[0] + '">' + f[1] + '<span class="c">' + f[2] + "</span></button>";
+        }).join("") + '</div><span class="sp"></span><select class="in" id="ic"><option value="">Alle centra</option>' +
+        Object.keys(centers).map(function (s) { return '<option value="' + esc(s) + '"' + (s === inboxCenter ? " selected" : "") + ">" + esc(centers[s]) + "</option>"; }).join("") + "</select></div>";
+      h += '<p class="muted" style="margin:-6px 0 12px;font-size:13.5px">Gesprekken waarin de duiker de laatste 24 uur schreef: daarin mag het team nog vrij antwoorden. Een klik opent het gesprek in de zone van dat center.</p>';
+      h += '<div class="card rows">' + (list.map(function (x) {
+        var tags = (x.needsYou ? '<span class="pill sand">Team nodig</span>' : "") + (x.waiting ? '<span class="pill warn">Geen antwoord</span>' : "") +
+          (x.teamActive ? '<span class="pill ok">Team neemt over</span>' : "") + (x.language ? '<span class="pill">' + esc(String(x.language).toUpperCase()) + "</span>" : "");
+        var left = x.closesAt ? (Date.parse(x.closesAt) - Date.now()) / 36e5 : 0;
+        return '<a class="row" target="_blank" rel="noopener" href="' + zoneLink(x.slug, x.id) + '"><div class="x"><div class="l1"><b>' + esc(x.name || "Duiker") + '</b><span class="muted">' + esc(x.center) + "</span>" + tags + '</div><div class="pv">' +
+          (x.previewDir === "Customer" ? "" : esc(x.previewDir === "Mia" ? "Assistent: " : "Team: ")) + esc(x.preview) + '</div></div><span class="tm">' + esc(ago(x.lastAt)) +
+          (left > 0 ? '<br><span style="color:' + (left < 3 ? "var(--warn)" : "inherit") + '">nog ' + (left < 1 ? Math.max(1, Math.round(left * 60)) + " min" : Math.floor(left) + " u") + "</span>" : "") + "</span></a>";
+      }).join("") || '<div class="empty">Niets open. Alles is beantwoord.</div>') + "</div>";
+      setPage("Inbox", h);
+      $$(".chip[data-f]").forEach(function (b) { b.onclick = function () { inboxFilter = b.getAttribute("data-f"); store.set("inbox", inboxFilter); pInbox(); }; });
+      $("#ic").onchange = function () { inboxCenter = this.value; pInbox(); };
+    }).catch(fail);
   }
 
-  function load(fresh) {
-    $("#refresh").disabled = true;
-    return fetch("/zone/admin/api/overview" + (fresh ? "?fresh=1" : ""), { credentials: "same-origin" })
-      .then(function (r) { if (r.status === 401) { location.reload(); throw new Error("auth"); } return r.json(); })
-      .then(function (d) { if (d.error) throw new Error(d.error); data = d; $("#err").innerHTML = ""; render(); })
-      .catch(function (x) { if (x.message !== "auth") $("#err").innerHTML = '<div class="err">' + e(x.message || "Laden lukte niet.") + "</div>"; })
-      .then(function () { $("#refresh").disabled = false; });
+  // ---------- Zoeken ----------
+  function pSearch() {
+    var qv = decodeURIComponent((location.hash.split("?q=")[1] || ""));
+    setPage("Zoeken", '<form id="sf"><input class="big" id="sq" type="search" placeholder="Naam van een duiker, telefoonnummer, contact-ID of boekingsref" value="' + esc(qv) + '" autofocus></form><div id="sr" class="sec"></div>');
+    $("#sf").onsubmit = function (e) { e.preventDefault(); location.hash = "#/zoeken?q=" + encodeURIComponent($("#sq").value.trim()); };
+    if (qv.length < 2) { $("#sr").innerHTML = '<p class="muted">Zoekt in alle centra: duikers (naam, nummer, contact-ID) en boekingen (ref, naam van de betaler).</p>'; return; }
+    $("#sr").innerHTML = '<div class="skel"></div>';
+    api("search?q=" + encodeURIComponent(qv)).then(function (d) {
+      var h = '<div class="grid2"><div class="card"><h2>Duikers <span class="muted">' + d.leads.length + '</span></h2><div class="rows">' +
+        (d.leads.map(function (l) {
+          return '<a class="row" target="_blank" rel="noopener" href="' + zoneLink(l.slug, l.id) + '"><div class="x"><div class="l1"><b>' + esc(l.name || l.contact || "Duiker") + '</b>' + (l.status ? '<span class="pill">' + esc(l.status) + "</span>" : "") +
+            '</div><div class="pv">' + esc(l.center) + (l.contact ? " · " + esc(l.contact) : "") + '</div></div><span class="tm">' + esc(date(l.created)) + "</span></a>";
+        }).join("") || '<div class="empty">Geen duikers gevonden.</div>') + '</div></div><div class="card"><h2>Boekingen <span class="muted">' + d.bookings.length + '</span></h2><div class="rows">' +
+        (d.bookings.map(function (b) {
+          return '<div class="row"><div class="x"><div class="l1"><b>' + esc(b.ref || "–") + "</b><span>" + esc(b.name) + "</span>" + (b.cancelled ? '<span class="pill warn">' + esc(b.status) + "</span>" : "") +
+            '</div><div class="pv">' + esc(b.center) + " · " + esc(b.product) + " · " + b.divers + " duiker" + (b.divers > 1 ? "s" : "") + (b.date ? " · " + esc(b.date) : "") + '</div></div><span class="tm">' + thb(b.total) + "</span></div>";
+        }).join("") || '<div class="empty">Geen boekingen gevonden.</div>') + "</div></div></div>";
+      $("#sr").innerHTML = h;
+    }).catch(function (e) { $("#sr").innerHTML = '<div class="err">' + esc(e.message) + "</div>"; });
   }
 
-  document.querySelectorAll(".tabs button").forEach(function (b) {
-    b.classList.toggle("on", b.getAttribute("data-p") === per);
-    b.onclick = function () {
-      per = b.getAttribute("data-p");
-      try { localStorage.setItem("adm.per", per); } catch (x) {}
-      document.querySelectorAll(".tabs button").forEach(function (o) { o.classList.toggle("on", o === b); });
-      render();
-    };
-  });
-  $("#withTest").onchange = function () { withTest = this.checked; try { localStorage.setItem("adm.test", withTest ? "1" : ""); } catch (x) {} render(); };
-  $("#refresh").onclick = function () { load(true); };
-  $("#grid").addEventListener("click", function (ev) {
-    var b = ev.target.closest("button[data-slug]");
-    if (!b) return;
-    var pause = !b.getAttribute("data-paused");
-    var c = data.centers.find(function (x) { return x.slug === b.getAttribute("data-slug"); });
-    if (pause && !confirm(c.assistant + " pauzeren voor " + c.name + "? Dan antwoordt ze niemand meer tot je haar weer aanzet.")) return;
-    b.disabled = true;
-    fetch("/zone/admin/api/pause", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug: c.slug, paused: pause }) })
-      .then(function (r) { return r.json(); })
-      .then(function (d) { if (d.error) throw new Error(d.error); c.paused = d.paused; render(); })
-      .catch(function (x) { b.disabled = false; alert(x.message || "Opslaan lukte niet."); });
-  });
-  load(false);
-  setInterval(function () { if (!document.hidden) load(false); }, 120000);
-})();
-</script></body></html>`;
+  // ---------- Centra ----------
+  function pCenters(fresh) {
+    if (!state.ov) setPage("Centra", '<div class="skel"></div>');
+    overview(fresh).then(function (ov) {
+      if (route().k !== "centra" || route().id) return;
+      var h = '<div class="grid3">' + ov.centers.map(function (c) {
+        var m = c.periods.month, hl = c.health || {};
+        return '<a class="card cc" href="#/centra/' + esc(c.slug) + '"><div class="hd">' + avatar(c) + '<div class="x"><b>' + esc(c.name) + "</b><small>" + esc(c.slug) + (c.channel ? " · kanaal " + esc(c.channel) : " · geen kanaal") + '</small></div><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">' + miaPill(c) + typePill(c.type) + "</div></div>" +
+          '<div class="mini"><div><span>Gesprekken (maand)</span><b>' + nf.format(m.conversations) + "</b></div><div><span>Boekingen</span><b>" + nf.format(m.bookings) + "</b></div><div><span>Commissie</span><b>" + thb(m.commission) + "</b></div></div>" +
+          '<div class="muted" style="font-size:13px">Team ' + c.staff + " · admins " + c.admins + " · laatste antwoord " + esc(ago(hl.lastMia)) + "</div></a>";
+      }).join("") + "</div>";
+      h += '<p class="muted" style="font-size:13.5px;margin-top:16px">Een nieuw center toevoegen gaat via het stappenplan (talay.io/start → CSV-import → kanaal in respond.io). Zet het veld Type in Centers op Demo, Test, Pilot of Live.</p>';
+      setPage("Centra", h);
+    }).catch(fail);
+  }
+
+  function pCenter(slug, fresh) {
+    if (!state.cache["c:" + slug]) setPage("Center", '<div class="skel"></div>');
+    Promise.all([overview(fresh), load("c:" + slug, "center?slug=" + encodeURIComponent(slug), fresh)]).then(function (r) {
+      var ov = r[0], d = r[1];
+      if (route().id !== slug) return;
+      var c = ov.centers.find(function (x) { return x.slug === slug; }) || {};
+      var x = c.periods ? c.periods[state.per] : null, hl = c.health || {};
+      var h = '<a class="back" href="#/centra">← Alle centra</a>';
+      h += '<div class="bar"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' + avatar(c.name ? c : d) + miaPill({ assistant: d.assistant, paused: d.paused }) + typePill(d.type) +
+        '<span class="muted" style="font-size:13px">' + esc(slug) + (d.channel ? " · kanaal " + esc(d.channel) : "") + '</span></div><span class="sp"></span>' +
+        '<a class="btn" target="_blank" rel="noopener" href="' + zoneLink(slug) + '">' + icon("zone") + " Open zone</a>" +
+        '<button class="btn' + (d.paused ? " primary" : "") + '" id="pz">' + (d.paused ? esc(d.assistant) + " weer aanzetten" : esc(d.assistant) + " pauzeren") + "</button></div>";
+      if (x) {
+        h += '<div class="bar">' + seg() + "</div>";
+        h += '<div class="kpis">' +
+          kpi("Nieuwe gesprekken", nf.format(x.conversations), delta(x.conversations, x.prev.conversations)) +
+          kpi("Boekingen", nf.format(x.bookings) + " <small>" + nf.format(x.divers) + " duikers</small>", delta(x.bookings, x.prev.bookings)) +
+          kpi("Boekingswaarde", thb(x.value), delta(x.value, x.prev.value, true)) +
+          kpi("Commissie", thb(x.commission), delta(x.commission, x.prev.commission, true)) +
+          kpi("Eerste antwoord", secs(x.replySeconds), '<span class="d">mediaan</span>') +
+          kpi("Team na overdracht", mins(x.teamMinutes), '<span class="d">' + (x.teamCount ? "mediaan van " + x.teamCount : "nog geen overdrachten") + "</span>") + "</div>";
+        h += '<div class="grid2 sec"><div class="card"><h2>Boekingswaarde per dag</h2><div class="chart">' + chart("cv", c.daily.map(function (q) { return q[2]; }), thb, ov.day0) + "</div></div>" +
+          '<div class="card"><h2>Gezondheid (24 u)</h2><div class="pad"><dl class="dl">' +
+          "<dt>Laatste klantbericht</dt><dd>" + esc(ago(hl.lastCustomer)) + "</dd><dt>Laatste antwoord " + esc(d.assistant) + "</dt><dd>" + esc(ago(hl.lastMia)) + "</dd>" +
+          "<dt>Antwoorden verstuurd</dt><dd>" + nf.format(hl.replies || 0) + "</dd><dt>Sorry-berichten</dt><dd>" + (hl.errors ? '<span class="pill bad">' + hl.errors + "</span>" : "0") + "</dd>" +
+          "<dt>Zonder antwoord</dt><dd>" + (hl.waiting ? '<span class="pill warn">' + hl.waiting + "</span>" : "0") + "</dd><dt>Open overdrachten (7 d)</dt><dd>" + nf.format(c.openHandovers || 0) + "</dd>" +
+          "<dt>Conversie</dt><dd>" + (x.conversations ? nf.format(Math.round(x.booked / x.conversations * 1000) / 10) + " %" : "–") + "</dd><dt>Buiten kantooruren</dt><dd>" + nf.format(x.outsideHours) + "</dd>" +
+          "</dl></div></div></div>";
+      }
+      h += '<div class="grid2 sec"><div class="card"><h2>Recente gesprekken <span class="muted">30 d</span></h2><div class="rows">' +
+        (d.leads.slice(0, 12).map(function (l) {
+          return '<a class="row" target="_blank" rel="noopener" href="' + zoneLink(slug, l.id) + '"><div class="x"><div class="l1"><b>' + esc(l.name || "Duiker") + "</b>" + (l.language ? '<span class="pill">' + esc(l.language.toUpperCase()) + "</span>" : "") +
+            (l.status ? '<span class="pill">' + esc(l.status) + "</span>" : "") + (l.handover ? '<span class="pill sand">Overdracht</span>' : "") + (l.outside ? '<span class="pill">Buiten uren</span>' : "") +
+            '</div></div><span class="tm">' + esc(date(l.created, true)) + "</span></a>";
+        }).join("") || '<div class="empty">Geen gesprekken in 30 dagen.</div>') + "</div></div>" +
+        '<div class="card"><h2>Recente boekingen <span class="muted">30 d</span></h2><div class="tw"><table class="t"><tbody>' +
+        (d.bookings.slice(0, 12).map(function (b) {
+          return '<tr><td class="nm"><b' + (b.cancelled ? ' class="strike"' : "") + ">" + esc(b.name || b.ref) + "</b><small>" + esc(b.product) + " · " + b.divers + "×" + (b.date ? " · " + esc(b.date) : "") + '</small></td><td class="n">' + thb(b.total) + '<br><small class="muted">' + thb(b.commission) + "</small></td></tr>";
+        }).join("") || '<tr><td class="empty">Geen boekingen in 30 dagen.</td></tr>') + "</tbody></table></div></div></div>";
+      var s = d.settings, inf = s.info || {};
+      h += '<div class="grid2 sec"><div class="card"><h2>Instellingen</h2><div class="pad"><dl class="dl">' +
+        "<dt>Assistent</dt><dd>" + esc(inf.assistant || d.assistant) + "</dd><dt>Kantooruren</dt><dd>" + esc(s.hours || "–") + "</dd><dt>Meldingen naar</dt><dd>" + esc(s.alert || "–") + "</dd>" +
+        "<dt>Admins</dt><dd>" + esc(s.admins.join(", ") || "–") + "</dd><dt>Team</dt><dd>" + esc(s.staff.join(", ") || "–") + "</dd>" +
+        "<dt>Afspraakpunt</dt><dd>" + esc(inf.meeting || "–") + "</dd><dt>Talen</dt><dd>" + esc(inf.languages || "–") + "</dd><dt>Noodnummer</dt><dd>" + esc(inf.emergency || "–") + "</dd>" +
+        "</dl></div></div>" +
+        '<div class="card"><h2>Producten</h2><div class="tw"><table class="t"><thead><tr><th>Product</th><th class="n">Prijs</th><th class="n">Aanbetaling</th><th class="n">Comm.</th><th>Online</th></tr></thead><tbody>' +
+        (d.products.map(function (p) {
+          return "<tr><td>" + esc(p.name) + ' <small class="muted">' + esc(p.code) + '</small></td><td class="n">' + thb(p.price) + '</td><td class="n">' + thb(p.deposit) + '</td><td class="n">' + nf.format(p.pct) + " %</td><td>" + (p.active ? '<span class="pill ok">aan</span>' : '<span class="pill">uit</span>') + "</td></tr>";
+        }).join("") || '<tr><td class="empty" colspan="5">Geen producten.</td></tr>') + "</tbody></table></div></div></div>";
+      h += '<div class="sec card"><h2>Wijzigingslog</h2><div class="pad log">' + (d.log.length ? esc(d.log.join("\n")) : "Nog geen wijzigingen.") + "</div></div>";
+      setPage(d.name, h);
+      bindSeg(function () { pCenter(slug); });
+      $("#pz").onclick = function () { pause(d, this, function () { pCenter(slug); }); };
+    }).catch(fail);
+  }
+
+  // ---------- Boekingen + Commissie ----------
+  var bookMonth = "", bookCenter = "", bookStatus = "all";
+  function monthBar(d, extra) {
+    return '<select class="in" id="bm">' + d.months.map(function (m) { return '<option value="' + m.value + '"' + (m.value === d.month ? " selected" : "") + ">" + esc(monthName(m.value)) + "</option>"; }).join("") + "</select>" + (extra || "");
+  }
+  function monthName(v) { return new Date(v + "-15T12:00:00Z").toLocaleDateString("nl-BE", { month: "long", year: "numeric" }); }
+  function bindMonth(again) { $("#bm").onchange = function () { bookMonth = this.value; again(); }; }
+  function stripeNote(d) { return d.system.stripe === "test" ? '<div class="alert warn"><div class="x"><b>Stripe staat in testmodus</b>Bedragen en boekingen hieronder zijn testdata.</div></div>' : ""; }
+  function bookingsData(fresh) { return load("b:" + (bookMonth || "now"), "bookings" + (bookMonth ? "?month=" + bookMonth : ""), fresh); }
+
+  function pBookings(fresh) {
+    setPage("Boekingen", '<div class="skel"></div>');
+    bookingsData(fresh).then(function (d) {
+      if (route().k !== "boekingen") return;
+      bookMonth = d.month;
+      var list = d.bookings.filter(function (b) { return state.withTest || !b.test; });
+      if (bookCenter) list = list.filter(function (b) { return b.slug === bookCenter; });
+      if (bookStatus === "live") list = list.filter(function (b) { return !b.cancelled; });
+      if (bookStatus === "cx") list = list.filter(function (b) { return b.cancelled; });
+      var live = list.filter(function (b) { return !b.cancelled; });
+      var s = function (arr, k) { return arr.reduce(function (a, b) { return a + (b[k] || 0); }, 0); };
+      var h = '<div class="bar">' + monthBar(d) + '<select class="in" id="bc"><option value="">Alle centra</option>' +
+        d.centers.filter(function (c) { return state.withTest || !c.test; }).map(function (c) { return '<option value="' + esc(c.slug) + '"' + (c.slug === bookCenter ? " selected" : "") + ">" + esc(c.name) + "</option>"; }).join("") + "</select>" +
+        '<div class="chips">' + [["all", "Alle"], ["live", "Actief"], ["cx", "Geannuleerd"]].map(function (f) { return '<button class="chip' + (bookStatus === f[0] ? " on" : "") + '" data-s="' + f[0] + '">' + f[1] + "</button>"; }).join("") + "</div>" +
+        '<span class="sp"></span><button class="btn" id="bx">CSV exporteren</button></div>';
+      h += stripeNote(d);
+      h += '<div class="kpis">' + kpi("Boekingen", nf.format(live.length)) + kpi("Duikers", nf.format(s(live, "divers"))) + kpi("Waarde", thb(s(live, "total"))) +
+        kpi("Commissie", thb(s(live, "commission"))) + kpi("Geannuleerd", nf.format(list.length - live.length)) + kpi("Terugbetaald", thb(s(list, "refunded"))) + "</div>";
+      h += '<div class="sec card tw"><table class="t"><thead><tr><th>Gemaakt</th><th>Center</th><th>Ref</th><th>Klant</th><th>Product</th><th>Datum</th><th class="n">Duikers</th><th class="n">Waarde</th><th class="n">Commissie</th><th>Status</th></tr></thead><tbody>' +
+        (list.map(function (b) {
+          return "<tr><td>" + esc(date(b.created, true)) + "</td><td>" + esc(b.center) + "</td><td>" + esc(b.ref) + "</td><td>" + esc(b.name) + "</td><td>" + esc(b.product) + "</td><td>" + esc(b.date) + '</td><td class="n">' + b.divers + '</td><td class="n' + (b.cancelled ? " strike" : "") + '">' + thb(b.total) +
+            '</td><td class="n">' + thb(b.commission) + "</td><td>" + (b.cancelled ? '<span class="pill warn">' + esc(b.status) + "</span>" : '<span class="pill ok">' + esc(b.status) + "</span>") + "</td></tr>";
+        }).join("") || '<tr><td colspan="10" class="empty">Geen boekingen in ' + esc(monthName(d.month)) + ".</td></tr>") + "</tbody></table></div>";
+      setPage("Boekingen", h);
+      bindMonth(pBookings);
+      $("#bc").onchange = function () { bookCenter = this.value; pBookings(); };
+      $$(".chip[data-s]").forEach(function (b) { b.onclick = function () { bookStatus = b.getAttribute("data-s"); pBookings(); }; });
+      $("#bx").onclick = function () {
+        csv("talay-boekingen-" + d.month + ".csv", [["Gemaakt", "Center", "Ref", "Klant", "Product", "Activiteitsdatum", "Duikers", "Waarde THB", "Commissie THB", "Terugbetaald THB", "Status"]].concat(
+          list.map(function (b) { return [b.created.slice(0, 16).replace("T", " "), b.center, b.ref, b.name, b.product, b.date, b.divers, b.total, b.commission, b.refunded, b.status]; })));
+      };
+    }).catch(fail);
+  }
+
+  function pCommission(fresh) {
+    setPage("Commissie", '<div class="skel"></div>');
+    bookingsData(fresh).then(function (d) {
+      if (route().k !== "commissie") return;
+      bookMonth = d.month;
+      var rows = d.centers.filter(function (c) { return state.withTest || !c.test; }).map(function (c) {
+        var bs = d.bookings.filter(function (b) { return b.slug === c.slug; }), live = bs.filter(function (b) { return !b.cancelled; });
+        var r = { c: c, n: live.length, cx: bs.length - live.length, divers: 0, value: 0, gross: 0, refunded: 0, list: bs };
+        live.forEach(function (b) { r.divers += b.divers; r.value += b.total; });
+        bs.forEach(function (b) { r.gross += b.commission; r.refunded += b.refunded; });
+        r.net = r.gross - r.refunded;
+        return r;
+      });
+      var tot = rows.reduce(function (a, r) { ["n", "cx", "divers", "value", "gross", "refunded", "net"].forEach(function (k) { a[k] += r[k]; }); return a; }, { n: 0, cx: 0, divers: 0, value: 0, gross: 0, refunded: 0, net: 0 });
+      var h = '<div class="bar">' + monthBar(d) + '<span class="sp"></span><button class="btn primary" id="cx">CSV voor facturatie</button></div>';
+      h += stripeNote(d);
+      h += '<div class="kpis">' + kpi("Netto commissie", thb(tot.net)) + kpi("Bruto commissie", thb(tot.gross)) + kpi("Terugbetaald", thb(tot.refunded)) + kpi("Boekingswaarde", thb(tot.value)) + kpi("Boekingen", nf.format(tot.n)) + kpi("Geannuleerd", nf.format(tot.cx)) + "</div>";
+      h += '<div class="sec card tw"><table class="t"><thead><tr><th>Center</th><th class="n">Boekingen</th><th class="n">Geannuleerd</th><th class="n">Duikers</th><th class="n">Waarde</th><th class="n">Commissie</th><th class="n">Terugbetaald</th><th class="n">Netto</th><th></th></tr></thead><tbody>' +
+        rows.map(function (r) {
+          return '<tr><td class="nm"><b>' + esc(r.c.name) + '</b></td><td class="n">' + r.n + '</td><td class="n">' + r.cx + '</td><td class="n">' + r.divers + '</td><td class="n">' + thb(r.value) + '</td><td class="n">' + thb(r.gross) + '</td><td class="n">' + thb(r.refunded) + '</td><td class="n"><b>' + thb(r.net) + '</b></td><td class="n"><button class="btn" data-csv="' + esc(r.c.slug) + '"' + (r.list.length ? "" : " disabled") + ">CSV</button></td></tr>";
+        }).join("") + '</tbody><tfoot><tr><td>Totaal</td><td class="n">' + tot.n + '</td><td class="n">' + tot.cx + '</td><td class="n">' + tot.divers + '</td><td class="n">' + thb(tot.value) + '</td><td class="n">' + thb(tot.gross) + '</td><td class="n">' + thb(tot.refunded) + '</td><td class="n">' + thb(tot.net) + "</td><td></td></tr></tfoot></table></div>";
+      h += '<p class="muted" style="font-size:13.5px">Per maand van aanmaak van de boeking (Koh Tao-tijd). Commissie = Commission THB, anders de betaalde aanbetaling. Netto = commissie min terugbetaald.</p>';
+      setPage("Commissie", h);
+      bindMonth(pCommission);
+      var lines = function (list) { return list.map(function (b) { return [b.center, b.created.slice(0, 10), b.ref, b.name, b.product, b.date, b.divers, b.total, b.commission, b.refunded, b.commission - b.refunded, b.status]; }); };
+      var head = [["Center", "Gemaakt", "Ref", "Klant", "Product", "Activiteitsdatum", "Duikers", "Waarde THB", "Commissie THB", "Terugbetaald THB", "Netto THB", "Status"]];
+      $("#cx").onclick = function () { csv("talay-commissie-" + d.month + ".csv", head.concat(lines([].concat.apply([], rows.map(function (r) { return r.list; }))))); };
+      $$("[data-csv]").forEach(function (b) { b.onclick = function () { var r = rows.find(function (x) { return x.c.slug === b.getAttribute("data-csv"); }); csv("talay-commissie-" + r.c.slug + "-" + d.month + ".csv", head.concat(lines(r.list))); }; });
+    }).catch(fail);
+  }
+
+  // ---------- Aanmeldingen ----------
+  function pIntake(fresh) {
+    setPage("Aanmeldingen", '<div class="skel"></div>');
+    load("intake", "intake", fresh).then(function (d) {
+      if (route().k !== "aanmeldingen") return;
+      if (d.missing) { setPage("Aanmeldingen", '<div class="alert warn"><div class="x"><b>Nog niet ingesteld</b>De aanmeldingen van talay.io/start komen in de Airtable-tabel Intake. Die tabel bestaat nog niet (zie het onboarding-stappenplan, PR #2).</div></div>'); return; }
+      var STATUS = ["New", "In progress", "Live", "Declined"], NL = { New: "Nieuw", "In progress": "Bezig", Live: "Live", Declined: "Afgewezen" };
+      var h = '<div class="card rows">' + (d.items.map(function (x) {
+        var wa = String(x.whatsapp || "").replace(/[^\d]/g, "");
+        return '<div class="row"><div class="x"><div class="l1"><b>' + esc(x.centre || "Onbekend center") + '</b><span class="muted">' + esc(x.name) + "</span></div>" +
+          '<div class="pv">' + (x.email ? '<a href="mailto:' + esc(x.email) + '">' + esc(x.email) + "</a>" : "") + (wa ? ' · <a target="_blank" rel="noopener" href="https://wa.me/' + wa + '">WhatsApp</a>' : "") + " · " + esc(date(x.received, true)) + "</div>" +
+          (x.summary ? '<button class="btn" style="margin-top:8px" data-sum>Samenvatting</button><div class="sum">' + esc(x.summary) + "</div>" : "") + "</div>" +
+          '<select class="in" data-id="' + esc(x.id) + '">' + STATUS.map(function (s) { return '<option value="' + s + '"' + (s === x.status ? " selected" : "") + ">" + NL[s] + "</option>"; }).join("") + "</select></div>";
+      }).join("") || '<div class="empty">Nog geen aanmeldingen.</div>') + "</div>";
+      setPage("Aanmeldingen", h);
+      $$("[data-sum]").forEach(function (b) { b.onclick = function () { b.nextElementSibling.classList.toggle("open"); }; });
+      $$("select[data-id]").forEach(function (s) {
+        s.onchange = function () { s.disabled = true; post("intake", { id: s.getAttribute("data-id"), status: s.value }).then(function () { s.disabled = false; delete state.cache.intake; }).catch(function (e) { s.disabled = false; alert(e.message); }); };
+      });
+    }).catch(fail);
+  }
+
+  // ---------- Systeem ----------
+  function pSystem(fresh) {
+    if (!state.ov) setPage("Systeem", '<div class="skel"></div>');
+    overview(fresh).then(function (ov) {
+      if (route().k !== "systeem") return;
+      var s = ov.system;
+      var item = function (ok, name, text) { return '<div class="row"><span class="pill ' + (ok === true ? "ok" : ok === false ? "bad" : "warn") + '">' + (ok === true ? "OK" : ok === false ? "Uit" : "Let op") + '</span><div class="x"><b>' + name + '</b><div class="pv">' + text + "</div></div></div>"; };
+      var h = healthBox(ov, true);
+      h += '<div class="grid2"><div class="card"><h2>Koppelingen</h2><div class="rows">' +
+        item(true, "Airtable", "Bereikbaar. Base " + esc(s.base)) +
+        item(ov.healthOk ? true : false, "Tabel Chat", ov.healthOk ? "Leesbaar, basis van de inbox en de systeemcheck." : "Niet leesbaar.") +
+        item(s.stripe === "live" ? true : s.stripe === "test" ? "warn" : false, "Stripe", s.stripe === "live" ? "Live: echte betalingen." : s.stripe === "test" ? "Testmodus: er wordt niets echt betaald." : "Geen sleutel ingesteld.") +
+        item(s.respondio, "respond.io", s.respondio ? "Token ingesteld: antwoorden vanuit de zone werken." : "RESPONDIO_TOKEN ontbreekt.") +
+        item(s.push ? true : "warn", "Pushmeldingen", s.push ? "Ingesteld." : "VAPID-sleutel ontbreekt: geen meldingen op telefoons.") +
+        item(s.accessAud ? true : "warn", "Cloudflare Access", s.accessAud ? "Beperkt tot de app van de zone (AUD)." : "ACCESS_AUD niet ingesteld: elke Access-app van Talay telt.") +
+        '</div></div><div class="card"><h2>Snel naar</h2><div class="rows">' +
+        [["Airtable", "https://airtable.com/" + s.base], ["Make", "https://www.make.com/en/login"], ["respond.io", "https://app.respond.io/"], ["Stripe", "https://dashboard.stripe.com/" + (s.stripe === "test" ? "test/" : "") + "payments"], ["Cloudflare", "https://dash.cloudflare.com/"], ["Anthropic Console (API-tegoed)", "https://console.anthropic.com/settings/billing"]].map(function (l) {
+          return '<a class="row" target="_blank" rel="noopener" href="' + esc(l[1]) + '"><div class="x"><b>' + esc(l[0]) + '</b></div><span class="tm">' + icon("zone") + "</span></a>";
+        }).join("") + "</div></div></div>";
+      h += '<div class="sec"><h2>Gezondheid per center (24 u)</h2><div class="card tw"><table class="t"><thead><tr><th>Center</th><th>Assistent</th><th>Laatste klantbericht</th><th>Laatste antwoord</th><th class="n">Antwoorden</th><th class="n">Sorry</th><th class="n">Wacht</th><th class="n">Open overdrachten</th></tr></thead><tbody>' +
+        ov.centers.map(function (c) {
+          var hl = c.health || {};
+          return '<tr class="link" data-href="#/centra/' + esc(c.slug) + '"><td class="nm"><b>' + esc(c.name) + "</b><small>" + esc(c.type || c.slug) + "</small></td><td>" + miaPill(c) + "</td><td>" + esc(ago(hl.lastCustomer)) + "</td><td>" + esc(ago(hl.lastMia)) + '</td><td class="n">' + nf.format(hl.replies || 0) +
+            '</td><td class="n">' + (hl.errors ? '<span class="pill bad">' + hl.errors + "</span>" : "0") + '</td><td class="n">' + (hl.waiting ? '<span class="pill warn">' + hl.waiting + "</span>" : "0") + '</td><td class="n">' + c.openHandovers + "</td></tr>";
+        }).join("") + "</tbody></table></div></div>";
+      h += '<div class="sec"><h2>Wijzigingen in de zones</h2><div class="card rows">' + (ov.activity.map(actRow).join("") || '<div class="empty">Nog geen wijzigingen.</div>') + "</div></div>";
+      setPage("Systeem", h);
+      $$("tr[data-href]").forEach(function (r) { r.onclick = function () { location.hash = r.getAttribute("data-href"); }; });
+    }).catch(fail);
+  }
+
+  // ---------- Team ----------
+  function pTeam(fresh) {
+    if (cfg.role !== "owner") { setPage("Team", '<div class="empty">Alleen voor eigenaars.</div>'); return; }
+    setPage("Team", '<div class="skel"></div>');
+    load("team", "team", fresh).then(function (d) {
+      if (route().k !== "team") return;
+      var h = "";
+      if (d.missing) h += '<div class="alert warn"><div class="x"><b>Tabel HQ team ontbreekt</b>Maak in Airtable een tabel <b>HQ team</b> met de velden Email, Name en Role (Owner of Staff). Tot dan heeft alleen de vaste eigenaar toegang.</div></div>';
+      h += '<div class="card"><h2>Toegang tot Talay HQ</h2><div class="tw"><table class="t"><thead><tr><th>E-mail</th><th>Naam</th><th>Rol</th><th></th></tr></thead><tbody>' +
+        d.owners.map(function (e) { return "<tr><td>" + esc(e) + '</td><td class="muted">vast (Cloudflare)</td><td><span class="pill sand">Eigenaar</span></td><td></td></tr>'; }).join("") +
+        d.members.map(function (m) {
+          return "<tr><td>" + esc(m.email) + "</td><td>" + esc(m.name) + '</td><td><select class="in" data-role="' + esc(m.id) + '"><option value="Staff"' + (m.role === "Staff" ? " selected" : "") + '>Medewerker</option><option value="Owner"' + (m.role === "Owner" ? " selected" : "") + '>Eigenaar</option></select></td><td class="n"><button class="btn danger" data-rm="' + esc(m.id) + '" data-email="' + esc(m.email) + '">Verwijderen</button></td></tr>';
+        }).join("") + "</tbody></table></div></div>";
+      if (!d.missing) h += '<div class="sec card"><h2>Iemand toevoegen</h2><div class="pad"><form class="form" id="tf"><input class="in" id="te" type="email" placeholder="naam@talay.io" required><input class="in" id="tn" placeholder="Naam"><select class="in" id="tr"><option value="Staff">Medewerker</option><option value="Owner">Eigenaar</option></select><button class="btn primary">Toevoegen</button></form>' +
+        '<p class="muted" style="font-size:13.5px;margin:10px 0 0">Medewerkers zien alles in HQ en in elke zone en kunnen de assistent pauzeren. Eigenaars beheren ook dit team. Zet het adres ook in de Access-regel van de zone in Cloudflare, anders kan die persoon niet inloggen.</p></div></div>';
+      setPage("Team", h);
+      var done = function () { delete state.cache.team; pTeam(true); };
+      var f = $("#tf"); if (f) f.onsubmit = function (e) {
+        e.preventDefault(); var b = f.querySelector("button"); b.disabled = true;
+        post("team", { action: "add", email: $("#te").value, name: $("#tn").value, role: $("#tr").value }).then(done).catch(function (x) { b.disabled = false; alert(x.message); });
+      };
+      $$("[data-role]").forEach(function (s) { s.onchange = function () { post("team", { action: "role", id: s.getAttribute("data-role"), role: s.value }).then(done).catch(function (x) { alert(x.message); }); }; });
+      $$("[data-rm]").forEach(function (b) { b.onclick = function () { if (!confirm(b.getAttribute("data-email") + " verwijderen uit Talay HQ?")) return; b.disabled = true; post("team", { action: "remove", id: b.getAttribute("data-rm") }).then(done).catch(function (x) { b.disabled = false; alert(x.message); }); }; });
+    }).catch(fail);
+  }
+
+  // ---------- router ----------
+  function route() {
+    var h = (location.hash || "#/overzicht").slice(2).split("?")[0].split("/");
+    return { k: h[0] || "overzicht", id: h[1] ? decodeURIComponent(h[1]) : "" };
+  }
+  var PAGES = { overzicht: pOverview, inbox: pInbox, zoeken: pSearch, centra: pCenters, boekingen: pBookings, commissie: pCommission, aanmeldingen: pIntake, systeem: pSystem, team: pTeam };
+  function render(fresh) {
+    var r = route();
+    $$("#nav a").forEach(function (a) { a.classList.toggle("on", a.getAttribute("data-k") === r.k); });
+    $("#tip").style.display = "none";
+    if (r.k === "centra" && r.id) return pCenter(r.id, fresh);
+    (PAGES[r.k] || pOverview)(fresh);
+    if (fresh || !state.cache.inbox) load("inbox", "inbox", fresh).then(function (d) { inboxBadge(d.items); }).catch(function () {});
+    stamp();
+  }
+  function stamp() { $("#upd").textContent = state.ov ? "Bijgewerkt " + new Date(state.ov.updated).toLocaleTimeString("nl-BE", { hour: "2-digit", minute: "2-digit" }) : ""; }
+  function setTest(v) { state.withTest = v; store.set("test", v ? "1" : ""); $("#withTest").checked = v; $("#withTest2").checked = v; render(); }
+
+  window.addEventListener("hashchange", function () { window.scrollTo(0, 0); render(); });
+  $("#withTest").checked = state.withTest;
+  $("#withTest").onchange = function () { setTest(this.checked); };
+  $("#withTest2").checked = state.withTest;
+  $("#withTest2").onchange = function () { setTest(this.checked); };
+  $("#refresh").onclick = function () { var b = this; b.disabled = true; state.cache = {}; render(true); setTimeout(function () { b.disabled = false; stamp(); }, 1500); };
+  $("#gs").onsubmit = function (e) { e.preventDefault(); var v = $("#gq").value.trim(); if (v) location.hash = "#/zoeken?q=" + encodeURIComponent(v); };
+  render();
+  // Light polling (Airtable limits): overview and inbox every 2 minutes while visible.
+  setInterval(function () {
+    if (document.hidden) return;
+    var k = route().k;
+    if (k === "overzicht" || k === "inbox" || k === "systeem") { delete state.cache[k === "inbox" ? "inbox" : "ov"]; render(); }
+  }, 120000);
 }
 
 function text(t, status = 200) {
@@ -2674,7 +3428,7 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 @media (max-width:760px){.trow1,.trow2{grid-template-columns:1fr}.trow2 #tWeek{grid-column:auto}.tarr{grid-template-columns:1fr}}
 </style></head>
 <body>
-<header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>Customer zone</small></span></div><span class="sp"></span>${switcher}<div class="htools">${superadmin ? `<a href="/zone/admin" title="All centers">All centers</a>` : ""}<button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">Sign out</span></a></div></header>
+<header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>Customer zone</small></span></div><span class="sp"></span>${switcher}<div class="htools">${superadmin ? `<a href="/zone/admin" title="Talay HQ">Talay HQ</a>` : ""}<button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">Sign out</span></a></div></header>
 <nav><button class="on" data-v="today"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></i><span class="nl">Today</span></button><button data-v="convos"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg></i><span class="nl"><span class="long">Conversations</span><span class="short">Chats</span></span><span class="count" id="count" hidden></span></button><button data-v="books"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></i><span class="nl">Bookings</span></button><button data-v="dash"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></i><span class="nl">Dashboard</span></button><button data-v="sett"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></i><span class="nl">Settings</span></button><button data-v="supp"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg></i><span class="nl">Support</span><span class="count" id="tcount" hidden></span></button></nav>
 
 <section id="today" class="view on">
@@ -3875,6 +4629,8 @@ function zoneClient(cfg) {
     apply(); window.addEventListener("resize", apply); window.addEventListener("orientationchange", function () { setTimeout(apply, 300); });
   })();
   loadList();
+  // Opened from Talay HQ with ?c=<contact id>: show that conversation straight away.
+  (function () { var m = location.search.match(/[?&]c=([A-Za-z0-9:_-]{1,64})/); if (m) openChat(m[1]); })();
   // Polling is kept light on purpose (Airtable limits): the list every 30 s while the page
   // is visible; the open conversation only when the list shows something new in it.
   setInterval(function () { if (!document.hidden) loadList(); }, 30000);
