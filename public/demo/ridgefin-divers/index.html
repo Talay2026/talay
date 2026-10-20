@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Meet Mia · Talay demo</title>
+<meta name="description" content="Try Talay live: chat with Mia, the WhatsApp assistant of our demo dive centre Ridgefin Divers, and book with a test card.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--deep:#09262F;--deep-2:#14404D;--sand:#E0A84A;--sand-2:#F3D9A6;--paper:#F4F0E6;--paper-2:#FBF8F1;--muted:#55646A;--soft:#9FB2B8;--line:#E2DACB;--wa-bg:#E9E2D6;--wa-out:#D9FDD3;--ok:#1F7A55}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--deep);font-family:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+a{color:inherit}
+.btn{display:inline-flex;align-items:center;gap:10px;border-radius:999px;padding:13px 22px;font-weight:700;font-size:16px;text-decoration:none;border:0;cursor:pointer;transition:transform .15s ease}
+.btn:hover{transform:translateY(-1px)}
+.btn-sand{background:var(--sand);color:var(--deep)}
+.btn-dark{background:var(--deep);color:var(--paper)}
+.btn-ghost{color:var(--paper);box-shadow:inset 0 0 0 1.5px rgba(244,240,230,.35)}
+.btn:focus-visible,.copy:focus-visible{outline:3px solid var(--sand);outline-offset:3px}
+
+/* demo notice */
+.notice{background:var(--sand-2);color:var(--deep);font-size:14px;text-align:center;padding:8px 16px}
+.notice b{font-weight:700}
+
+/* hero */
+.hero{background:radial-gradient(900px 420px at 88% -10%,#1C5262 0%,transparent 62%),var(--deep);color:var(--paper);overflow:hidden}
+.hero .wrap{display:grid;grid-template-columns:1fr 300px;gap:56px;align-items:center;padding-top:44px;padding-bottom:64px}
+.brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:17px;margin-bottom:40px}
+.brand .x{color:var(--soft);font-weight:500}
+.brand .rf{display:flex;align-items:center;gap:8px}
+h1{font-size:clamp(38px,5.4vw,60px);line-height:1.02;letter-spacing:-.03em;margin:0 0 18px;font-weight:800}
+h1 em{font-style:normal;color:var(--sand)}
+.lead{font-size:19px;color:#C9D4D7;margin:0 0 30px;max-width:480px}
+.ctas{display:flex;flex-wrap:wrap;gap:12px}
+.langs{display:flex;flex-wrap:wrap;gap:8px;margin-top:28px;padding:0;list-style:none}
+.langs li{font-size:13px;font-weight:600;color:var(--paper);background:rgba(244,240,230,.08);border:1px solid rgba(244,240,230,.14);border-radius:999px;padding:5px 11px}
+
+/* phone */
+.phone{position:relative;width:300px;aspect-ratio:9/19.5;background:#111416;border-radius:50px;padding:11px;box-shadow:0 0 0 2px #2A3236,0 50px 90px -30px rgba(0,0,0,.75);transform:rotate(2deg)}
+.phone::before{content:"";position:absolute;left:-3px;top:112px;width:3px;height:56px;border-radius:2px 0 0 2px;background:#2A3236}
+.phone::after{content:"";position:absolute;right:-3px;top:152px;width:3px;height:84px;border-radius:0 2px 2px 0;background:#2A3236}
+.screen{position:relative;height:100%;background:var(--wa-bg);border-radius:40px;overflow:hidden;display:flex;flex-direction:column}
+.island{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:86px;height:24px;border-radius:14px;background:#000;z-index:3}
+.status{display:flex;justify-content:space-between;align-items:center;padding:12px 26px 0;height:40px;font-size:12px;font-weight:700;color:#fff;background:#075E54}
+.status .icons{display:flex;gap:4px;align-items:center}
+.wa-head{background:#075E54;color:#fff;display:flex;align-items:center;gap:9px;padding:6px 12px 10px}
+.wa-head .back{font-size:20px;line-height:1;opacity:.9}
+.av{width:32px;height:32px;border-radius:50%;background:var(--deep);display:grid;place-items:center;flex:none;overflow:hidden}
+.wa-head b{display:block;font-size:14px;line-height:1.2}
+.wa-head span{font-size:11px;opacity:.85}
+.chat{flex:1;padding:10px 9px;display:flex;flex-direction:column;gap:6px;justify-content:flex-end;background-image:radial-gradient(rgba(9,38,47,.06) 1px,transparent 1px);background-size:12px 12px;overflow:hidden}
+.b{max-width:86%;padding:6px 9px 15px;border-radius:9px;font-size:12px;line-height:1.38;color:#111;box-shadow:0 1px 1px rgba(0,0,0,.08);position:relative}
+.b time{position:absolute;right:7px;bottom:2px;font-size:9.5px;color:#778}
+.b.in{background:#fff;align-self:flex-start;border-top-left-radius:2px}
+.b.out{background:var(--wa-out);align-self:flex-end;border-top-right-radius:2px}
+.b .l{color:#0B7FB0;word-break:break-all}
+.inputbar{display:flex;align-items:center;gap:6px;padding:7px 8px 18px;background:#F0EBE3}
+.inputbar .field{flex:1;background:#fff;border-radius:18px;height:32px;padding:0 12px;display:flex;align-items:center;font-size:12px;color:#99A}
+.inputbar .mic{width:32px;height:32px;border-radius:50%;background:#00A884;display:grid;place-items:center}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:-34px;position:relative}
+.stat{background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px 22px;box-shadow:0 18px 40px -28px rgba(9,38,47,.35)}
+.stat strong{display:block;font-size:30px;line-height:1.1;letter-spacing:-.02em;font-weight:800}
+.stat span{color:var(--muted);font-size:15px}
+.src{color:var(--muted);font-size:13px;margin:10px 2px 0}
+
+/* sections */
+section{padding-top:72px}
+h2{font-size:clamp(28px,3.6vw,40px);line-height:1.1;letter-spacing:-.02em;margin:0 0 8px;font-weight:800}
+.sub{color:var(--muted);margin:0 0 28px;max-width:620px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.feat{background:var(--paper-2);border:1px solid var(--line);border-radius:18px;padding:22px}
+.feat h3{margin:12px 0 6px;font-size:19px}
+.feat p{margin:0;color:var(--muted);font-size:15.5px}
+.ico{width:40px;height:40px;border-radius:12px;background:var(--deep);display:grid;place-items:center}
+
+.steps{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.step{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px}
+.step h3{display:flex;align-items:center;gap:12px;margin:0 0 14px;font-size:20px}
+.n{width:32px;height:32px;border-radius:50%;background:var(--sand);display:grid;place-items:center;font-size:15px;font-weight:800;flex:none}
+.step p{margin:0 0 12px;color:var(--muted);font-size:15.5px}
+.step p:last-child{margin-bottom:0}
+.msgs{display:grid;gap:8px;margin:0 0 16px}
+.try{display:flex;align-items:center;gap:10px}
+.try q{quotes:none;flex:1;min-width:0;background:var(--wa-out);border-radius:12px;border-top-right-radius:3px;padding:7px 11px;font-weight:600;font-size:15px;line-height:1.35}
+.copy{flex:none;background:var(--paper-2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;color:var(--deep)}
+.copy.done{background:var(--ok);border-color:var(--ok);color:#fff}
+.tag{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:4px 0 8px}
+.card{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:linear-gradient(135deg,var(--deep-2),var(--deep));color:var(--paper);border-radius:14px;padding:16px 18px;margin:0 0 12px}
+.card .num{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:19px;letter-spacing:.1em}
+.card small{color:var(--soft);font-size:14px}
+
+.deal{margin-top:72px;background:var(--deep);color:var(--paper);border-radius:24px;padding:36px;display:grid;grid-template-columns:1.3fr 1fr;gap:32px;align-items:center}
+.deal h2{color:var(--paper)}
+.deal p{margin:0;color:#C9D4D7}
+.deal ul{margin:0;padding:0;list-style:none;display:grid;gap:10px}
+.deal li{display:flex;gap:10px;align-items:flex-start;color:var(--paper);font-weight:600}
+.deal li::before{content:"";flex:none;width:18px;height:18px;margin-top:3px;border-radius:50%;background:var(--sand) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%2309262F' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px no-repeat}
+
+footer.wrap{padding-top:40px;padding-bottom:48px;color:var(--muted);font-size:15px;display:flex;flex-wrap:wrap;gap:8px 24px;justify-content:space-between}
+footer a{color:var(--deep);font-weight:600}
+
+@media (max-width:860px){
+  .hero .wrap{grid-template-columns:1fr;padding-top:32px;gap:44px}
+  .phone{justify-self:center;transform:none}
+  .stats{grid-template-columns:1fr;margin-top:24px}
+  .grid,.steps{grid-template-columns:1fr}
+  .deal{grid-template-columns:1fr;padding:28px}
+}
+@media (max-width:480px){
+  .wrap{padding:0 16px}
+  .phone{width:276px}
+  .step,.feat{padding:18px}
+  .brand{margin-bottom:28px}
+  .btn{width:100%;justify-content:center}
+  section{padding-top:56px}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.btn{transition:none}}
+</style>
+</head>
+<body>
+
+<div class="notice"><b>Demo:</b> Ridgefin Divers is a demo dive centre. Mia, the booking page and the emails are real; payments use a test card.</div>
+
+<header class="hero">
+  <div class="wrap">
+    <div>
+      <div class="brand">
+        <svg width="26" height="26" viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="14" fill="#F4F0E6"/><path d="M1 15a14 14 0 0 0 28 0z" fill="#E0A84A"/></svg>
+        Talay
+        <span class="x">×</span>
+        <span class="rf">
+          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 16 14.5 5l-.4 11z" fill="#E0A84A"/><rect x="4" y="16" width="16" height="2" rx="1" fill="#F4F0E6"/></svg>
+          Ridgefin Divers
+        </span>
+      </div>
+      <h1>Meet Mia. <em>Every diver answered in seconds.</em></h1>
+      <p class="lead">The WhatsApp assistant of a dive centre, built on Talay. It knows the courses, prices and schedule, answers in five languages day and night, and sends a link to book with a deposit.</p>
+      <div class="ctas">
+        <a class="btn btn-sand" href="https://wa.me/32456900033?text=Hi!" target="_blank" rel="noopener">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5 5 0 0 0 1 2.7 11.5 11.5 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6a2.6 2.6 0 0 0 1.7-1.2 2.1 2.1 0 0 0 .2-1.2c-.1-.1-.3-.2-.5-.3z"/></svg>
+          Chat with Mia
+        </a>
+        <a class="btn btn-ghost" href="#test">How to test</a>
+      </div>
+      <ul class="langs" aria-label="Languages">
+        <li>English</li><li>Deutsch</li><li>Français</li><li>Español</li><li>Nederlands</li>
+      </ul>
+    </div>
+    <div class="phone" aria-hidden="true">
+      <div class="screen">
+        <div class="island"></div>
+        <div class="status"><span>23:42</span><span class="icons">
+          <svg width="16" height="10" viewBox="0 0 16 10"><rect x="0" y="6" width="3" height="4" rx="1" fill="#fff"/><rect x="4.3" y="4" width="3" height="6" rx="1" fill="#fff"/><rect x="8.6" y="2" width="3" height="8" rx="1" fill="#fff"/><rect x="12.9" y="0" width="3" height="10" rx="1" fill="#fff"/></svg>
+          <svg width="22" height="11" viewBox="0 0 22 11"><rect x=".5" y=".5" width="18" height="10" rx="2.5" fill="none" stroke="#fff" opacity=".6"/><rect x="2" y="2" width="14" height="7" rx="1.5" fill="#fff"/><rect x="19.5" y="3.5" width="1.5" height="4" rx=".75" fill="#fff" opacity=".6"/></svg>
+        </span></div>
+        <div class="wa-head">
+          <span class="back">‹</span>
+          <div class="av"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M7 16 14.5 5l-.4 11z" fill="#E0A84A"/><rect x="4" y="16" width="16" height="2" rx="1" fill="#F4F0E6"/></svg></div>
+          <div><b>Ridgefin Divers</b><span>online</span></div>
+        </div>
+        <div class="chat">
+          <div class="b out">Hi! How much is diving here? 🤿<time>23:41</time></div>
+          <div class="b in">Hi! 👋 I'm Mia, the virtual assistant of Ridgefin Divers. Have you dived before, or would this be your first time?<time>23:41</time></div>
+          <div class="b out">First time! I'd like to try it first<time>23:42</time></div>
+          <div class="b in"><b>Basic Diver</b>: 1 day, 3,500 THB<br>All gear, boat, instructor, insurance.<br><br>You pay a small deposit online, the rest at the shop.<br><br>Pick your date here 👇<br><span class="l">talay.io/b/ridgefin-divers?p=DSD</span><time>23:42</time></div>
+        </div>
+        <div class="inputbar"><div class="field">Message</div><div class="mic"><svg width="14" height="14" viewBox="0 0 24 24"><path fill="#fff" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V22h2v-3.1A7 7 0 0 0 19 12z"/></svg></div></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="stats">
+    <div class="stat"><strong>7.2 hours</strong><span>median wait for a real answer to a night message</span></div>
+    <div class="stat"><strong>0 of 38</strong><span>night messages answered within the hour</span></div>
+    <div class="stat"><strong>0 of 67</strong><span>answers that came with a way to pay</span></div>
+  </div>
+  <p class="src">From our inquiry test with 57 dive centres on Koh Tao, October 2026.</p>
+
+  <section>
+    <h2>What Mia does</h2>
+    <p class="sub">Talay is set up with the centre's own details: courses, prices, schedules, meeting point and rules. Mia only picks the right answer; the texts are the centre's own.</p>
+    <div class="grid">
+      <div class="feat">
+        <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z" fill="#E0A84A"/></svg></div>
+        <h3>Answers in seconds, 24/7</h3>
+        <p>More than 160 standard diver questions, under the centre's name, in the diver's own language.</p>
+      </div>
+      <div class="feat">
+        <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="#E0A84A" stroke-width="2"/><path d="M3 10h18" stroke="#E0A84A" stroke-width="2"/></svg></div>
+        <h3>Turns a chat into a booking</h3>
+        <p>A link where the diver picks a date and pays a deposit by card. The team gets the booking by email.</p>
+      </div>
+      <div class="feat">
+        <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3" fill="none" stroke="#E0A84A" stroke-width="2" stroke-linecap="round"/><path d="M18 3v4h-4M6 21v-4h4" fill="none" stroke="#E0A84A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3>Follows up</h3>
+        <p>When a diver goes quiet, Mia sends a friendly reminder, at most three times, never at night.</p>
+      </div>
+      <div class="feat">
+        <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="#E0A84A" stroke-width="2"/><path d="M4 21a8 8 0 0 1 16 0" fill="none" stroke="#E0A84A" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <h3>Knows when to step back</h3>
+        <p>Medical questions, groups, schedule changes: the team gets an alert, and Mia stays quiet as soon as a person replies.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="test">
+    <h2>Try it yourself · 10 minutes</h2>
+    <p class="sub">Write to Mia as if you were a diver. Follow the four steps in order.</p>
+
+    <div class="steps">
+      <div class="step">
+        <h3><span class="n">1</span>Chat as a diver</h3>
+        <span class="tag">Easy</span>
+        <div class="msgs">
+          <div class="try"><q>Hi! How much is diving here?</q><button class="copy" type="button">Copy</button></div>
+          <div class="try"><q>Bonjour ! Qu'est-ce que je dois apporter ?</q><button class="copy" type="button">Copy</button></div>
+        </div>
+        <span class="tag">Tricky</span>
+        <div class="msgs">
+          <div class="try"><q>I have asthma, can I still dive?</q><button class="copy" type="button">Copy</button></div>
+          <div class="try"><q>My ferry arrives at 8:45, can I start the course later?</q><button class="copy" type="button">Copy</button></div>
+        </div>
+        <a class="btn btn-dark" href="https://wa.me/32456900033?text=Hi!" target="_blank" rel="noopener">Open WhatsApp</a>
+      </div>
+
+      <div class="step">
+        <h3><span class="n">2</span>Book with a test card</h3>
+        <p>Tap the booking link Mia sent, pick a date and pay with:</p>
+        <div class="card"><span class="num">4242 4242 4242 4242</span><small>12/30 · CVC 123</small></div>
+        <p>Nothing is charged. The confirmation arrives on WhatsApp.</p>
+      </div>
+
+      <div class="step">
+        <h3><span class="n">3</span>See what the team gets</h3>
+        <p>For every booking the team gets an email with the details and the balance to collect at the shop.</p>
+        <p>With <b>Manage booking</b> the team can move or cancel it, and the diver is told on WhatsApp. The tricky questions from step 1 go to the team as an alert.</p>
+      </div>
+
+      <div class="step">
+        <h3><span class="n">4</span>See the results</h3>
+        <p>Conversations, bookings and revenue via Mia, live in the dashboard.</p>
+        <a class="btn btn-dark" href="https://airtable.com/appEXBMOJa73WiQHb/shrkzC7WhyMBUsEiO" target="_blank" rel="noopener">Open dashboard</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="deal">
+    <div>
+      <h2>Free to use</h2>
+      <p>Talay only earns a small commission on bookings that come in through it, confirmed straight away or won by its follow-up. If it brings nothing, you pay nothing.</p>
+    </div>
+    <ul>
+      <li>No setup fee, no monthly fee, no contract</li>
+      <li>Switch it on and off whenever you want</li>
+      <li>Keep taking direct bookings as you do now</li>
+      <li>Nothing changes in your system</li>
+    </ul>
+  </div>
+</main>
+
+<footer class="wrap">
+  <span>Questions? <a href="https://wa.me/32456953907" target="_blank" rel="noopener">WhatsApp Jonas</a> · <a href="mailto:jonas@talay.io">jonas@talay.io</a></span>
+  <span><a href="https://talay.io">talay.io</a></span>
+</footer>
+
+<script>
+document.querySelectorAll('.copy').forEach(function(b){
+  b.addEventListener('click',function(){
+    var t=b.parentElement.querySelector('q').textContent;
+    var done=function(){b.textContent='Copied ✓';b.classList.add('done');setTimeout(function(){b.textContent='Copy';b.classList.remove('done')},1600)};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,done)}
+    else{var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy')}catch(e){}document.body.removeChild(a);done()}
+  });
+});
+</script>
+</body>
+</html>
