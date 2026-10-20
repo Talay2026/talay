@@ -43,7 +43,15 @@ export async function handleZone(request, env, ctx) {
     const email = await accessEmail(request, env);
     if (!email) return text("Please sign in again: open talay.io/zone.", 401);
 
-    const centers = await centersFor(env, email);
+    const superadmin = isSuperadmin(env, email);
+    const p0 = url.pathname.replace(/\/+$/, "");
+    if (p0 === "/zone/admin" || p0.startsWith("/zone/admin/")) {
+      if (!superadmin) return html(noAccess(email), 403);
+      return await handleAdmin(request, env, url, p0, email);
+    }
+
+    // The superadmin sees every center in the zone, as an admin of each.
+    const centers = superadmin ? await allCenters(env) : await centersFor(env, email);
     if (!centers.length) {
       return html(noAccess(email), 403);
     }
@@ -51,7 +59,7 @@ export async function handleZone(request, env, ctx) {
     const center = centers.find((c) => c.slug === wanted) || centers[0];
 
     const p = url.pathname.replace(/\/+$/, "") || "/zone";
-    if (p === "/zone") return html(app(center, centers, email));
+    if (p === "/zone") return html(app(center, centers, email, superadmin));
     const fresh = url.searchParams.get("fresh") === "1";
     if (p === "/zone/api/conversations") {
       const view = url.searchParams.get("view") === "all" ? "all" : "open";
@@ -254,17 +262,27 @@ async function centersFor(env, email) {
   return recs
     .filter((r) => String(r.fields["Staff emails"] || "").toLowerCase()
       .split(/[\s,;]+/).includes(email))
-    .map((r) => ({
-      id: r.id,
-      slug: String(first(r.fields["Slug"]) || "").toLowerCase(),
-      name: first(r.fields["Name"]) || "Dive center",
-      channel: Number(first(r.fields["Channel ID"])) || 0, // respond.io channel = this center's WhatsApp number
-      assistant: first(r.fields["Assistant name"]) || "Mia",
-      admin: splitEmails(r.fields["Admin emails"]).includes(email),
-      logo: first(r.fields["Logo"])?.thumbnails?.large?.url || first(r.fields["Logo"])?.url || "",
-    }))
+    .map((r) => centerOut(r, splitEmails(r.fields["Admin emails"]).includes(email)))
     .filter((c) => /^[a-z0-9-]{1,60}$/.test(c.slug));
 }
+async function allCenters(env) {
+  const recs = await at(env, "Centers", { sort: [{ field: "Name" }] });
+  return recs.map((r) => centerOut(r, true)).filter((c) => /^[a-z0-9-]{1,60}$/.test(c.slug));
+}
+function centerOut(r, admin) {
+  return {
+    id: r.id,
+    slug: String(first(r.fields["Slug"]) || "").toLowerCase(),
+    name: first(r.fields["Name"]) || "Dive center",
+    channel: Number(first(r.fields["Channel ID"])) || 0, // respond.io channel = this center's WhatsApp number
+    assistant: first(r.fields["Assistant name"]) || "Mia",
+    admin,
+    logo: first(r.fields["Logo"])?.thumbnails?.large?.url || first(r.fields["Logo"])?.url || "",
+  };
+}
+
+// Talay itself (Jonas). Cloudflare variable SUPERADMIN_EMAILS overrides the default.
+const isSuperadmin = (env, email) => splitEmails(env.SUPERADMIN_EMAILS || "jonas@talay.io").includes(email);
 
 // Exact match on the linked Center: FIND on the name would also match "Simple Life Divers" for "Simple Life".
 const ofCenter = (center) => `ARRAYJOIN({Center}) & '' = '${q(center.name)}'`;
@@ -1539,6 +1557,275 @@ async function saveProduct(env, center, email, b) {
 
 // ---------- Pages ----------
 
+// ---------- Superadmin: talay.io/zone/admin ----------
+// One page for Talay itself: every center side by side (today, this week, this month),
+// booking value and commission, response times, Mia on/paused with a button, and a link
+// into each center's zone. Only for SUPERADMIN_EMAILS (default jonas@talay.io).
+
+async function handleAdmin(request, env, url, p, email) {
+  if (p === "/zone/admin") return html(adminApp(email));
+  if (p === "/zone/admin/api/overview") {
+    return json(await cached(env, "admin/overview/v1", 120, () => adminOverview(env), url.searchParams.get("fresh") === "1"));
+  }
+  if (p === "/zone/admin/api/pause" && request.method === "POST") {
+    const body = await readBody(request);
+    const center = body && (await allCenters(env)).find((c) => c.slug === String(body.slug || "").toLowerCase());
+    if (!center) return json({ error: "Onbekend center." }, 400);
+    const res = await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Centers/${center.id}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ fields: { "Mia paused": !!body.paused }, typecast: true }),
+    });
+    if (!res.ok) { console.error("admin pause", res.status, await res.text()); return json({ error: "Opslaan lukte niet. Probeer opnieuw." }, 502); }
+    await logChange(env, center, email, describe({ action: "mia", paused: !!body.paused }));
+    await forget(env, ["admin/overview/v1"]);
+    return json({ ok: true, paused: !!body.paused });
+  }
+  return json({ error: "Not found" }, 404);
+}
+
+async function adminOverview(env) {
+  const TZ = 7 * 3600 * 1000, now = Date.now(), t = new Date(now + TZ);
+  const today = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) - TZ;
+  const week = today - ((t.getUTCDay() + 6) % 7) * DAY; // Monday, Koh Tao time
+  const month = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), 1) - TZ;
+  const from = Math.min(week, month, now - 7 * DAY);
+  const since = `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${new Date(from - 1000).toISOString()}'))`;
+  const [centerRecs, leads, books] = await Promise.all([
+    at(env, "Centers", { sort: [{ field: "Name" }] }),
+    at(env, "Leads", { formula: since, max: 20000 }),
+    at(env, "Bookings", { formula: since, max: 20000 }),
+  ]);
+  const n = (v) => Number(first(v)) || 0;
+  const s = (f, k) => String(first(f[k]) || "");
+  const ms = (v) => Date.parse(first(v) || "") || 0;
+  const cx = (b) => /cancel|refund/i.test(s(b.fields, "Status"));
+  const handed = (l) => n(l.fields["Handed over"]) || first(l.fields["Handover at"]);
+
+  // A record belongs to a center through the linked Center (record id), else the C slug lookup.
+  const owner = (r, c) => (Array.isArray(r.fields["Center"]) && r.fields["Center"].includes(c.id)) ||
+    String(first(r.fields["C slug"]) || "").toLowerCase() === c.slug;
+
+  const stats = (ls, bs, start) => {
+    const L = ls.filter((l) => Date.parse(l.createdTime) >= start);
+    const B = bs.filter((b) => Date.parse(b.createdTime) >= start && !cx(b));
+    return {
+      conversations: L.length,
+      handedOver: L.filter(handed).length,
+      bookings: B.length,
+      divers: B.reduce((a, b) => a + (n(b.fields["Group size"]) || 1), 0),
+      value: B.reduce((a, b) => a + n(b.fields["Total value THB"]), 0),
+      commission: B.reduce((a, b) => a + (n(b.fields["Commission THB"]) || n(b.fields["Deposit paid THB"])), 0),
+    };
+  };
+  const quality = (ls) => {
+    const resp = ls.map((l) => n(l.fields["Response seconds"])).filter((x) => x > 0 && x < 3600);
+    const team = ls.map((l) => (ms(l.fields["Human took over at"]) - ms(l.fields["Handover at"])) / 60000)
+      .filter((x) => x > 0 && x < 7 * 24 * 60).sort((a, b) => a - b);
+    const booked = ls.filter((l) => /booked/i.test(s(l.fields, "Status")));
+    return {
+      miaSeconds: resp.length ? Math.round(resp.reduce((a, b) => a + b, 0) / resp.length) : null,
+      teamMinutes: team.length ? Math.round(team[Math.floor(team.length / 2)]) : null,
+      teamCount: team.length,
+      conversion: ls.length ? Math.round((booked.length / ls.length) * 1000) / 10 : 0,
+      outsideHours: ls.reduce((a, l) => a + n(l.fields["Outside hours"]), 0),
+      afterFollowUp: booked.filter((l) => n(l.fields["Follow-ups sent"]) > 0).length,
+    };
+  };
+
+  const centers = centerRecs.map((r) => {
+    const f = r.fields;
+    const c = { id: r.id, slug: String(first(f["Slug"]) || "").toLowerCase() };
+    const ls = leads.filter((l) => owner(l, c));
+    const bs = books.filter((b) => owner(b, c));
+    const open = ls.filter((l) => handed(l) && Date.parse(l.createdTime) >= now - 7 * DAY &&
+      !l.fields["Opted out"] && !l.fields["Human took over"] && !first(l.fields["Human took over at"]) &&
+      !/booked|lost|closed|spam/i.test(s(l.fields, "Status"))).length;
+    const last = ls.reduce((a, l) => Math.max(a, Date.parse(l.createdTime) || 0), 0);
+    return {
+      slug: c.slug, name: s(f, "Name") || c.slug || "Center zonder naam",
+      assistant: s(f, "Assistant name") || "Mia", channel: n(f["Channel ID"]) || null,
+      paused: !!f["Mia paused"], staff: splitEmails(f["Staff emails"]).length,
+      validSlug: /^[a-z0-9-]{1,60}$/.test(c.slug),
+      today: stats(ls, bs, today), week: stats(ls, bs, week), month: stats(ls, bs, month),
+      quality: quality(ls.filter((l) => Date.parse(l.createdTime) >= month)),
+      openHandovers: open, lastConversation: last ? new Date(last).toISOString() : null,
+    };
+  });
+
+  const total = {};
+  for (const k of ["today", "week", "month"]) {
+    total[k] = {};
+    for (const m of ["conversations", "handedOver", "bookings", "divers", "value", "commission"]) {
+      total[k][m] = centers.reduce((a, c) => a + c[k][m], 0);
+    }
+  }
+  total.openHandovers = centers.reduce((a, c) => a + c.openHandovers, 0);
+  total.live = centers.filter((c) => !c.paused).length;
+  const monthLeads = leads.filter((l) => Date.parse(l.createdTime) >= month);
+  total.quality = quality(monthLeads);
+  return {
+    updated: new Date(now).toISOString(),
+    periods: { today: new Date(today).toISOString(), week: new Date(week).toISOString(), month: new Date(month).toISOString() },
+    centers, total,
+  };
+}
+
+function adminApp(email) {
+  return `<!doctype html><html lang="nl"><head>${HEAD}
+<title>Alle centra · Talay</title>
+<link rel="icon" type="image/png" href="/zone/icon-192.png">
+<meta name="theme-color" content="#0A2029">
+<style>
+:root{--deep:#0A2029;--paper:#F4F0E6;--card:#fff;--muted:#55646A;--line:#E2DACB;--ok:#1F7A55;--okbg:#E3F2EA;--warn:#B4561B;--warnbg:#FBEADF;--sand:#DCA44A;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--deep:#F4F0E6;--paper:#0B1A20;--card:#122A33;--muted:#9FB2B8;--line:#1F3D48;--ok:#3FB37F;--okbg:#173B2E;--warn:#E69A5B;--warnbg:#3D2A1C;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--deep);font-family:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+header{display:flex;align-items:center;gap:12px;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 12px;background:#0A2029;color:#F4F0E6}
+header b{font-size:17px}header small{display:block;color:#B7C7CB;font-size:12.5px}
+header .sp{flex:1}header a{color:#B7C7CB;font-size:13.5px;text-decoration:none;padding:6px 8px;border-radius:8px}
+header a:hover{background:rgba(247,243,234,.08);color:#F7F3EA}
+main{max-width:1100px;margin:0 auto;padding:18px 16px 48px}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
+.tabs{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:3px}
+.tabs button{font:inherit;font-size:14px;border:0;background:none;color:var(--muted);padding:7px 13px;border-radius:8px;cursor:pointer}
+.tabs button.on{background:#0A2029;color:#F4F0E6}
+@media (prefers-color-scheme:dark){.tabs button.on{background:#F4F0E6;color:#0A2029}}
+.bar .sp{flex:1}.upd{color:var(--muted);font-size:13px}
+.btn{font:inherit;font-size:13.5px;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--deep);padding:7px 12px;border-radius:9px;cursor:pointer}
+.btn:disabled{opacity:.55;cursor:default}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:22px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.kpi span{display:block;color:var(--muted);font-size:12.5px}.kpi b{font-size:22px;font-variant-numeric:tabular-nums}
+.kpi.alert b{color:var(--warn)}.kpi b small{font-size:13px;font-weight:500}
+h2{font-size:15px;margin:0 0 10px;color:var(--muted);font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+@media (max-width:400px){.grid{grid-template-columns:1fr}}
+.c{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.c.paused{border-color:var(--warn)}
+.top{display:flex;align-items:flex-start;gap:10px}.top .nm{flex:1;min-width:0}
+.top b{font-size:16.5px;display:block;overflow-wrap:anywhere}.top small{color:var(--muted);font-size:12.5px}
+.pill{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.pill.on{background:var(--okbg);color:var(--ok)}.pill.off{background:var(--warnbg);color:var(--warn)}
+.nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 10px}
+.nums div span{display:block;color:var(--muted);font-size:12px}.nums div b{font-size:18px;font-variant-numeric:tabular-nums}
+.meta{display:grid;grid-template-columns:1fr auto;gap:3px 10px;font-size:13.5px;border-top:1px solid var(--line);padding-top:10px}
+.meta span{color:var(--muted)}.meta b{font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.meta b.warn{color:var(--warn)}
+.acts{display:flex;gap:8px;flex-wrap:wrap}.acts a{text-decoration:none;display:inline-flex;align-items:center}
+.err{background:var(--warnbg);color:var(--warn);padding:10px 12px;border-radius:10px;margin-bottom:12px}
+.muted{color:var(--muted)}
+</style></head><body>
+<header><div><b>Talay · alle centra</b><small>Superadmin</small></div><span class="sp"></span>
+<a href="/zone">Zone</a><a href="/cdn-cgi/access/logout" title="${esc(email)}">Afmelden</a></header>
+<main>
+<div class="bar"><div class="tabs" role="tablist">
+<button data-p="today" class="on">Vandaag</button><button data-p="week">Deze week</button><button data-p="month">Deze maand</button></div>
+<span class="sp"></span><span class="upd" id="upd"></span><button class="btn" id="refresh" type="button">Vernieuwen</button></div>
+<div id="err"></div>
+<div class="kpis" id="kpis"><div class="kpi"><span>Laden…</span><b>–</b></div></div>
+<h2 id="h2">Per center</h2>
+<div class="grid" id="grid"></div>
+</main>
+<script>
+(function () {
+  var data = null, per = "today";
+  var $ = function (s) { return document.querySelector(s); };
+  var e = function (v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var nf = new Intl.NumberFormat("nl-BE");
+  var thb = function (v) { return "฿ " + nf.format(Math.round(v || 0)); };
+  var secs = function (v) { return v == null ? "–" : v < 60 ? v + " s" : Math.round(v / 6) / 10 + " min"; };
+  var mins = function (v) { return v == null ? "–" : v < 60 ? v + " min" : Math.round(v / 6) / 10 + " u"; };
+  var when = function (iso) {
+    if (!iso) return "nog geen";
+    var d = (Date.now() - Date.parse(iso)) / 60000;
+    if (d < 60) return Math.max(1, Math.round(d)) + " min geleden";
+    if (d < 48 * 60) return Math.round(d / 60) + " u geleden";
+    return Math.round(d / 1440) + " dagen geleden";
+  };
+  var label = { today: "vandaag", week: "deze week", month: "deze maand" };
+
+  function kpi(name, value, cls) { return '<div class="kpi' + (cls ? " " + cls : "") + '"><span>' + name + "</span><b>" + value + "</b></div>"; }
+
+  function render() {
+    if (!data) return;
+    var t = data.total, p = t[per];
+    $("#kpis").innerHTML =
+      kpi("Gesprekken", nf.format(p.conversations)) +
+      kpi("Overdrachten", nf.format(p.handedOver)) +
+      kpi("Boekingen", nf.format(p.bookings) + ' <small class="muted">' + nf.format(p.divers) + " duikers</small>") +
+      kpi("Boekingswaarde", thb(p.value)) +
+      kpi("Commissie Talay", thb(p.commission)) +
+      kpi("Open overdrachten (7 d)", nf.format(t.openHandovers), t.openHandovers ? "alert" : "") +
+      kpi("Centra actief", t.live + " / " + data.centers.length) +
+      kpi("Antwoordtijd Mia (maand)", secs(t.quality.miaSeconds));
+    $("#h2").textContent = "Per center, " + label[per];
+    $("#grid").innerHTML = data.centers.map(function (c) {
+      var x = c[per], q = c.quality;
+      return '<section class="c' + (c.paused ? " paused" : "") + '">' +
+        '<div class="top"><div class="nm"><b>' + e(c.name) + "</b><small>" + e(c.slug) + (c.channel ? " · kanaal " + e(c.channel) : " · geen kanaal") + " · " + c.staff + " team</small></div>" +
+        '<span class="pill ' + (c.paused ? "off" : "on") + '">' + e(c.assistant) + (c.paused ? " gepauzeerd" : " actief") + "</span></div>" +
+        '<div class="nums">' +
+          "<div><span>Gesprekken</span><b>" + nf.format(x.conversations) + "</b></div>" +
+          "<div><span>Overdrachten</span><b>" + nf.format(x.handedOver) + "</b></div>" +
+          "<div><span>Boekingen</span><b>" + nf.format(x.bookings) + "</b></div>" +
+          "<div><span>Duikers</span><b>" + nf.format(x.divers) + "</b></div>" +
+          "<div><span>Waarde</span><b>" + thb(x.value) + "</b></div>" +
+          "<div><span>Commissie</span><b>" + thb(x.commission) + "</b></div>" +
+        "</div>" +
+        '<div class="meta">' +
+          "<span>Antwoordtijd " + e(c.assistant) + " (maand)</span><b>" + secs(q.miaSeconds) + "</b>" +
+          "<span>Reactie team na overdracht (mediaan)</span><b>" + mins(q.teamMinutes) + (q.teamCount ? ' <small class="muted">(' + q.teamCount + ")</small>" : "") + "</b>" +
+          "<span>Conversie (maand)</span><b>" + nf.format(q.conversion) + " %</b>" +
+          "<span>Buiten kantooruren (maand)</span><b>" + nf.format(q.outsideHours) + "</b>" +
+          "<span>Geboekt na follow-up (maand)</span><b>" + nf.format(q.afterFollowUp) + "</b>" +
+          "<span>Open overdrachten (7 d)</span><b" + (c.openHandovers ? ' class="warn"' : "") + ">" + nf.format(c.openHandovers) + "</b>" +
+          "<span>Laatste gesprek</span><b>" + when(c.lastConversation) + "</b>" +
+        "</div>" +
+        '<div class="acts">' +
+          (c.validSlug ? '<a class="btn" href="/zone?center=' + encodeURIComponent(c.slug) + '">Open zone</a>' : '<span class="muted">Slug ongeldig: niet zichtbaar in de zone</span>') +
+          '<button class="btn" type="button" data-slug="' + e(c.slug) + '" data-paused="' + (c.paused ? "1" : "") + '">' +
+            (c.paused ? e(c.assistant) + " weer aanzetten" : e(c.assistant) + " pauzeren") + "</button>" +
+        "</div></section>";
+    }).join("") || '<p class="muted">Nog geen centra in Airtable.</p>';
+    $("#upd").textContent = "Bijgewerkt " + new Date(data.updated).toLocaleTimeString("nl-BE", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function load(fresh) {
+    $("#refresh").disabled = true;
+    return fetch("/zone/admin/api/overview" + (fresh ? "?fresh=1" : ""), { credentials: "same-origin" })
+      .then(function (r) { if (r.status === 401) { location.reload(); throw new Error("auth"); } return r.json(); })
+      .then(function (d) { if (d.error) throw new Error(d.error); data = d; $("#err").innerHTML = ""; render(); })
+      .catch(function (x) { if (x.message !== "auth") $("#err").innerHTML = '<div class="err">' + e(x.message || "Laden lukte niet.") + "</div>"; })
+      .then(function () { $("#refresh").disabled = false; });
+  }
+
+  document.querySelectorAll(".tabs button").forEach(function (b) {
+    b.onclick = function () {
+      per = b.getAttribute("data-p");
+      document.querySelectorAll(".tabs button").forEach(function (o) { o.classList.toggle("on", o === b); });
+      render();
+    };
+  });
+  $("#refresh").onclick = function () { load(true); };
+  $("#grid").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button[data-slug]");
+    if (!b) return;
+    var pause = !b.getAttribute("data-paused");
+    var c = data.centers.find(function (x) { return x.slug === b.getAttribute("data-slug"); });
+    if (pause && !confirm(c.assistant + " pauzeren voor " + c.name + "? Dan antwoordt ze niemand meer tot je haar weer aanzet.")) return;
+    b.disabled = true;
+    fetch("/zone/admin/api/pause", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug: c.slug, paused: pause }) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d.error) throw new Error(d.error); c.paused = d.paused; render(); })
+      .catch(function (x) { b.disabled = false; alert(x.message || "Opslaan lukte niet."); });
+  });
+  load(false);
+  setInterval(function () { if (!document.hidden) load(false); }, 120000);
+})();
+</script></body></html>`;
+}
+
 function text(t, status = 200) {
   return new Response(t, { status, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
 }
@@ -1565,7 +1852,7 @@ main{max-width:440px;text-align:center}a{color:#0A2029;font-weight:700}</style><
 <p><a href="/cdn-cgi/access/logout">Sign out</a></p></main></body></html>`;
 }
 
-function app(center, centers, email) {
+function app(center, centers, email, superadmin = false) {
   const switcher = centers.length > 1
     ? `<select id="center" aria-label="Dive center">${centers.map((c) =>
       `<option value="${esc(c.slug)}"${c.slug === center.slug ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select>` : "";
@@ -2268,7 +2555,7 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 @media (max-width:760px){.trow1,.trow2{grid-template-columns:1fr}.trow2 #tWeek{grid-column:auto}.tarr{grid-template-columns:1fr}}
 </style></head>
 <body>
-<header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>Customer zone</small></span></div><span class="sp"></span>${switcher}<div class="htools"><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">Sign out</span></a></div></header>
+<header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>Customer zone</small></span></div><span class="sp"></span>${switcher}<div class="htools">${superadmin ? `<a href="/zone/admin" title="All centers">All centers</a>` : ""}<button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">Sign out</span></a></div></header>
 <nav><button class="on" data-v="today"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></i><span class="nl">Today</span></button><button data-v="convos"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg></i><span class="nl"><span class="long">Conversations</span><span class="short">Chats</span></span><span class="count" id="count" hidden></span></button><button data-v="books"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></i><span class="nl">Bookings</span></button><button data-v="dash"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></i><span class="nl">Dashboard</span></button><button data-v="sett"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></i><span class="nl">Settings</span></button><button data-v="supp"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg></i><span class="nl">Support</span><span class="count" id="tcount" hidden></span></button></nav>
 
 <section id="today" class="view on">
