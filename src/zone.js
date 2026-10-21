@@ -279,6 +279,7 @@ function centerOut(r, admin) {
     assistant: first(r.fields["Assistant name"]) || "Mia",
     admin,
     logo: first(r.fields["Logo"])?.thumbnails?.large?.url || first(r.fields["Logo"])?.url || "",
+    live: !!r.fields["Stripe live"], // Stripe live key for this center; otherwise the test key
   };
 }
 
@@ -677,9 +678,13 @@ function countryOf(phone) {
   return null;
 }
 
+// Same rule as the booking page: "Stripe live" in Centers and a live key set, otherwise the test key.
+const stripeKeyOf = (env, center) => (center.live && env.STRIPE_LIVE_KEY ? env.STRIPE_LIVE_KEY : env.STRIPE_SECRET_KEY) || "";
+
 // Stripe Checkout sessions created between start and end (ms), newest first, at most 500.
-async function checkoutSessions(env, start, end) {
-  if (!env.STRIPE_SECRET_KEY) return [];
+async function checkoutSessions(env, center, start, end) {
+  const key = stripeKeyOf(env, center);
+  if (!key) return [];
   const out = [];
   let after = "";
   for (let page = 0; page < 5; page++) {
@@ -688,7 +693,7 @@ async function checkoutSessions(env, start, end) {
     u.searchParams.set("created[gte]", String(Math.floor(start / 1000)));
     u.searchParams.set("created[lt]", String(Math.floor(end / 1000)));
     if (after) u.searchParams.set("starting_after", after);
-    const res = await fetch(u, { headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}` } });
+    const res = await fetch(u, { headers: { Authorization: `Bearer ${key}` } });
     if (!res.ok) throw new Error(`Stripe: ${res.status}`);
     const body = await res.json();
     out.push(...(body.data || []));
@@ -709,7 +714,7 @@ async function dashboard(env, center, period) {
       formula: `AND({Center} = '${q(center.slug)}', FIND('talay.io/b/', {Text}), {Direction} != 'Customer', IS_AFTER({Sent at}, DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE({Sent at}, DATETIME_PARSE('${iso(end)}')))`,
       fields: ["Contact ID"], max: 5000,
     }).catch(() => []),
-    checkoutSessions(env, start, end).catch(() => []),
+    checkoutSessions(env, center, start, end).catch(() => []),
   ]);
   const n = (v) => Number(first(v)) || 0;
   const cx = (b) => /cancel|refund/i.test(String(first(b.fields["Status"]) || ""));
@@ -1209,7 +1214,8 @@ const REMIND = {
 const LOCALE = { en: "en-GB", nl: "nl-BE", fr: "fr-FR", de: "de-DE", es: "es-ES" };
 
 async function unfinished(env, center) {
-  if (!env.STRIPE_SECRET_KEY) return { items: [] };
+  const key = stripeKeyOf(env, center);
+  if (!key) return { items: [] };
   const since = Math.floor((Date.now() - 7 * DAY) / 1000);
   const sessions = [];
   let after = "";
@@ -1218,7 +1224,7 @@ async function unfinished(env, center) {
     u.searchParams.set("limit", "100");
     u.searchParams.set("created[gte]", String(since));
     if (after) u.searchParams.set("starting_after", after);
-    const res = await fetch(u, { headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}` } });
+    const res = await fetch(u, { headers: { Authorization: `Bearer ${key}` } });
     if (!res.ok) throw new Error(`Stripe: ${res.status} ${await res.text()}`);
     const body = await res.json();
     sessions.push(...(body.data || []));
@@ -1271,7 +1277,7 @@ async function unfinished(env, center) {
   }
 
   const check = {
-    stripeMode: String(env.STRIPE_SECRET_KEY).startsWith("sk_test_") ? "test" : String(env.STRIPE_SECRET_KEY).slice(0, 3),
+    stripeMode: key.startsWith("sk_test_") ? "test" : key.slice(0, 3),
     sessions7d: sessions.length, forThisCenter: mine.length,
     unpaid: mine.filter((s) => s.status !== "complete").length,
     centersSeen: [...new Set(sessions.map((s) => (s.metadata || {}).center_slug || "(none)"))].slice(0, 10),
@@ -1837,9 +1843,10 @@ async function adminOverview(env) {
 }
 
 function adminSystem(env) {
-  const key = String(env.STRIPE_SECRET_KEY || "");
+  const key = String(env.STRIPE_SECRET_KEY || ""), liveKey = String(env.STRIPE_LIVE_KEY || "");
   return {
-    stripe: !key ? "missing" : /^(sk|rk)_live_/.test(key) ? "live" : "test",
+    // "live" = a live key is set; it only takes payments for centers with "Stripe live" ticked.
+    stripe: /^(sk|rk)_live_/.test(liveKey) ? "live" : /^(sk|rk)_live_/.test(key) ? "live" : key ? "test" : "missing",
     push: !!env.VAPID_PRIVATE, respondio: !!env.RESPONDIO_TOKEN, accessAud: !!env.ACCESS_AUD,
     base: String(env.AIRTABLE_BASE || ""),
   };
@@ -2650,7 +2657,7 @@ function hqClient(cfg) {
       h += '<div class="grid2"><div class="card"><h2>Koppelingen</h2><div class="rows">' +
         item(true, "Airtable", "Bereikbaar. Base " + esc(s.base)) +
         item(ov.healthOk ? true : false, "Tabel Chat", ov.healthOk ? "Leesbaar, basis van de inbox en de systeemcheck." : "Niet leesbaar.") +
-        item(s.stripe === "live" ? true : s.stripe === "test" ? "warn" : false, "Stripe", s.stripe === "live" ? "Live: echte betalingen." : s.stripe === "test" ? "Testmodus: er wordt niets echt betaald." : "Geen sleutel ingesteld.") +
+        item(s.stripe === "live" ? true : s.stripe === "test" ? "warn" : false, "Stripe", s.stripe === "live" ? "Live sleutel staat klaar: centers met het vinkje Stripe live betalen echt, de rest blijft test." : s.stripe === "test" ? "Testmodus: er wordt niets echt betaald." : "Geen sleutel ingesteld.") +
         item(s.respondio, "respond.io", s.respondio ? "Token ingesteld: antwoorden vanuit de zone werken." : "RESPONDIO_TOKEN ontbreekt.") +
         item(s.push ? true : "warn", "Pushmeldingen", s.push ? "Ingesteld." : "VAPID-sleutel ontbreekt: geen meldingen op telefoons.") +
         item(s.accessAud ? true : "warn", "Cloudflare Access", s.accessAud ? "Beperkt tot de app van de zone (AUD)." : "ACCESS_AUD niet ingesteld: elke Access-app van Talay telt.") +
