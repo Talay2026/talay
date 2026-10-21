@@ -342,11 +342,17 @@ const json = (obj, status = 200) => new Response(JSON.stringify(obj), {
   status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
 });
 
-async function stripe(env, method, path, params, extraHeaders = {}) {
+// Test or live per center: Centers → "Stripe live" (checkbox) uses STRIPE_LIVE_KEY, every other
+// center (demo centers included) keeps STRIPE_SECRET_KEY, the test key. A session id tells its own mode.
+const centerLive = (env, center) => !!center["Stripe live"] && !!env.STRIPE_LIVE_KEY;
+const stripeKey = (env, live) => (live ? env.STRIPE_LIVE_KEY : env.STRIPE_SECRET_KEY) || "";
+const sessionKey = (env, id) => stripeKey(env, String(id).startsWith("cs_live_"));
+
+async function stripe(key, method, path, params, extraHeaders = {}) {
   const res = await fetch(`https://api.stripe.com/v1/${path}`, {
     method,
     headers: {
-      Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      Authorization: `Bearer ${key}`,
       ...(params ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
       ...extraHeaders,
     },
@@ -369,8 +375,6 @@ async function checkout(request, env, ctx, url) {
   try { input = await request.json(); } catch { return json({ error: T.en.invalid }, 400); }
   const lang = okLang(input.lang) || "en";
   const t = T[lang];
-  if (!env.STRIPE_SECRET_KEY) return json({ error: t.notAvailable }, 503);
-
   const slug = String(input.slug || "").toLowerCase();
   const code = String(input.code || "").toUpperCase();
   const date = String(input.date || "");
@@ -382,6 +386,8 @@ async function checkout(request, env, ctx, url) {
   if (!found) return json({ error: t.notFoundTitle }, 404);
   const { center, product } = found;
   if (!product["Active"]) return json({ error: CLOSED[lang].title }, 409);
+  const key = stripeKey(env, centerLive(env, center));
+  if (!key) return json({ error: t.notAvailable }, 503);
   const minDate = earliestDate(num(product["Cutoff hour"]) || 15);
   const maxDate = plusDays(minDate, 180);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < minDate || date > maxDate) {
@@ -429,12 +435,12 @@ async function checkout(request, env, ctx, url) {
   }
   let session;
   try {
-    session = await stripe(env, "POST", "checkout/sessions", params);
+    session = await stripe(key, "POST", "checkout/sessions", params);
   } catch (err) {
     // A rejected statement descriptor must never block a booking: retry without it.
     if (!suffix || !/statement_descriptor/.test(String(err.message))) throw err;
     delete params["payment_intent_data[statement_descriptor_suffix]"];
-    session = await stripe(env, "POST", "checkout/sessions", params);
+    session = await stripe(key, "POST", "checkout/sessions", params);
   }
   return json({ url: session.url });
 }
@@ -442,8 +448,8 @@ async function checkout(request, env, ctx, url) {
 async function thanks(request, env, ctx, url) {
   const id = url.searchParams.get("session_id") || "";
   let lang = pickLang(request, url);
-  if (!env.STRIPE_SECRET_KEY || !/^cs_[A-Za-z0-9_]{10,200}$/.test(id)) return page(notFound(lang), 404, lang);
-  const s = await stripe(env, "GET", `checkout/sessions/${id}`);
+  if (!sessionKey(env, id) || !/^cs_[A-Za-z0-9_]{10,200}$/.test(id)) return page(notFound(lang), 404, lang);
+  const s = await stripe(sessionKey(env, id), "GET", `checkout/sessions/${id}`);
   const m = s.metadata || {};
   lang = okLang(m.lang) || lang;
   const t = T[lang];
@@ -512,13 +518,14 @@ async function loadManaged(env, ctx, token) {
   if (!rec) return null;
   const f = rec.fields;
   const sessionId = first(f["Stripe session ID"]) || "";
-  if (!/^cs_[A-Za-z0-9_]{10,200}$/.test(sessionId)) return null;
-  const session = await stripe(env, "GET", `checkout/sessions/${sessionId}`);
+  const key = sessionKey(env, sessionId);
+  if (!key || !/^cs_[A-Za-z0-9_]{10,200}$/.test(sessionId)) return null;
+  const session = await stripe(key, "GET", `checkout/sessions/${sessionId}`);
   const m = session.metadata || {};
   const found = await loadBooking(env, ctx, m.center_slug, m.product_code);
   const created = Date.parse(rec.createdTime);
   return {
-    rec, f, session, m,
+    rec, f, session, m, key,
     center: found?.center || {}, product: found?.product || {},
     created, late: Date.now() > created + WINDOW_MS,
     cancelled: /cancel|refund/i.test(String(first(f["Status"]) || "")),
@@ -566,7 +573,6 @@ async function managePage(env, ctx, url) {
   <p class="intro"><strong>${esc(name)}</strong>, ${esc(date ? fmtDate(date, "en") : "")}, ${esc(diversLabel(divers, "en"))}${diver ? `, ${esc(diver)}` : ""}. Deposit paid online: ${thb(paid)} THB.</p>
   ${b.cancelled ? `<p class="msg">This booking is cancelled. The diver's deposit has been refunded.</p>` : `
   <p id="msg" class="msg" role="status" hidden></p>
-  <p class="terms">${esc(t.terms[0])}<a href="/terms/" target="_blank" rel="noopener">${esc(t.terms[1])}</a></p>
   <div id="actions">
   ${windowLine}
   <section class="field" style="margin-top:2rem">
@@ -665,7 +671,7 @@ async function manageAction(request, env, ctx) {
     const pi = typeof b.session.payment_intent === "string" ? b.session.payment_intent : b.session.payment_intent?.id;
     if (!pi) return json({ error: "No payment found for this booking. Contact Talay." }, 409);
     try {
-      await stripe(env, "POST", "refunds",
+      await stripe(b.key, "POST", "refunds",
         { payment_intent: pi, "metadata[cancelled_by]": "center", "metadata[booking]": String(first(b.f["Ref"]) || "") },
         { "Idempotency-Key": `cancel-${token}` });
     } catch (err) {
@@ -744,8 +750,9 @@ function bookingPage(c, p, code, slug, env, lang, ref = "") {
 
   const minDate = earliestDate(cutoff);
   const maxDate = plusDays(minDate, 180);
-  const payments = !!env.STRIPE_SECRET_KEY;
-  const testMode = String(env.STRIPE_SECRET_KEY || "").startsWith("sk_test_");
+  const key = stripeKey(env, centerLive(env, c));
+  const payments = !!key;
+  const testMode = key.startsWith("sk_test_");
   const isCourse = code === "OW" || /course|diver/i.test(englishName);
   const minLabel = fmtDate(minDate, lang);
   const data = {
@@ -807,6 +814,7 @@ ${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
 
   <button type="button" id="book" class="book">${esc(t.btn[0])}<span id="btn-amount">${thb(deposit, lang)}</span>${esc(t.btn[1])}</button>
   <p id="msg" class="msg" role="status" hidden></p>
+  <p class="terms">${esc(t.terms[0])}<a href="/terms/" target="_blank" rel="noopener">${esc(t.terms[1])}</a></p>
 
   ${(checkIn || meeting) ? `<dl class="practical">
     ${checkIn ? `<div><dt>${esc(t.checkIn)}</dt><dd>${esc(checkIn)}</dd></div>` : ""}
