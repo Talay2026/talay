@@ -11,6 +11,7 @@
 
 import { handleZone } from "./zone.js"; // customer zone for dive centers: talay.io/zone
 import { handleDemo } from "./demo.js"; // demo requests from the homepage form: talay.io/api/demo
+import { handleIntake } from "./intake.js"; // onboarding form for a new centre: talay.io/start -> talay.io/api/intake
 
 const CACHE_SECONDS = 120; // limits Airtable API calls; logo links stay valid
 const MAX_DIVERS = 10; // more than 10 goes to a person (rule from the conversation flow)
@@ -276,6 +277,9 @@ export default {
     }
     if (url.pathname === "/api/demo") {
       return handleDemo(request, env, ctx);
+    }
+    if (url.pathname === "/api/intake") {
+      return handleIntake(request, env, ctx);
     }
     if (!url.pathname.startsWith("/b/")) return env.ASSETS.fetch(request);
     const lang = pickLang(request, url);
