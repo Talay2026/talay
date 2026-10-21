@@ -1,6 +1,6 @@
 // Talay booking page: talay.io/b/[center-slug]?p=[product-code]
 // Reads the center and product from Airtable (read-only token) and renders a
-// white-label page: the diver sees the dive center, not Talay.
+// white-label page: the diver sees the dive center; Talay only appears in the fine print and on Stripe.
 // Everything outside /b/ is served from /public by the assets binding.
 //
 // Languages: English, French, German, Spanish, Dutch. The page follows ?l=fr|de|es|nl|en
@@ -37,6 +37,8 @@ const T = {
     payNow: "Pay now to secure your spot",
     payShop: "Pay at the shop on the day",
     never: "You never pay more than the shop price.",
+    terms: ["Booking and payment via Talay. ", "Booking terms"],
+    termsStripe: "By paying you accept the [booking terms](https://talay.io/terms/).",
     btn: ["Pay ", " THB and book"],
     checkIn: "Check-in",
     meeting: "Meeting point",
@@ -80,6 +82,8 @@ const T = {
     payNow: "À payer maintenant pour réserver votre place",
     payShop: "À payer au centre le jour même",
     never: "Vous ne payez jamais plus que le prix du centre.",
+    terms: ["Réservation et paiement via Talay. ", "Conditions de réservation"],
+    termsStripe: "En payant, vous acceptez les [conditions de réservation](https://talay.io/terms/).",
     btn: ["Payer ", " THB et réserver"],
     checkIn: "Check-in",
     meeting: "Point de rendez-vous",
@@ -123,6 +127,8 @@ const T = {
     payNow: "Jetzt zahlen und Platz sichern",
     payShop: "Am Tag selbst im Shop zahlen",
     never: "Du zahlst nie mehr als den Preis im Shop.",
+    terms: ["Buchung und Zahlung über Talay. ", "Buchungsbedingungen"],
+    termsStripe: "Mit der Zahlung akzeptierst du die [Buchungsbedingungen](https://talay.io/terms/).",
     btn: ["", " THB zahlen und buchen"],
     checkIn: "Check-in",
     meeting: "Treffpunkt",
@@ -166,6 +172,8 @@ const T = {
     payNow: "Paga ahora para asegurar tu plaza",
     payShop: "Paga en el centro el mismo día",
     never: "Nunca pagas más que el precio del centro.",
+    terms: ["Reserva y pago a través de Talay. ", "Condiciones de reserva"],
+    termsStripe: "Al pagar aceptas las [condiciones de reserva](https://talay.io/terms/).",
     btn: ["Pagar ", " THB y reservar"],
     checkIn: "Check-in",
     meeting: "Punto de encuentro",
@@ -209,6 +217,8 @@ const T = {
     payNow: "Nu betalen om je plaats vast te leggen",
     payShop: "Op de dag zelf te betalen in het duikcentrum",
     never: "Je betaalt nooit meer dan de prijs in het duikcentrum.",
+    terms: ["Boeking en betaling via Talay. ", "Boekingsvoorwaarden"],
+    termsStripe: "Door te betalen aanvaard je de [boekingsvoorwaarden](https://talay.io/terms/).",
     btn: ["Betaal ", " THB en boek"],
     checkIn: "Check-in",
     meeting: "Afspraakpunt",
@@ -347,6 +357,13 @@ async function stripe(env, method, path, params, extraHeaders = {}) {
   return body;
 }
 
+// Stripe allows Latin letters, digits and spaces; prefix + suffix stay within 22 characters.
+function descriptorSuffix(name) {
+  const s = String(name).normalize("NFD").replace(/[^A-Za-z0-9 ]/g, "")
+    .replace(/\b(dive|diving|divers|center|centre|resort|school)\b/gi, "").replace(/\s+/g, " ").trim().toUpperCase();
+  return /[A-Z]/.test(s) ? s.slice(0, 12).trim() : "";
+}
+
 async function checkout(request, env, ctx, url) {
   let input;
   try { input = await request.json(); } catch { return json({ error: T.en.invalid }, 400); }
@@ -401,12 +418,24 @@ async function checkout(request, env, ctx, url) {
     success_url: `${url.origin}/b/thanks?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: back,
     "payment_intent_data[description]": `${name} at ${centerName}, ${date}, ${divers}x`,
+    "custom_text[submit][message]": t.termsStripe,
   };
+  // Card statement: "TALAY* <CENTER>" (prefix set in Stripe, suffix per center).
+  const suffix = descriptorSuffix(centerName);
+  if (suffix) params["payment_intent_data[statement_descriptor_suffix]"] = suffix;
   for (const [k, v] of Object.entries(meta)) {
     params[`metadata[${k}]`] = v;
     params[`payment_intent_data[metadata][${k}]`] = v;
   }
-  const session = await stripe(env, "POST", "checkout/sessions", params);
+  let session;
+  try {
+    session = await stripe(env, "POST", "checkout/sessions", params);
+  } catch (err) {
+    // A rejected statement descriptor must never block a booking: retry without it.
+    if (!suffix || !/statement_descriptor/.test(String(err.message))) throw err;
+    delete params["payment_intent_data[statement_descriptor_suffix]"];
+    session = await stripe(env, "POST", "checkout/sessions", params);
+  }
   return json({ url: session.url });
 }
 
@@ -537,6 +566,7 @@ async function managePage(env, ctx, url) {
   <p class="intro"><strong>${esc(name)}</strong>, ${esc(date ? fmtDate(date, "en") : "")}, ${esc(diversLabel(divers, "en"))}${diver ? `, ${esc(diver)}` : ""}. Deposit paid online: ${thb(paid)} THB.</p>
   ${b.cancelled ? `<p class="msg">This booking is cancelled. The diver's deposit has been refunded.</p>` : `
   <p id="msg" class="msg" role="status" hidden></p>
+  <p class="terms">${esc(t.terms[0])}<a href="/terms/" target="_blank" rel="noopener">${esc(t.terms[1])}</a></p>
   <div id="actions">
   ${windowLine}
   <section class="field" style="margin-top:2rem">
@@ -949,6 +979,8 @@ input[type=date]::-webkit-date-and-time-value{text-align:left}
 .book.danger:hover{background:#FDF4F1}
 .warn{margin:0;padding:.8rem 1rem;border-radius:10px;background:#FFF3D6;color:#6B4A00;font-size:.95rem}
 .testmode{margin:0 0 1rem;padding:.5rem .8rem;border-radius:8px;background:#FFF3D6;color:#6B4A00;font-size:.85rem;font-weight:600}
+.terms{margin:.8rem 0 0;font-size:.82rem;text-align:center;color:var(--muted)}
+.terms a{color:inherit}
 .msg{margin:.9rem 0 0;padding:.8rem 1rem;border-radius:10px;background:var(--shallow);font-size:.95rem}
 .practical{margin:2.25rem 0 0;padding-top:1.25rem;border-top:1px solid var(--line);display:grid;gap:.8rem}
 .practical div{display:grid;grid-template-columns:7.5rem 1fr;gap:.75rem}
