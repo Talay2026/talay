@@ -1672,6 +1672,24 @@ const firstReply = (l) => {
   const d = (msOf(l.fields["First reply at"]) - msOf(l.fields["First message at"])) / 1000;
   return d > 0 && d < 7 * 86400 ? d : (num(l.fields["Response seconds"]) || null);
 };
+// Seconds between a diver's message and the assistant's answer to it, from Chat. Leads →
+// First message at / First reply at are written in the same minute, so they always give 0.
+function replyDelays(rows) {
+  const open = {}, out = [];
+  for (const m of rows) {
+    const f = m.fields, id = String(f["Contact ID"] || ""), slug = String(f["Center"] || "").toLowerCase();
+    const t = msOf(f["Sent at"]);
+    if (!id || !t) continue;
+    const k = slug + "/" + id;
+    if (f["Direction"] === "Customer") { if (!open[k]) open[k] = t; continue; }
+    if (open[k] && f["Direction"] === "Mia") {
+      const d = (t - open[k]) / 1000;
+      if (d >= 0 && d < 86400) out.push({ slug, at: t, sec: d });
+    }
+    delete open[k];
+  }
+  return out;
+}
 const commissionOf = (b) => num(b.fields["Commission THB"]) || num(b.fields["Deposit paid THB"]);
 // A record belongs to a center through the linked Center (record id), else the C slug lookup.
 const ownedBy = (r, c) => (Array.isArray(r.fields["Center"]) && r.fields["Center"].includes(c.id)) ||
@@ -1688,7 +1706,7 @@ async function adminOverview(env) {
   const now = Date.now();
   const P = adminPeriods(now);
   const from = Math.min(P.month.prev[0], P.week.prev[0], now - 30 * DAY);
-  const [centerRecs, leads, books, msgs] = await Promise.all([
+  const [centerRecs, leads, books, msgs, talk] = await Promise.all([
     at(env, "Centers", { sort: [{ field: "Name" }] }),
     at(env, "Leads", { formula: `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${isoT(from - 1000)}'))`, max: 20000 }),
     at(env, "Bookings", { formula: `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${isoT(from - 1000)}'))`, max: 20000 }),
@@ -1696,7 +1714,13 @@ async function adminOverview(env) {
       formula: `IS_AFTER({Sent at}, DATETIME_PARSE('${isoT(now - DAY)}'))`,
       fields: ["Direction", "Contact ID", "Center", "Sent at", "Text"], sort: [{ field: "Sent at" }], max: 5000,
     }).catch(() => null),
+    at(env, "Chat", {
+      formula: `IS_AFTER({Sent at}, DATETIME_PARSE('${isoT(Math.min(P.month.start, P.week.start) - DAY)}'))`,
+      fields: ["Direction", "Contact ID", "Center", "Sent at"], sort: [{ field: "Sent at" }], max: 20000,
+    }).catch(() => null),
   ]);
+  const delays = talk ? replyDelays(talk) : null;
+  const replyOf = (list, a, b) => median(list.filter((d) => d.at >= a && d.at < b).map((d) => d.sec));
 
   const stats = (ls, bs, a, b) => {
     const L = ls.filter((l) => madeAt(l) >= a && madeAt(l) < b);
@@ -1717,10 +1741,12 @@ async function adminOverview(env) {
         .filter((x) => x > 0 && x < 7 * 24 * 60),
     };
   };
-  const periodStats = (ls, bs) => {
+  const periodStats = (ls, bs, slug) => {
     const out = {};
+    const mine = delays && delays.filter((d) => d.slug === slug);
     for (const [k, p] of Object.entries(P)) {
       const cur = stats(ls, bs, p.start, p.end + 1), prev = stats(ls, bs, p.prev[0], p.prev[1] + 1);
+      if (mine) cur.replySeconds = replyOf(mine, p.start, p.end + 1);
       cur.teamMinutes = median(cur.team); cur.teamCount = cur.team.length; delete cur.team; delete prev.team;
       out[k] = { ...cur, prev };
     }
@@ -1771,18 +1797,23 @@ async function adminOverview(env) {
       ...c, channel: num(f["Channel ID"]) || null, paused: !!f["Mia paused"],
       staff: splitEmails(f["Staff emails"]).length, admins: splitEmails(f["Admin emails"]).length,
       validSlug: /^[a-z0-9-]{1,60}$/.test(c.slug), logo: first(f["Logo"])?.thumbnails?.small?.url || "",
-      periods: periodStats(ls, bs), daily: daily(ls, bs),
+      periods: periodStats(ls, bs, c.slug), daily: daily(ls, bs),
       health, openHandovers: open, lastConversation: last ? isoT(last) : null,
     };
   });
 
-  // Median first-reply time over all centers and over the real ones only (medians can't be summed).
+  // Median reply time over all centers and over the real ones only (medians can't be summed).
   const testIds = new Set(centers.filter((c) => c.test).map((c) => c.id));
   const testSlugs = new Set(centers.filter((c) => c.test).map((c) => c.slug));
   const isTest = (l) => (Array.isArray(l.fields["Center"]) && l.fields["Center"].some((id) => testIds.has(id))) ||
     testSlugs.has(String(first(l.fields["C slug"]) || "").toLowerCase());
   const reply = { all: {}, live: {} };
   for (const [k, p] of Object.entries(P)) {
+    if (delays) {
+      reply.all[k] = replyOf(delays, p.start, p.end + 1);
+      reply.live[k] = replyOf(delays.filter((d) => !testSlugs.has(d.slug)), p.start, p.end + 1);
+      continue;
+    }
     const L = leads.filter((l) => madeAt(l) >= p.start);
     reply.all[k] = median(L.map(firstReply).filter(Boolean));
     reply.live[k] = median(L.filter((l) => !isTest(l)).map(firstReply).filter(Boolean));
@@ -2344,13 +2375,13 @@ function hqClient(cfg) {
         kpi("Boekingswaarde", thb(t.value), delta(t.value, pv.value, true)) +
         kpi("Commissie Talay", thb(t.commission), delta(t.commission, pv.commission, true)) +
         kpi("Overdrachten", nf.format(t.handedOver) + (open ? " <small>" + open + " open</small>" : ""), delta(t.handedOver, pv.handedOver)) +
-        kpi("Eerste antwoord", secs(reply), '<span class="d">mediaan, ' + LABEL[state.per] + "</span>") + "</div>";
+        kpi("Antwoordtijd", secs(reply), '<span class="d">mediaan, ' + LABEL[state.per] + "</span>") + "</div>";
       h += '<div class="grid2 sec">' +
         '<div class="card"><h2>Nieuwe gesprekken per dag</h2><div class="chart"><div class="tot"><b>' + nf.format(conv30) + "</b> in 30 dagen</div>" +
           chart("conv", daily.map(function (d) { return d[0]; }), function (v) { return nf.format(v) + " gesprekken"; }, ov.day0) + "</div></div>" +
         '<div class="card"><h2>Boekingswaarde per dag</h2><div class="chart"><div class="tot"><b>' + thb(val30) + "</b> in 30 dagen</div>" +
           chart("val", daily.map(function (d) { return d[2]; }), thb, ov.day0) + "</div></div></div>";
-      h += '<div class="sec"><h2>Centra, ' + LABEL[state.per] + ' <a href="#/centra">Alle centra →</a></h2><div class="card tw"><table class="t"><thead><tr><th>Center</th><th>Assistent</th><th class="n">Gesprekken</th><th class="n">Boekingen</th><th class="n">Waarde</th><th class="n">Commissie</th><th class="n">Eerste antwoord</th><th>Signalen</th></tr></thead><tbody>' +
+      h += '<div class="sec"><h2>Centra, ' + LABEL[state.per] + ' <a href="#/centra">Alle centra →</a></h2><div class="card tw"><table class="t"><thead><tr><th>Center</th><th>Assistent</th><th class="n">Gesprekken</th><th class="n">Boekingen</th><th class="n">Waarde</th><th class="n">Commissie</th><th class="n">Antwoordtijd</th><th>Signalen</th></tr></thead><tbody>' +
         ov.centers.map(function (c) {
           var x = c.periods[state.per], hl = c.health || {}, sig = [];
           if (hl.errors) sig.push('<span class="pill bad">' + hl.errors + " fout" + (hl.errors > 1 ? "en" : "") + "</span>");
@@ -2474,7 +2505,7 @@ function hqClient(cfg) {
           kpi("Boekingen", nf.format(x.bookings) + " <small>" + nf.format(x.divers) + " duikers</small>", delta(x.bookings, x.prev.bookings)) +
           kpi("Boekingswaarde", thb(x.value), delta(x.value, x.prev.value, true)) +
           kpi("Commissie", thb(x.commission), delta(x.commission, x.prev.commission, true)) +
-          kpi("Eerste antwoord", secs(x.replySeconds), '<span class="d">mediaan</span>') +
+          kpi("Antwoordtijd", secs(x.replySeconds), '<span class="d">mediaan per bericht</span>') +
           kpi("Team na overdracht", mins(x.teamMinutes), '<span class="d">' + (x.teamCount ? "mediaan van " + x.teamCount : "nog geen overdrachten") + "</span>") + "</div>";
         h += '<div class="grid2 sec"><div class="card"><h2>Boekingswaarde per dag</h2><div class="chart">' + chart("cv", c.daily.map(function (q) { return q[2]; }), thb, ov.day0) + "</div></div>" +
           '<div class="card"><h2>Gezondheid (24 u)</h2><div class="pad"><dl class="dl">' +
