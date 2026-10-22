@@ -448,6 +448,31 @@ footer a:hover{text-decoration:underline}
 .zc-slide{grid-area:1 / 1;padding:0;visibility:hidden;opacity:0;transition:opacity .35s ease,visibility 0s .35s}
 .zc-slide.on{visibility:visible;opacity:1;transition:opacity .35s ease}
 @media(prefers-reduced-motion:reduce){.zc-slide,.zc-slide.on{transition:none}}
+
+/* Customer zone: real screens (laptop + phone) and video tour */
+.zone-wrap{max-width:1080px}
+.zshot{position:relative;padding:0 9% 28px 0}
+.zs-laptop{border-radius:10px;overflow:hidden;background:#fff;box-shadow:0 18px 40px -20px rgba(0,0,0,.6);border:1px solid var(--ridge)}
+.zs-bar{display:flex;align-items:center;gap:6px;padding:7px 10px;background:#E9E4D8}
+.zs-bar i{width:9px;height:9px;border-radius:50%;background:#C9C1B0}
+.zs-bar span{margin-left:10px;padding:2px 10px;border-radius:6px;background:#F7F3EA;color:#56696D;font-size:.68rem}
+.zshot img{display:block;width:100%;height:auto}
+.zs-phone{position:absolute;right:0;bottom:0;width:21%;padding:5px;border-radius:22px;background:#0A1A1F;box-shadow:0 18px 36px -14px rgba(0,0,0,.7)}
+.zs-phone img{border-radius:17px}
+.zs-tour{display:flex;justify-content:center;margin-top:var(--s4)}
+.zs-play{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border:1px solid var(--shore-rule);border-radius:999px;background:none;color:inherit;font:inherit;font-size:.9rem;font-weight:600;cursor:pointer}
+.zs-play:hover{background:rgba(220,164,74,.12)}
+.zs-play svg{color:var(--sand)}
+.zs-video{width:min(1100px,94vw);padding:0;border:0;border-radius:12px;background:#000;overflow:visible}
+.zs-video::backdrop{background:rgba(5,20,25,.82)}
+.zs-video video{display:block;width:100%;height:auto;max-height:86vh;border-radius:12px}
+.zs-close{position:absolute;top:-44px;right:0;width:36px;height:36px;border:0;border-radius:50%;background:var(--shore);color:var(--deep);font-size:1.4rem;line-height:1;cursor:pointer}
+@media(max-width:599px){
+ .zshot{padding:0}
+ .zs-laptop{display:none}
+ .zs-phone{position:static;width:min(270px,78%);margin:0 auto}
+ .zs-video{width:min(400px,88vw)}
+}
 </style>
 </head>
 <body id="top">
@@ -617,74 +642,56 @@ footer a:hover{text-decoration:underline}
       <div class="zone-wrap">
         <figure>
           <div class="zone" id="zone" role="region" aria-roledescription="carousel" aria-label="โซนลูกค้า Talay">
-            <div class="zone-head"><b>ศูนย์ดำน้ำของคุณ</b><span>โซนลูกค้า · คอมพิวเตอร์หรือมือถือ</span></div>
             <div class="zc-ctrl">
               <button type="button" class="zc-arrow" id="zc-prev" aria-label="ก่อนหน้า"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg></button>
-              <div class="zc-dots" id="zc-dots"><button type="button" aria-label="แสดงแชท" aria-controls="zs-0" aria-current="true"><span>แชท</span></button><button type="button" aria-label="แสดงการจอง" aria-controls="zs-1"><span>การจอง</span></button><button type="button" aria-label="แสดงผลลัพธ์" aria-controls="zs-2"><span>ผลลัพธ์</span></button><button type="button" aria-label="แสดงการตั้งค่า" aria-controls="zs-3"><span>การตั้งค่า</span></button></div>
+              <div class="zc-dots" id="zc-dots"><button type="button" aria-label="แสดงวันนี้" aria-controls="zs-0" aria-current="true"><span>วันนี้</span></button><button type="button" aria-label="แสดงบทสนทนา" aria-controls="zs-1"><span>บทสนทนา</span></button><button type="button" aria-label="แสดงการจอง" aria-controls="zs-2"><span>การจอง</span></button><button type="button" aria-label="แสดงแดชบอร์ด" aria-controls="zs-3"><span>แดชบอร์ด</span></button><button type="button" aria-label="แสดงการตั้งค่า" aria-controls="zs-4"><span>การตั้งค่า</span></button></div>
               <button type="button" class="zc-arrow" id="zc-next" aria-label="ถัดไป"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg></button>
             </div>
             <div class="zc-track" id="zc-track">
-              <div class="zc-slide" id="zs-0" role="group" aria-roledescription="slide" aria-label="1 จาก 4: แชท">
-                <div class="zc-cap"><em>แชท</em><h3>ทุกบทสนทนาในกล่องข้อความเดียว</h3><p>ดูได้ในพริบตาว่าใครจองแล้ว และใครต้องการทีมของคุณ ตอบเองหรือให้ผู้ช่วยทำต่อก็ได้</p></div>
-                <div class="zp-grid">
-                  <div>
-                    <div class="tabs"><span>เปิดอยู่</span><span>รอคุณ · 1</span><span>จองแล้ว</span></div>
-                    <div class="row"><b>Lena</b><small>Open Water · 2 คน</small><span class="tag booked">จองแล้ว</span></div>
-                    <div class="row"><b>Tom</b><small>ถามเรื่องโรคหอบหืด</small><span class="tag need">รอคุณ</span></div>
-                    <div class="row"><b>Sofia</b><small>Basic Diver · ถามเรื่องวันที่</small><span class="tag open">เปิดอยู่</span></div>
-                    <div class="row"><b>Marc</b><small>Fun dive · 4 คน · ภาษาฝรั่งเศส</small><span class="tag booked">จองแล้ว</span></div>
-                  </div>
-                  <div class="lead">
-                    <div class="lead-top"><b>Tom</b><span class="tag need" style="grid-row:auto">รอคุณ</span></div>
-                    <dl><dt>ภาษา</dt><dd>อังกฤษ</dd><dt>ระดับ</dt><dd>ไม่เคยดำน้ำ</dd><dt>วันที่</dt><dd>18 – 24 พ.ย.</dd><dt>สนใจ</dt><dd>Open Water</dd></dl>
-                    <div class="bub c">ผมเป็นหอบหืดเล็กน้อย ยังเรียนคอร์สได้ไหมครับ<small>21:14</small></div>
-                    <div class="bub m">ฉันส่งคำถามของคุณให้ทีมแล้ว ทีมจะตอบที่นี่ ระหว่างนี้ถ้ามีเรื่องอื่นให้ช่วย บอกได้เลยค่ะ<small>ผู้ช่วย · 21:14</small></div>
-                    <div class="reply"><span>ตอบในนามทีม…</span><span class="pill ghost">ให้ผู้ช่วยทำต่อ</span></div>
-                  </div>
+              <div class="zc-slide" id="zs-0" role="group" aria-roledescription="slide" aria-label="1 จาก 5: วันนี้">
+                <div class="zc-cap"><em>วันนี้</em><h3>เช้าของคุณในหน้าเดียว</h3><p>ใครต้องการทีมของคุณ ใครลงเรือวันนี้และพรุ่งนี้ และนักดำน้ำที่กำลังจะมาถึงแต่ยังไม่ได้จอง</p></div>
+                <div class="zshot">
+                  <div class="zs-laptop"><div class="zs-bar" aria-hidden="true"><i></i><i></i><i></i><span>talay.io/zone</span></div><img src="/img/zone/desk-today.webp" width="1600" height="1000" alt="หน้าวันนี้ในโซนลูกค้า, บนคอมพิวเตอร์" decoding="async"></div>
+                  <div class="zs-phone"><img src="/img/zone/mob-today.webp" width="560" height="1212" alt="หน้าวันนี้ในโซนลูกค้า, บนมือถือ" decoding="async"></div>
                 </div>
               </div>
-              <div class="zc-slide" id="zs-1" role="group" aria-roledescription="slide" aria-label="2 จาก 4: การจอง">
+              <div class="zc-slide" id="zs-1" role="group" aria-roledescription="slide" aria-label="2 จาก 5: บทสนทนา">
+                <div class="zc-cap"><em>บทสนทนา</em><h3>ทุกบทสนทนาในกล่องข้อความเดียว</h3><p>WhatsApp, Instagram และ Messenger รวมไว้ที่เดียว ดูว่าใครต้องการทีมของคุณ ตอบเอง หรือส่งลิงก์จองได้ในคลิกเดียว</p></div>
+                <div class="zshot">
+                  <div class="zs-laptop"><div class="zs-bar" aria-hidden="true"><i></i><i></i><i></i><span>talay.io/zone</span></div><img src="/img/zone/desk-chat.webp" width="1600" height="1000" alt="บทสนทนาในโซนลูกค้า, บนคอมพิวเตอร์" loading="lazy" decoding="async"></div>
+                  <div class="zs-phone"><img src="/img/zone/mob-chat.webp" width="560" height="1212" alt="บทสนทนาในโซนลูกค้า, บนมือถือ" loading="lazy" decoding="async"></div>
+                </div>
+              </div>
+              <div class="zc-slide" id="zs-2" role="group" aria-roledescription="slide" aria-label="3 จาก 5: การจอง">
                 <div class="zc-cap"><em>การจอง</em><h3>นักดำน้ำของวันนี้ พร้อมขึ้นเรือ</h3><p>ใครจะมา จ่ายออนไลน์แล้วเท่าไหร่ และต้องเก็บเงินที่ร้านเท่าไหร่ พร้อมเตือนคนที่ยังจ่ายไม่ครบ</p></div>
-                <div class="tabs"><span>วันนี้</span><span>พรุ่งนี้</span><span>30 วันข้างหน้า</span></div>
-                <div class="bk-wrap"><table class="bk">
-                  <thead><tr><th>ทริป</th><th>เวลา</th><th>นักดำน้ำ</th><th>จ่ายออนไลน์</th><th>ที่ร้าน</th></tr></thead>
-                  <tbody>
-                    <tr><td>Fun dive</td><td>06:30</td><td>4</td><td>1,320</td><td>7,480</td></tr>
-                    <tr><td>Open Water วันที่ 1</td><td>08:00</td><td>2</td><td>3,000</td><td>22,000</td></tr>
-                    <tr><td>Basic Diver</td><td>08:30</td><td>1</td><td>525</td><td>2,975</td></tr>
-                    <tr><td>Fun dive</td><td>11:30</td><td>6</td><td>1,980</td><td>11,220</td></tr>
-                  </tbody>
-                </table></div>
-                <div class="unpaid"><div><b>ยังไม่ชำระ · 2 คน</b><small>เข้าหน้าชำระเงินแล้วแต่ยังไม่จ่าย</small></div><span class="pill">ส่งข้อความเตือน</span></div>
-                <div class="zone-foot"><span>พิมพ์รายชื่อขึ้นเรือ</span><span>เลื่อน / ยกเลิก</span></div>
-              </div>
-              <div class="zc-slide" id="zs-2" role="group" aria-roledescription="slide" aria-label="3 จาก 4: ผลลัพธ์">
-                <div class="zc-cap"><em>ผลลัพธ์</em><h3>ดูว่า Talay สร้างรายได้เท่าไหร่</h3><p>รายได้ การจอง และจำนวนคำถามที่เข้ามานอกเวลาทำการ</p></div>
-                <h4>30 วันที่ผ่านมา</h4>
-                <div class="kpis">
-                  <div class="kpi gold"><small>รายได้ผ่าน Talay</small><b>318,400</b><span>THB</span></div>
-                  <div class="kpi"><small>บทสนทนา</small><b>212</b><span>41% นอกเวลาทำการ</span></div>
-                  <div class="kpi"><small>กลายเป็นการจอง</small><b>23%</b><span>15 รายหลังติดตามผล</span></div>
-                  <div class="kpi"><small>เวลาตอบเฉลี่ย</small><b>9 วิ</b><span>ทั้งกลางวันและกลางคืน</span></div>
+                <div class="zshot">
+                  <div class="zs-laptop"><div class="zs-bar" aria-hidden="true"><i></i><i></i><i></i><span>talay.io/zone</span></div><img src="/img/zone/desk-books.webp" width="1600" height="1000" alt="รายการจองในโซนลูกค้า, บนคอมพิวเตอร์" loading="lazy" decoding="async"></div>
+                  <div class="zs-phone"><img src="/img/zone/mob-books.webp" width="560" height="1212" alt="รายการจองในโซนลูกค้า, บนมือถือ" loading="lazy" decoding="async"></div>
                 </div>
-                <h4 style="margin-top:var(--s4)">การจองต่อสัปดาห์</h4>
-                <div class="bars" aria-hidden="true"><i style="height:38%"></i><i style="height:52%"></i><i style="height:47%"></i><i style="height:66%"></i><i style="height:74%"></i><i style="height:92%"></i></div>
-                <div class="bars-cap"><span>6 สัปดาห์ก่อน</span><span>สัปดาห์นี้</span></div>
               </div>
-              <div class="zc-slide" id="zs-3" role="group" aria-roledescription="slide" aria-label="4 จาก 4: การตั้งค่า">
-                <div class="zc-cap"><em>การตั้งค่า</em><h3>คุณเป็นคนกำหนดว่าจองอะไรได้บ้าง</h3><p>ราคา เวลาปิดรับจอง และเวลาทำการ หยุดผู้ช่วยชั่วคราวได้ทุกเมื่อ</p></div>
-                <div class="mia"><div><b>ผู้ช่วยเปิดอยู่</b><small>ตอบทุกคำถาม ตลอด 24 ชั่วโมง</small></div><span class="tg" aria-label="เปิด"></span></div>
-                <div class="set"><div>เวลาทำการ<small>เรื่องที่ส่งต่อจะถึงทีมของคุณ</small></div><span class="v">ทุกวัน 9:00 – 18:00</span></div>
-                <div class="set"><div>Open Water<small>จองออนไลน์ได้ถึง 16:00 น. ของวันก่อน</small></div><span class="v">12,500 THB</span><span class="tg" aria-label="จองออนไลน์ได้"></span></div>
-                <div class="set"><div>ทริป Fun dive<small>จองออนไลน์ได้ถึง 15:00 น. ของวันก่อน</small></div><span class="v">2,200 THB</span><span class="tg" aria-label="จองออนไลน์ได้"></span></div>
-                <div class="set"><div>Deep Diving Specialty<small>ตอนนี้ยังจองออนไลน์ไม่ได้</small></div><span class="v">7,750 THB</span><span class="tg off" aria-label="จองออนไลน์ไม่ได้"></span></div>
-                <div class="zone-foot"><span>ทีมและการแจ้งเตือน</span><span>แจ้งปัญหา</span></div>
+              <div class="zc-slide" id="zs-3" role="group" aria-roledescription="slide" aria-label="4 จาก 5: แดชบอร์ด">
+                <div class="zc-cap"><em>แดชบอร์ด</em><h3>ดูว่า Talay สร้างรายได้เท่าไหร่</h3><p>รายได้ การจอง อัตราการจอง และจำนวนคำถามที่เข้ามานอกเวลาทำการ</p></div>
+                <div class="zshot">
+                  <div class="zs-laptop"><div class="zs-bar" aria-hidden="true"><i></i><i></i><i></i><span>talay.io/zone</span></div><img src="/img/zone/desk-dash.webp" width="1600" height="1000" alt="แดชบอร์ดของโซนลูกค้า, บนคอมพิวเตอร์" loading="lazy" decoding="async"></div>
+                  <div class="zs-phone"><img src="/img/zone/mob-dash.webp" width="560" height="1212" alt="แดชบอร์ดของโซนลูกค้า, บนมือถือ" loading="lazy" decoding="async"></div>
+                </div>
+              </div>
+              <div class="zc-slide" id="zs-4" role="group" aria-roledescription="slide" aria-label="5 จาก 5: การตั้งค่า">
+                <div class="zc-cap"><em>การตั้งค่า</em><h3>คุณเลือกได้ว่าผู้ช่วยจะตอบเมื่อไร</h3><p>ตลอดทั้งวันทั้งคืน หรือเฉพาะนอกเวลาทำการ หยุดชั่วคราวได้ทุกเมื่อ เช่น ช่วงพายุหรือวันหยุด</p></div>
+                <div class="zshot">
+                  <div class="zs-laptop"><div class="zs-bar" aria-hidden="true"><i></i><i></i><i></i><span>talay.io/zone</span></div><img src="/img/zone/desk-sett.webp" width="1600" height="1000" alt="การตั้งค่าของโซนลูกค้า, บนคอมพิวเตอร์" loading="lazy" decoding="async"></div>
+                  <div class="zs-phone"><img src="/img/zone/mob-sett.webp" width="560" height="1212" alt="การตั้งค่าของโซนลูกค้า, บนมือถือ" loading="lazy" decoding="async"></div>
+                </div>
               </div>
             </div>
-            
           </div>
-          <figcaption class="caption">ภาพตัวอย่างโซนลูกค้า</figcaption>
+          <figcaption class="caption">หน้าจอจริงจากโซนลูกค้า แสดงด้วยศูนย์ดำน้ำตัวอย่าง</figcaption>
         </figure>
+        <div class="zs-tour"><button type="button" class="zs-play" id="zs-play"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9.5-5.5z" fill="currentColor"/></svg>ดูทัวร์ 30 วินาที</button></div>
+        <dialog class="zs-video" id="zs-video" aria-label="ทัวร์โซนลูกค้า">
+          <button type="button" class="zs-close" id="zs-close" aria-label="ปิด">×</button>
+          <video id="zs-vid" preload="none" muted playsinline controls></video>
+        </dialog>
       </div>
       <div class="cta-row"><a class="cta" href="#demo">ขอเดโมฟรี</a><span class="cta-note">20 นาที ไม่มีข้อผูกมัด</span></div>
     </div>
@@ -914,6 +921,25 @@ const TURNSTILE_SITEKEY = "0x4AAAAAAFXZnn0VWocS_nWR";  // Cloudflare Turnstile s
     }, { threshold: 0.35 });
     zio.observe(zone);
   }
+
+  // Customer zone video tour
+  const zdlg = document.getElementById('zs-video'), zvid = document.getElementById('zs-vid');
+  document.getElementById('zs-play').addEventListener('click', () => {
+    // Phone screens get the phone recording, larger screens the computer one
+    const name = matchMedia('(max-width:599px)').matches ? 'zone-tour-phone' : 'zone-tour';
+    if (zvid.dataset.name !== name) {
+      zvid.dataset.name = name;
+      zvid.poster = name === 'zone-tour' ? '/img/zone/tour-poster.webp' : '/img/zone/mob-today.webp';
+      zvid.innerHTML = '<source src="/img/zone/' + name + '.mp4" type="video/mp4"><source src="/img/zone/' + name + '.webm" type="video/webm">';
+      zvid.load();
+    }
+    if (zdlg.showModal) zdlg.showModal(); else zdlg.setAttribute('open', '');
+    zvid.currentTime = 0; zvid.play().catch(() => {});
+  });
+  const zclose = () => { zvid.pause(); if (zdlg.close) zdlg.close(); else zdlg.removeAttribute('open'); };
+  document.getElementById('zs-close').addEventListener('click', zclose);
+  zdlg.addEventListener('click', e => { if (e.target === zdlg) zclose(); });
+  zdlg.addEventListener('close', () => zvid.pause());
 
   // Demo form
   const form = document.getElementById('demo-form');

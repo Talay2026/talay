@@ -447,6 +447,31 @@ footer a:hover{text-decoration:underline}
 .zc-slide{grid-area:1 / 1;padding:0;visibility:hidden;opacity:0;transition:opacity .35s ease,visibility 0s .35s}
 .zc-slide.on{visibility:visible;opacity:1;transition:opacity .35s ease}
 @media(prefers-reduced-motion:reduce){.zc-slide,.zc-slide.on{transition:none}}
+
+/* Customer zone: real screens (laptop + phone) and video tour */
+.zone-wrap{max-width:1080px}
+.zshot{position:relative;padding:0 9% 28px 0}
+.zs-laptop{border-radius:10px;overflow:hidden;background:#fff;box-shadow:0 18px 40px -20px rgba(0,0,0,.6);border:1px solid var(--ridge)}
+.zs-bar{display:flex;align-items:center;gap:6px;padding:7px 10px;background:#E9E4D8}
+.zs-bar i{width:9px;height:9px;border-radius:50%;background:#C9C1B0}
+.zs-bar span{margin-left:10px;padding:2px 10px;border-radius:6px;background:#F7F3EA;color:#56696D;font-size:.68rem}
+.zshot img{display:block;width:100%;height:auto}
+.zs-phone{position:absolute;right:0;bottom:0;width:21%;padding:5px;border-radius:22px;background:#0A1A1F;box-shadow:0 18px 36px -14px rgba(0,0,0,.7)}
+.zs-phone img{border-radius:17px}
+.zs-tour{display:flex;justify-content:center;margin-top:var(--s4)}
+.zs-play{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border:1px solid var(--shore-rule);border-radius:999px;background:none;color:inherit;font:inherit;font-size:.9rem;font-weight:600;cursor:pointer}
+.zs-play:hover{background:rgba(220,164,74,.12)}
+.zs-play svg{color:var(--sand)}
+.zs-video{width:min(1100px,94vw);padding:0;border:0;border-radius:12px;background:#000;overflow:visible}
+.zs-video::backdrop{background:rgba(5,20,25,.82)}
+.zs-video video{display:block;width:100%;height:auto;max-height:86vh;border-radius:12px}
+.zs-close{position:absolute;top:-44px;right:0;width:36px;height:36px;border:0;border-radius:50%;background:var(--shore);color:var(--deep);font-size:1.4rem;line-height:1;cursor:pointer}
+@media(max-width:599px){
+ .zshot{padding:0}
+ .zs-laptop{display:none}
+ .zs-phone{position:static;width:min(270px,78%);margin:0 auto}
+ .zs-video{width:min(400px,88vw)}
+}
 </style>
 </head>
 <body id="top">
@@ -616,74 +641,56 @@ footer a:hover{text-decoration:underline}
       <div class="zone-wrap">
         <figure>
           <div class="zone" id="zone" role="region" aria-roledescription="carousel" aria-label="L’espace client Talay">
-            <div class="zone-head"><b>Votre centre de plongée</b><span>Espace client · ordinateur ou téléphone</span></div>
             <div class="zc-ctrl">
               <button type="button" class="zc-arrow" id="zc-prev" aria-label="Précédent"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg></button>
-              <div class="zc-dots" id="zc-dots"><button type="button" aria-label="Afficher Conversations" aria-controls="zs-0" aria-current="true"><span>Conversations</span></button><button type="button" aria-label="Afficher Réservations" aria-controls="zs-1"><span>Réservations</span></button><button type="button" aria-label="Afficher Résultats" aria-controls="zs-2"><span>Résultats</span></button><button type="button" aria-label="Afficher Réglages" aria-controls="zs-3"><span>Réglages</span></button></div>
+              <div class="zc-dots" id="zc-dots"><button type="button" aria-label="Afficher Aujourd’hui" aria-controls="zs-0" aria-current="true"><span>Aujourd’hui</span></button><button type="button" aria-label="Afficher Conversations" aria-controls="zs-1"><span>Conversations</span></button><button type="button" aria-label="Afficher Réservations" aria-controls="zs-2"><span>Réservations</span></button><button type="button" aria-label="Afficher Tableau de bord" aria-controls="zs-3"><span>Tableau de bord</span></button><button type="button" aria-label="Afficher Réglages" aria-controls="zs-4"><span>Réglages</span></button></div>
               <button type="button" class="zc-arrow" id="zc-next" aria-label="Suivant"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg></button>
             </div>
             <div class="zc-track" id="zc-track">
-              <div class="zc-slide" id="zs-0" role="group" aria-roledescription="slide" aria-label="1 sur 4 : Conversations">
-                <div class="zc-cap"><em>Conversations</em><h3>Toutes les conversations, une seule boîte</h3><p>Voyez d’un coup d’œil qui a réservé et qui a besoin de votre équipe. Répondez vous-même ou laissez l’assistant continuer.</p></div>
-                <div class="zp-grid">
-                  <div>
-                    <div class="tabs"><span>Ouvertes</span><span>Pour vous · 1</span><span>Réservées</span></div>
-                    <div class="row"><b>Lena</b><small>Open Water · 2 plongeurs</small><span class="tag booked">Réservé</span></div>
-                    <div class="row"><b>Tom</b><small>Question sur l’asthme</small><span class="tag need">Pour vous</span></div>
-                    <div class="row"><b>Sofia</b><small>Basic Diver · demande les dates</small><span class="tag open">Ouverte</span></div>
-                    <div class="row"><b>Marc</b><small>Fun dives · 4 plongeurs · en français</small><span class="tag booked">Réservé</span></div>
-                  </div>
-                  <div class="lead">
-                    <div class="lead-top"><b>Tom</b><span class="tag need" style="grid-row:auto">Pour vous</span></div>
-                    <dl><dt>Langue</dt><dd>Anglais</dd><dt>Niveau</dt><dd>Jamais plongé</dd><dt>Dates</dt><dd>18 – 24 nov.</dd><dt>Intéressé par</dt><dd>Open Water</dd></dl>
-                    <div class="bub c">J’ai un léger asthme. Est-ce que je peux quand même faire le cours ?<small>21:14</small></div>
-                    <div class="bub m">J’ai transmis votre question à l’équipe, elle vous répondra ici. En attendant, je peux vous aider pour autre chose.<small>Assistant · 21:14</small></div>
-                    <div class="reply"><span>Répondre au nom de l’équipe…</span><span class="pill ghost">Rendre la main à l’assistant</span></div>
-                  </div>
+              <div class="zc-slide" id="zs-0" role="group" aria-roledescription="slide" aria-label="1 sur 5 : Aujourd’hui">
+                <div class="zc-cap"><em>Aujourd’hui</em><h3>Votre matinée en un coup d’œil</h3><p>Qui a besoin de votre équipe, qui est sur le bateau aujourd’hui et demain, et les plongeurs qui arrivent bientôt sans avoir encore réservé.</p></div>
+                <div class="zshot">
+                  <div class="zs-laptop"><div class="zs-bar" aria-hidden="true"><i></i><i></i><i></i><span>talay.io/zone</span></div><img src="/img/zone/desk-today.webp" width="1600" height="1000" alt="La page Aujourd’hui de l’espace client, sur un ordinateur" decoding="async"></div>
+                  <div class="zs-phone"><img src="/img/zone/mob-today.webp" width="560" height="1212" alt="La page Aujourd’hui de l’espace client, sur un téléphone" decoding="async"></div>
                 </div>
               </div>
-              <div class="zc-slide" id="zs-1" role="group" aria-roledescription="slide" aria-label="2 sur 4 : Réservations">
+              <div class="zc-slide" id="zs-1" role="group" aria-roledescription="slide" aria-label="2 sur 5 : Conversations">
+                <div class="zc-cap"><em>Conversations</em><h3>Toutes les conversations, une seule boîte</h3><p>WhatsApp, Instagram et Messenger réunis. Voyez qui a besoin de votre équipe, répondez vous-même ou envoyez un lien de réservation en un clic.</p></div>
+                <div class="zshot">
+                  <div class="zs-laptop"><div class="zs-bar" aria-hidden="true"><i></i><i></i><i></i><span>talay.io/zone</span></div><img src="/img/zone/desk-chat.webp" width="1600" height="1000" alt="Une conversation dans l’espace client, sur un ordinateur" loading="lazy" decoding="async"></div>
+                  <div class="zs-phone"><img src="/img/zone/mob-chat.webp" width="560" height="1212" alt="Une conversation dans l’espace client, sur un téléphone" loading="lazy" decoding="async"></div>
+                </div>
+              </div>
+              <div class="zc-slide" id="zs-2" role="group" aria-roledescription="slide" aria-label="3 sur 5 : Réservations">
                 <div class="zc-cap"><em>Réservations</em><h3>Les plongeurs du jour, prêts pour le bateau</h3><p>Qui vient, ce qui est payé en ligne et ce qu’il reste à encaisser. Relancez les plongeurs qui n’ont pas fini de payer.</p></div>
-                <div class="tabs"><span>Aujourd’hui</span><span>Demain</span><span>30 prochains jours</span></div>
-                <div class="bk-wrap"><table class="bk">
-                  <thead><tr><th>Sortie</th><th>Heure</th><th>Plongeurs</th><th>Payé en ligne</th><th>Au centre</th></tr></thead>
-                  <tbody>
-                    <tr><td>Fun dives</td><td>06:30</td><td>4</td><td>1 320</td><td>7 480</td></tr>
-                    <tr><td>Open Water, jour 1</td><td>08:00</td><td>2</td><td>3 000</td><td>22 000</td></tr>
-                    <tr><td>Basic Diver</td><td>08:30</td><td>1</td><td>525</td><td>2 975</td></tr>
-                    <tr><td>Fun dives</td><td>11:30</td><td>6</td><td>1 980</td><td>11 220</td></tr>
-                  </tbody>
-                </table></div>
-                <div class="unpaid"><div><b>Pas encore payé · 2 plongeurs</b><small>Arrivés sur la page de paiement, sans payer</small></div><span class="pill">Envoyer un rappel</span></div>
-                <div class="zone-foot"><span>Imprimer la liste du bateau</span><span>Déplacer / annuler</span></div>
-              </div>
-              <div class="zc-slide" id="zs-2" role="group" aria-roledescription="slide" aria-label="3 sur 4 : Résultats">
-                <div class="zc-cap"><em>Résultats</em><h3>Voyez ce que Talay rapporte</h3><p>Chiffre d’affaires, réservations et nombre de demandes arrivées en dehors des heures d’ouverture.</p></div>
-                <h4>30 derniers jours</h4>
-                <div class="kpis">
-                  <div class="kpi gold"><small>CA via Talay</small><b>318 400</b><span>THB</span></div>
-                  <div class="kpi"><small>Conversations</small><b>212</b><span>41 % hors heures d’ouverture</span></div>
-                  <div class="kpi"><small>Devenues réservation</small><b>23 %</b><span>15 après une relance</span></div>
-                  <div class="kpi"><small>Réponse moyenne</small><b>9 s</b><span>jour et nuit</span></div>
+                <div class="zshot">
+                  <div class="zs-laptop"><div class="zs-bar" aria-hidden="true"><i></i><i></i><i></i><span>talay.io/zone</span></div><img src="/img/zone/desk-books.webp" width="1600" height="1000" alt="La liste des réservations dans l’espace client, sur un ordinateur" loading="lazy" decoding="async"></div>
+                  <div class="zs-phone"><img src="/img/zone/mob-books.webp" width="560" height="1212" alt="La liste des réservations dans l’espace client, sur un téléphone" loading="lazy" decoding="async"></div>
                 </div>
-                <h4 style="margin-top:var(--s4)">Réservations par semaine</h4>
-                <div class="bars" aria-hidden="true"><i style="height:38%"></i><i style="height:52%"></i><i style="height:47%"></i><i style="height:66%"></i><i style="height:74%"></i><i style="height:92%"></i></div>
-                <div class="bars-cap"><span>Il y a 6 semaines</span><span>Cette semaine</span></div>
               </div>
-              <div class="zc-slide" id="zs-3" role="group" aria-roledescription="slide" aria-label="4 sur 4 : Réglages">
-                <div class="zc-cap"><em>Réglages</em><h3>Vous décidez de ce qui est réservable</h3><p>Prix, délais de réservation et heures d’ouverture. Mettez l’assistant en pause à tout moment.</p></div>
-                <div class="mia"><div><b>L’assistant est actif</b><small>Répond à chaque demande, 24 h/24, 7 j/7</small></div><span class="tg" aria-label="Activé"></span></div>
-                <div class="set"><div>Heures d’ouverture<small>Les transferts arrivent à votre équipe</small></div><span class="v">Tous les jours 9:00 – 18:00</span></div>
-                <div class="set"><div>Open Water<small>Réservable en ligne jusqu’à 16:00 la veille</small></div><span class="v">12 500 THB</span><span class="tg" aria-label="Réservable en ligne"></span></div>
-                <div class="set"><div>Sortie fun dive<small>Réservable en ligne jusqu’à 15:00 la veille</small></div><span class="v">2 200 THB</span><span class="tg" aria-label="Réservable en ligne"></span></div>
-                <div class="set"><div>Deep Diving Specialty<small>Pas réservable en ligne pour l’instant</small></div><span class="v">7 750 THB</span><span class="tg off" aria-label="Non réservable en ligne"></span></div>
-                <div class="zone-foot"><span>Équipe et alertes</span><span>Tickets de support</span></div>
+              <div class="zc-slide" id="zs-3" role="group" aria-roledescription="slide" aria-label="4 sur 5 : Tableau de bord">
+                <div class="zc-cap"><em>Tableau de bord</em><h3>Voyez ce que Talay rapporte</h3><p>Chiffre d’affaires, réservations, conversion et nombre de demandes arrivées en dehors des heures d’ouverture.</p></div>
+                <div class="zshot">
+                  <div class="zs-laptop"><div class="zs-bar" aria-hidden="true"><i></i><i></i><i></i><span>talay.io/zone</span></div><img src="/img/zone/desk-dash.webp" width="1600" height="1000" alt="Le tableau de bord de l’espace client, sur un ordinateur" loading="lazy" decoding="async"></div>
+                  <div class="zs-phone"><img src="/img/zone/mob-dash.webp" width="560" height="1212" alt="Le tableau de bord de l’espace client, sur un téléphone" loading="lazy" decoding="async"></div>
+                </div>
+              </div>
+              <div class="zc-slide" id="zs-4" role="group" aria-roledescription="slide" aria-label="5 sur 5 : Réglages">
+                <div class="zc-cap"><em>Réglages</em><h3>Vous décidez quand l’assistant répond</h3><p>Jour et nuit, ou seulement en dehors de vos heures d’ouverture. Mettez-le en pause à tout moment, pour une tempête ou des vacances.</p></div>
+                <div class="zshot">
+                  <div class="zs-laptop"><div class="zs-bar" aria-hidden="true"><i></i><i></i><i></i><span>talay.io/zone</span></div><img src="/img/zone/desk-sett.webp" width="1600" height="1000" alt="Les réglages de l’espace client, sur un ordinateur" loading="lazy" decoding="async"></div>
+                  <div class="zs-phone"><img src="/img/zone/mob-sett.webp" width="560" height="1212" alt="Les réglages de l’espace client, sur un téléphone" loading="lazy" decoding="async"></div>
+                </div>
               </div>
             </div>
-            
           </div>
-          <figcaption class="caption">Illustration de l’espace client.</figcaption>
+          <figcaption class="caption">Vrais écrans de l’espace client, avec un centre de plongée de démonstration.</figcaption>
         </figure>
+        <div class="zs-tour"><button type="button" class="zs-play" id="zs-play"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9.5-5.5z" fill="currentColor"/></svg>Voir la visite de 30 secondes</button></div>
+        <dialog class="zs-video" id="zs-video" aria-label="Visite de l’espace client">
+          <button type="button" class="zs-close" id="zs-close" aria-label="Fermer">×</button>
+          <video id="zs-vid" preload="none" muted playsinline controls></video>
+        </dialog>
       </div>
       <div class="cta-row"><a class="cta" href="#demo">Demander une démo gratuite</a><span class="cta-note">20 minutes, sans engagement.</span></div>
     </div>
@@ -913,6 +920,25 @@ const TURNSTILE_SITEKEY = "0x4AAAAAAFXZnn0VWocS_nWR";  // Cloudflare Turnstile s
     }, { threshold: 0.35 });
     zio.observe(zone);
   }
+
+  // Customer zone video tour
+  const zdlg = document.getElementById('zs-video'), zvid = document.getElementById('zs-vid');
+  document.getElementById('zs-play').addEventListener('click', () => {
+    // Phone screens get the phone recording, larger screens the computer one
+    const name = matchMedia('(max-width:599px)').matches ? 'zone-tour-phone' : 'zone-tour';
+    if (zvid.dataset.name !== name) {
+      zvid.dataset.name = name;
+      zvid.poster = name === 'zone-tour' ? '/img/zone/tour-poster.webp' : '/img/zone/mob-today.webp';
+      zvid.innerHTML = '<source src="/img/zone/' + name + '.mp4" type="video/mp4"><source src="/img/zone/' + name + '.webm" type="video/webm">';
+      zvid.load();
+    }
+    if (zdlg.showModal) zdlg.showModal(); else zdlg.setAttribute('open', '');
+    zvid.currentTime = 0; zvid.play().catch(() => {});
+  });
+  const zclose = () => { zvid.pause(); if (zdlg.close) zdlg.close(); else zdlg.removeAttribute('open'); };
+  document.getElementById('zs-close').addEventListener('click', zclose);
+  zdlg.addEventListener('click', e => { if (e.target === zdlg) zclose(); });
+  zdlg.addEventListener('close', () => zvid.pause());
 
   // Demo form
   const form = document.getElementById('demo-form');
