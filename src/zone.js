@@ -500,7 +500,7 @@ async function reply(request, env, center) {
   const c = await chat(env, center, id);
   if (c.error) return json({ error: c.error }, 404);
   if (!c.canReply) {
-    return json({ error: "More than 24 hours since the diver's last message: WhatsApp and Instagram no longer allow a free reply." }, 409);
+    return json({ error: "More than 24 hours since the diver's last message: WhatsApp, Instagram and Messenger no longer allow a free reply." }, 409);
   }
 
   const contact = id.includes(":") ? id : `id:${id}`;
@@ -3501,7 +3501,7 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
     <div class="ms small" id="msChat" hidden></div>
     <div class="items" id="list"><div class="skel list"><i></i><i></i><i></i><i></i></div></div>
   </div>
-  <div class="pane" id="pane"><div class="placeholder">Pick a conversation.<br><br><b>Open</b> shows every diver who wrote in the last 24 hours: WhatsApp only lets you reply freely within that window. <b>Needs you</b> means ${esc(center.assistant)} handed it over to your team.</div></div>
+  <div class="pane" id="pane"><div class="placeholder">Pick a conversation.<br><br><b>Open</b> shows every diver who wrote in the last 24 hours: WhatsApp, Instagram and Messenger only let you reply freely within that window. <b>Needs you</b> means ${esc(center.assistant)} handed it over to your team.</div></div>
 </section>
 
 <section id="books" class="view">
@@ -3783,13 +3783,13 @@ function zoneClient(cfg) {
         (d.canReply
           ? '<div class="composer">' +
             '<div class="pchips" id="pchips" hidden></div>' +
-            '<div class="cbox"><textarea id="txt" placeholder="Reply on WhatsApp…" rows="1"></textarea>' +
+            '<div class="cbox"><textarea id="txt" placeholder="Reply on ' + esc((L && L.channel) || "WhatsApp") + '…" rows="1"></textarea>' +
             '<button class="send" id="send" aria-label="Send"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>' +
             '<div class="cmeta"><label class="sig">Signed as <input id="sig" maxlength="30" placeholder="your name"></label>' +
             '<select id="prod" aria-label="Booking link" hidden><option value="">+ Booking link…</option></select>' +
             '<span class="sp"></span><span class="bt' + (l.soon ? " soon" : "") + '">' + esc(l.t) + "</span></div>" +
             '<div class="note" id="note">⌘/Ctrl + Enter sends · replying pauses ' + esc(cfg.assistant) + " for this diver for 4 hours.</div></div>"
-          : '<div class="closed">More than 24 hours since the diver\'s last message, so WhatsApp no longer allows a free reply. Read only.</div>');
+          : '<div class="closed">More than 24 hours since the diver\'s last message, so WhatsApp, Instagram and Messenger no longer allow a free reply. Read only.</div>');
 
       document.querySelectorAll("[data-rep]").forEach(function (b) {
         b.onclick = function () {
@@ -4045,7 +4045,7 @@ function zoneClient(cfg) {
         return '<tr><td class="tname" data-l="Diver">' + who + '</td><td data-l="Product">' + esc(i.product) + '</td><td data-l="For">' + esc(dayLabel(i.date)) + '</td><td class="num" data-l="Divers">' + i.divers +
           '</td><td class="num" data-l="Value">' + thb(i.total) + '</td><td data-l="Left">' + (ago(i.at) === "now" ? "just now" : ago(i.at) + " ago") + '</td><td class="keep noprint tlinks">' + act.join(" · ") + "</td></tr>";
       }).join("") + "</tbody></table></div>" +
-      '<p style="color:var(--muted);font-size:13px">WhatsApp only allows a free message within 24 hours of the diver\'s last message, so older ones can\'t get a reminder from here.</p>';
+      '<p style="color:var(--muted);font-size:13px">WhatsApp, Instagram and Messenger only allow a free message within 24 hours of the diver\'s last message, so older ones can\'t get a reminder from here.</p>';
     function go(k, draft) {
       var i = udata.items[k]; pendingDraft = draft ? i.reminder : null;
       document.querySelector('nav button[data-v="convos"]').click();
@@ -4094,7 +4094,7 @@ function zoneClient(cfg) {
         return '<tr><td class="tname" data-l="Diver">' + who + '</td><td data-l="When">' + when + '</td><td data-l="Interested in">' + esc(i.interested || "–") +
           '</td><td data-l="Level">' + esc(i.cert || "–") + '</td><td class="num" data-l="Group">' + esc(i.group || "1") + '</td><td class="keep noprint tlinks">' + act.join(" · ") + "</td></tr>";
       }).join("") + "</tbody></table></div>" +
-      '<p style="color:var(--muted);font-size:13px">WhatsApp only allows a free message within 24 hours of the diver\'s last message. For the others, message them from your WhatsApp app.</p>';
+      '<p style="color:var(--muted);font-size:13px">WhatsApp, Instagram and Messenger only allow a free message within 24 hours of the diver\'s last message. For the others, message them from your own app.</p>';
     function go(k, draft) {
       var i = adata.items[k];
       var first = String(i.name || "").split(" ")[0];

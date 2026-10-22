@@ -132,13 +132,16 @@ const SECTIONS = [
     { k: "choose_instructor", label: "Can a diver ask for a specific instructor?", type: "one", opts: ["Yes, by name", "Only a language or country, not a name", "No"] },
     { k: "private_lessons", label: "Private lessons or a private guide?", type: "one", opts: ["Yes, on request", "No"] },
   ]},
-  { id: "whatsapp", title: "WhatsApp", why: "Divers keep writing to the number they already know. We help you connect it; nothing changes for your divers.", fields: [
-    { k: "wa_number", label: "The WhatsApp number divers write to today", type: "tel", req: true },
-    { k: "wa_setup", label: "How does your team use that number now?", type: "one", req: true, opts: ["WhatsApp Business app on a phone", "Through a tool (respond.io, WATI, Zoko, …)", "Normal WhatsApp app", "I don't know"] },
+  { id: "whatsapp", title: "WhatsApp, Instagram and Messenger", why: "Divers keep writing to the number and accounts they already know. We help you connect them; nothing changes for your divers.", fields: [
+    { k: "channels_now", label: "Where should your assistant answer?", type: "many", req: true, opts: ["WhatsApp", "Instagram messages", "Facebook Messenger"] },
+    { k: "wa_number", label: "The WhatsApp number divers write to today", type: "tel", help: "Leave the WhatsApp questions empty if you only want Instagram or Messenger." },
+    { k: "wa_setup", label: "How does your team use that number now?", type: "one", opts: ["WhatsApp Business app on a phone", "Through a tool (respond.io, WATI, Zoko, …)", "Normal WhatsApp app", "I don't know"] },
     { k: "wa_tool", label: "Which tool, if any?", ph: "e.g. respond.io" },
-    { k: "meta_access", label: "Do you have a Facebook / Meta Business account for the centre?", type: "one", opts: ["Yes, and I have admin access", "Yes, someone else manages it", "No", "I don't know"] },
-    { k: "wa_choice", label: "Where should your assistant answer?", type: "one", opts: ["On our existing number (team keeps using it too)", "On a new number, just for enquiries", "Let's discuss"] },
-    { k: "channels_later", label: "Other channels you'd like later", type: "many", opts: ["Instagram", "Facebook Messenger", "Website form", "Email", "LINE"] },
+    { k: "meta_access", label: "Do you have a Facebook / Meta Business account for the centre?", type: "one", help: "Instagram and Messenger are connected through your Facebook page, so someone with admin access to it needs to approve the connection.", opts: ["Yes, and I have admin access", "Yes, someone else manages it", "No", "I don't know"] },
+    { k: "wa_choice", label: "On WhatsApp: which number should your assistant use?", type: "one", opts: ["On our existing number (team keeps using it too)", "On a new number, just for enquiries", "Let's discuss"] },
+    { k: "facebook_page", label: "Your Facebook page", type: "url", ph: "https://facebook.com/yourcentre" },
+    { k: "ig_professional", label: "Is your Instagram a professional (business or creator) account, linked to that Facebook page?", type: "one", opts: ["Yes", "No", "I don't know"] },
+    { k: "channels_later", label: "Other channels you'd like later", type: "many", opts: ["Website form", "Email", "LINE", "Telegram"] },
   ]},
   { id: "products", title: "Courses and prices", why: "Your assistant only quotes the prices you give here. Untick what you don't offer; switch online booking off for anything you want to handle yourself.", products: true },
   { id: "schedule", title: "Times and schedule", why: "The questions divers ask most: when do I start, and when do I need to be there?", fields: [
