@@ -100,6 +100,11 @@ h2{font-size:clamp(28px,3.6vw,40px);line-height:1.1;letter-spacing:-.02em;margin
 .card .num{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:19px;letter-spacing:.1em}
 .card small{color:var(--soft);font-size:14px}
 
+.tour{margin:0}
+.tour video{display:block;width:100%;border-radius:18px;border:1px solid var(--line);background:var(--deep);box-shadow:0 24px 50px -30px rgba(9,38,47,.45)}
+.tour figcaption{color:var(--muted);font-size:13px;margin:10px 2px 0}
+.steps.three{grid-template-columns:repeat(3,1fr)}
+.cta-next{margin:24px 0 0}
 .deal{margin-top:72px;background:var(--deep);color:var(--paper);border-radius:24px;padding:36px;display:grid;grid-template-columns:1.3fr 1fr;gap:32px;align-items:center}
 .deal h2{color:var(--paper)}
 .deal p{margin:0;color:#C9D4D7}
@@ -114,7 +119,7 @@ footer a{color:var(--deep);font-weight:600}
   .hero .wrap{grid-template-columns:1fr;padding-top:32px;gap:44px}
   .phone{justify-self:center;transform:none}
   .stats{grid-template-columns:1fr;margin-top:24px}
-  .grid,.steps{grid-template-columns:1fr}
+  .grid,.steps,.steps.three{grid-template-columns:1fr}
   .deal{grid-template-columns:1fr;padding:28px}
 }
 @media (max-width:480px){
@@ -256,12 +261,42 @@ footer a{color:var(--deep);font-weight:600}
 
       <div class="step">
         <h3><span class="n">4</span>See the results</h3>
-        <p>Conversations, bookings and revenue via Mia, live in the dashboard.</p>
-        <a class="btn btn-dark" href="https://airtable.com/appEXBMOJa73WiQHb/shrkzC7WhyMBUsEiO" target="_blank" rel="noopener">Open dashboard</a>
+        <p>Conversations, bookings and revenue via Mia, live in the centre's own customer zone. The team can read along, take over a chat and switch Mia off with one tap.</p>
+        <a class="btn btn-dark" href="#zone">See the customer zone</a>
       </div>
     </div>
   </section>
 
+  <section id="zone">
+    <h2>The customer zone</h2>
+    <p class="sub">Every centre gets its own zone: today's conversations, bookings with the balance to collect, results per week and settings. Real screens, shown with the demo centre.</p>
+    <figure class="tour">
+      <video controls playsinline preload="none" poster="/img/zone/tour-poster.webp">
+        <source src="/img/zone/zone-tour.webm" type="video/webm">
+        <source src="/img/zone/zone-tour.mp4" type="video/mp4">
+      </video>
+      <figcaption>A 30-second tour of the zone.</figcaption>
+    </figure>
+  </section>
+  <section id="next">
+    <h2>What happens next</h2>
+    <p class="sub">From a first chat to Mia answering for your own centre.</p>
+    <div class="steps three">
+      <div class="step">
+        <h3><span class="n">1</span>Tell us about your centre</h3>
+        <p>Fill in the short form with your courses, prices, meeting point and opening hours. Choose whether Mia answers all day or only outside office hours.</p>
+      </div>
+      <div class="step">
+        <h3><span class="n">2</span>We set it up, you test it</h3>
+        <p>We set up Mia with your own details and texts on your own number. You and your team test it first, with your own tricky questions.</p>
+      </div>
+      <div class="step">
+        <h3><span class="n">3</span>You say go</h3>
+        <p>Mia only goes live when you say so. You follow everything in your zone and can switch it off at any moment.</p>
+      </div>
+    </div>
+    <p class="cta-next"><a class="btn btn-dark" href="/start/">Sign up your centre</a></p>
+  </section>
   <div class="deal">
     <div>
       <h2>Free to use</h2>
@@ -270,6 +305,7 @@ footer a{color:var(--deep);font-weight:600}
     <ul>
       <li>No setup fee, no monthly fee, no contract</li>
       <li>Switch it on and off whenever you want</li>
+      <li>All day, or only outside your office hours</li>
       <li>Keep taking direct bookings as you do now</li>
       <li>Nothing changes in your system</li>
     </ul>

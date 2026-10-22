@@ -57,6 +57,8 @@ input:focus,textarea:focus,select:focus{outline:3px solid var(--sand-2);border-c
 .saved{color:var(--muted);font-size:13.5px;margin-top:10px}
 .done{text-align:center;padding:40px 20px}
 .done h2{justify-content:center;font-size:28px}
+.next{margin:0 auto 16px;padding-left:20px;text-align:left;max-width:520px}
+.next li{margin:0 0 8px}
 .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 footer{color:var(--muted);font-size:14px;padding:10px 0 40px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
 @media (max-width:640px){.grid2{grid-template-columns:1fr}section{padding:18px 14px}}
@@ -81,6 +83,7 @@ footer{color:var(--muted);font-size:14px;padding:10px 0 40px;display:flex;justif
     <div class="hp" aria-hidden="true"><label>Website <input type="text" name="website_hp" tabindex="-1" autocomplete="off"></label></div>
     <section>
       <div class="f" id="ts"></div>
+      <p class="why">After sending, we set everything up and you test it first. Nothing goes live until you say go.</p>
       <button class="btn" id="submit" type="submit">Send to Talay</button>
       <p class="status" id="status" role="status"></p>
       <p class="saved" id="saved"></p>
@@ -88,7 +91,13 @@ footer{color:var(--muted);font-size:14px;padding:10px 0 40px;display:flex;justif
   </form>
   <section class="done" id="done" hidden>
     <h2>Thank you! 🎉</h2>
-    <p>We've received everything. We'll set up your assistant and send you a test number, so you can try it yourself before anything goes live.</p>
+    <p>We've received everything. This is what happens now:</p>
+    <ol class="next">
+      <li>We contact you on WhatsApp or by email, with any questions about your answers.</li>
+      <li>We set up your assistant with your own prices, times and texts, and send you a test number. You and your team try it with your own tricky questions.</li>
+      <li>We connect your WhatsApp, Instagram or Messenger together with you.</li>
+      <li>Your assistant only goes live when you say go. You follow everything in your zone and can switch it off at any time.</li>
+    </ol>
     <p class="why">Questions? WhatsApp Jonas on <a href="https://wa.me/32456953907">+32 456 95 39 07</a> or email <a href="mailto:info@talay.io">info@talay.io</a>.</p>
   </section>
 </main>
@@ -126,6 +135,8 @@ const SECTIONS = [
     { k: "alert_emails", label: "Who gets the alert when a diver needs a person?", req: true, type: "area", help: "One or more email addresses.", ph: "e.g. desk@yourcentre.com" },
     { k: "staff_emails", label: "Team members who may see and answer the chats", type: "area", help: "Email addresses. They log in at talay.io/zone with a code, no password." },
     { k: "admin_emails", label: "Who may change prices and settings?", type: "area", help: "Usually the owner or manager." },
+    { k: "answer_mode", label: "When should your assistant answer?", type: "one", req: true, help: "You can change this later in your zone.", opts: ["Day and night", "Only outside our office hours (our team answers during the day)"] },
+    { k: "answer_hours", label: "If only outside office hours: when does your team answer the chats?", ph: "e.g. every day 8:30 to 18:00" },
     { k: "emergency_phone", label: "Your emergency phone number (reachable 24/7)", type: "tel", req: true, help: "Only shared in a real emergency, next to the Thai emergency number 1669." },
     { k: "team_languages", label: "Languages your team teaches in", type: "many", opts: ["English", "Thai", "German", "French", "Dutch", "Spanish", "Italian", "Portuguese", "Chinese", "Swedish", "Other"] },
     { k: "instructor_countries", label: "Where are your instructors from?", ph: "e.g. Thailand, England, Germany, Sweden" },
