@@ -485,6 +485,19 @@ footer a:hover{text-decoration:underline}
  .zs-phone{position:static;width:min(270px,78%);margin:0 auto}
  .zs-video{width:min(400px,88vw)}
 }
+
+/* Try it yourself, Koh Tao numbers */
+.cta.ghost{background:none;color:var(--shore);box-shadow:inset 0 0 0 1.5px var(--ridge)}
+.cta.ghost:hover{background:var(--shelf);color:var(--shore)}
+.alt.try{margin-top:var(--s3)}
+.faq details p a{color:inherit;font-weight:600}
+.proof{margin-top:var(--s12);padding-top:var(--s8);border-top:1px solid var(--ridge)}
+.proof-head{color:var(--on-deep);max-width:60ch}
+.proof-stats{display:grid;gap:var(--s6);margin-top:var(--s6)}
+.proof-stats div{display:grid;gap:var(--s1)}
+.proof-stats b{color:var(--sand);font-size:2.1rem;line-height:1.1;letter-spacing:-.01em}
+.proof-stats span{color:var(--on-deep);max-width:30ch}
+@media(min-width:780px){.proof-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
 </style>
 </head>
 <body id="top">
@@ -517,6 +530,7 @@ footer a:hover{text-decoration:underline}
       <p class="lede">Talay replies to your inquiries within seconds, follows up and lets divers book online. All under your centre’s name.</p>
       <div class="cta-row">
         <a class="cta" href="#demo">Book a free demo</a>
+        <a class="cta ghost" href="/demo/ridgefin-divers/">Try it yourself</a>
       </div>
       <ul class="assure" aria-label="Terms">
         <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>Free to use</li>
@@ -570,6 +584,14 @@ footer a:hover{text-decoration:underline}
       <article><svg class="problem-art" viewBox="0 0 104 104" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h47a8 8 0 0 1 8 8v25a8 8 0 0 1-8 8H41L24 70V58h-5a8 8 0 0 1-8-8V25a8 8 0 0 1 8-8Z"/><circle cx="29" cy="38" r="2" fill="#DCA44A" stroke="#DCA44A"/><circle cx="43" cy="38" r="2" fill="#DCA44A" stroke="#DCA44A"/><circle cx="57" cy="38" r="2" fill="#DCA44A" stroke="#DCA44A"/><path d="M49 71h26m-26 9h17M82 45v19l10 8V45" stroke-dasharray="3 5" opacity=".55"/></svg><h3>“Let me think about it.”<br>Then nothing.</h3><p>Nobody follows up, and the booking quietly disappears.</p></article>
       <article><svg class="problem-art" viewBox="0 0 104 104" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="22" y="18" width="56" height="70" rx="7"/><rect x="36" y="12" width="28" height="13" rx="4" fill="#0A2029"/><path d="M34 71V58m15 13V47m15 24V37" stroke="#DCA44A" stroke-width="4"/><path d="M33 79h34M84 30h10m-10 10h7"/><path d="M11 47h6m-9 10h9" opacity=".5"/></svg><h3>Plenty of messages.<br>Little visibility.</h3><p>Which inquiries became bookings? Nobody really knows.</p></article>
     </div>
+    <div class="proof">
+      <p class="proof-head">We sent inquiries to 57 dive centres on Koh Tao in October 2026. What came back:</p>
+      <div class="proof-stats">
+        <div><b>7.2 hours</b><span>median wait for a real answer to a message sent at night</span></div>
+        <div><b>0 of 38</b><span>night messages answered within the hour</span></div>
+        <div><b>0 of 67</b><span>replies that came with a way to book or pay</span></div>
+      </div>
+    </div>
   </section>
 </div>
 
@@ -619,7 +641,7 @@ footer a:hover{text-decoration:underline}
         <article>
           <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3 5 6.5V13c0 5.5 3.8 9.7 9 11.5 5.2-1.8 9-6 9-11.5V6.5Z"/><path d="m10 14 3 3 5-6" stroke="#DCA44A"/></svg>
           <h3>Stay in control</h3>
-          <p>Your team can take over any conversation. Medical questions and complaints always go to you.</p>
+          <p>Let Talay answer day and night, or only when you’re closed. Your team can take over any conversation, and medical questions always go to you.</p>
         </article>
         <article>
           <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="22" height="17" rx="3"/><path d="M10 25h8M14 21v4"/><path d="M8 16v-3m4 3V9m4 7v-5m4 5V8" stroke="#DCA44A"/></svg>
@@ -766,12 +788,17 @@ footer a:hover{text-decoration:underline}
           <details><summary>Is Talay a booking system?</summary><p>No. Talay handles the inquiry until the diver books. Your booking system and CRM stay the same.</p></details>
           <details><summary>Do divers have to book through Talay?</summary><p>No. They can still walk in, call or book with you directly. Only bookings made through Talay carry a commission.</p></details>
           <details><summary>What does it cost?</summary><p>Nothing to use. Talay earns a commission only on bookings made through Talay, at rates agreed with you up front.</p></details>
+          <details><summary>Can I try it first?</summary><p>Yes. <a href="/demo/ridgefin-divers/">Chat with our demo dive centre</a> on WhatsApp, Instagram or Messenger, as if you were a diver, and see how it answers.</p></details>
+          <details><summary>Can Talay answer only when we’re closed?</summary><p>Yes. Choose day and night, or only outside your office hours. During office hours every message waits for your team, and you can switch any time in your customer zone.</p></details>
+          <details><summary>How long does it take to get started?</summary><p>About 20 minutes to tell us your courses, prices and rules. We set up your assistant and send you a test number, so you can try it yourself before anything goes live.</p></details>
           <details><summary>Which channels does Talay work with?</summary><p>WhatsApp, Instagram and Facebook Messenger today, each under your centre’s own name. LINE, Telegram, website forms and email are coming.</p></details>
         </div>
         <div class="faq-col">
           <details><summary>Which languages does it speak?</summary><p>English, Dutch, French, German and Spanish today. Other languages get English for now, and more can be added.</p></details>
           <details><summary>Can our team take over a conversation?</summary><p>Yes, at any time. Reply from your customer zone or inbox and Talay steps back.</p></details>
           <details><summary>What about medical questions or complaints?</summary><p>They always go to your team. Talay never gives medical advice.</p></details>
+          <details><summary>What if a diver asks something Talay can’t answer?</summary><p>It tells the diver a colleague will reply and alerts your team. Medical questions, large groups and schedule changes always go to you. Once your team replies, Talay steps back in that chat.</p></details>
+          <details><summary>Can we stop any time?</summary><p>Yes. Pause the assistant or switch it off whenever you want. No contract, no notice period.</p></details>
           <details><summary>Does Talay bring us new leads?</summary><p>No. It makes sure fewer of the inquiries you already get are lost.</p></details>
         </div>
       </div>
@@ -786,6 +813,7 @@ footer a:hover{text-decoration:underline}
       <p class="lead-in">We show you Talay with your own centre’s name, prices and courses.</p>
       <p class="free">Free 20-minute demo, by video or in person. No commitment.</p>
       <p class="alt">Prefer WhatsApp? <a href="https://wa.me/32456953907?text=Hi%20Talay%2C%20I%20run%20a%20dive%20centre%20and%20would%20like%20to%20see%20a%20demo.">Message us</a> or email <a href="mailto:info@talay.io?subject=Talay%20demo">info@talay.io</a>.</p>
+      <p class="alt try">Want to try it first? <a href="/demo/ridgefin-divers/">Chat with our demo assistant</a> on WhatsApp, Instagram or Messenger.</p>
     </div>
 
     <div class="form-card">

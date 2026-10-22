@@ -472,6 +472,19 @@ footer a:hover{text-decoration:underline}
  .zs-phone{position:static;width:min(270px,78%);margin:0 auto}
  .zs-video{width:min(400px,88vw)}
 }
+
+/* Try it yourself, Koh Tao numbers */
+.cta.ghost{background:none;color:var(--shore);box-shadow:inset 0 0 0 1.5px var(--ridge)}
+.cta.ghost:hover{background:var(--shelf);color:var(--shore)}
+.alt.try{margin-top:var(--s3)}
+.faq details p a{color:inherit;font-weight:600}
+.proof{margin-top:var(--s12);padding-top:var(--s8);border-top:1px solid var(--ridge)}
+.proof-head{color:var(--on-deep);max-width:60ch}
+.proof-stats{display:grid;gap:var(--s6);margin-top:var(--s6)}
+.proof-stats div{display:grid;gap:var(--s1)}
+.proof-stats b{color:var(--sand);font-size:2.1rem;line-height:1.1;letter-spacing:-.01em}
+.proof-stats span{color:var(--on-deep);max-width:30ch}
+@media(min-width:780px){.proof-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
 </style>
 </head>
 <body id="top">
@@ -504,6 +517,7 @@ footer a:hover{text-decoration:underline}
       <p class="lede">Talay responde a tus consultas en segundos, hace seguimiento y permite a los buceadores reservar online. Todo con el nombre de tu centro.</p>
       <div class="cta-row">
         <a class="cta" href="#demo">Pedir una demo gratis</a>
+        <a class="cta ghost" href="/demo/ridgefin-divers/">Pruébalo tú mismo</a>
       </div>
       <ul class="assure" aria-label="Condiciones">
         <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>Gratis</li>
@@ -557,6 +571,14 @@ footer a:hover{text-decoration:underline}
       <article><svg class="problem-art" viewBox="0 0 104 104" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h47a8 8 0 0 1 8 8v25a8 8 0 0 1-8 8H41L24 70V58h-5a8 8 0 0 1-8-8V25a8 8 0 0 1 8-8Z"/><circle cx="29" cy="38" r="2" fill="#DCA44A" stroke="#DCA44A"/><circle cx="43" cy="38" r="2" fill="#DCA44A" stroke="#DCA44A"/><circle cx="57" cy="38" r="2" fill="#DCA44A" stroke="#DCA44A"/><path d="M49 71h26m-26 9h17M82 45v19l10 8V45" stroke-dasharray="3 5" opacity=".55"/></svg><h3>“Me lo pienso.”<br>Y luego nada.</h3><p>Nadie hace seguimiento y la reserva desaparece sin más.</p></article>
       <article><svg class="problem-art" viewBox="0 0 104 104" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="22" y="18" width="56" height="70" rx="7"/><rect x="36" y="12" width="28" height="13" rx="4" fill="#0A2029"/><path d="M34 71V58m15 13V47m15 24V37" stroke="#DCA44A" stroke-width="4"/><path d="M33 79h34M84 30h10m-10 10h7"/><path d="M11 47h6m-9 10h9" opacity=".5"/></svg><h3>Muchos mensajes.<br>Poca visibilidad.</h3><p>¿Qué consultas acabaron en reserva? Nadie lo sabe realmente.</p></article>
     </div>
+    <div class="proof">
+      <p class="proof-head">En octubre de 2026 enviamos consultas a 57 centros de buceo de Koh Tao. Esto es lo que recibimos:</p>
+      <div class="proof-stats">
+        <div><b>7,2 horas</b><span>de espera media hasta una respuesta real a un mensaje enviado de noche</span></div>
+        <div><b>0 de 38</b><span>mensajes nocturnos respondidos en menos de una hora</span></div>
+        <div><b>0 de 67</b><span>respuestas con una forma de reservar o pagar</span></div>
+      </div>
+    </div>
   </section>
 </div>
 
@@ -606,7 +628,7 @@ footer a:hover{text-decoration:underline}
         <article>
           <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3 5 6.5V13c0 5.5 3.8 9.7 9 11.5 5.2-1.8 9-6 9-11.5V6.5Z"/><path d="m10 14 3 3 5-6" stroke="#DCA44A"/></svg>
           <h3>Mantén el control</h3>
-          <p>Tu equipo puede tomar el control de cualquier conversación. Las preguntas médicas y las quejas siempre te llegan a ti.</p>
+          <p>Talay responde día y noche, o solo cuando estás cerrado. Tu equipo puede tomar cualquier conversación, y las preguntas médicas siempre te llegan a ti.</p>
         </article>
         <article>
           <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="22" height="17" rx="3"/><path d="M10 25h8M14 21v4"/><path d="M8 16v-3m4 3V9m4 7v-5m4 5V8" stroke="#DCA44A"/></svg>
@@ -753,12 +775,17 @@ footer a:hover{text-decoration:underline}
           <details><summary>¿Talay es un sistema de reservas?</summary><p>No. Talay gestiona la consulta hasta que el buceador reserva. Tu sistema de reservas y tu CRM siguen igual.</p></details>
           <details><summary>¿Los buceadores tienen que reservar con Talay?</summary><p>No. Pueden seguir entrando, llamando o reservando directamente contigo. Solo las reservas hechas con Talay llevan comisión.</p></details>
           <details><summary>¿Cuánto cuesta?</summary><p>Usarlo no cuesta nada. Talay solo cobra una comisión por las reservas hechas con Talay, con un porcentaje acordado contigo de antemano.</p></details>
+          <details><summary>¿Puedo probarlo antes?</summary><p>Sí. <a href="/demo/ridgefin-divers/">Escribe a nuestro centro de demo</a> por WhatsApp, Instagram o Messenger, como si fueras un buceador, y mira cómo responde.</p></details>
+          <details><summary>¿Puede Talay responder solo cuando estamos cerrados?</summary><p>Sí. Elige día y noche, o solo fuera de tu horario de oficina. En horario de oficina cada mensaje espera a tu equipo, y puedes cambiarlo cuando quieras en tu zona de cliente.</p></details>
+          <details><summary>¿Cuánto se tarda en empezar?</summary><p>Unos 20 minutos para contarnos tus cursos, precios y normas. Configuramos tu asistente y te enviamos un número de prueba, para que lo pruebes tú antes de que nada esté en marcha.</p></details>
           <details><summary>¿Con qué canales funciona Talay?</summary><p>Hoy con WhatsApp, Instagram y Facebook Messenger, siempre con el nombre de tu centro. LINE, Telegram, formularios web y email llegarán pronto.</p></details>
         </div>
         <div class="faq-col">
           <details><summary>¿Qué idiomas habla?</summary><p>Inglés, neerlandés, francés, alemán y español hoy. Los demás idiomas reciben inglés por ahora, y se pueden añadir más.</p></details>
           <details><summary>¿Puede nuestro equipo tomar el control de una conversación?</summary><p>Sí, en cualquier momento. Responde desde tu zona de cliente o tu bandeja y Talay se retira.</p></details>
           <details><summary>¿Y las preguntas médicas o las quejas?</summary><p>Siempre van a tu equipo. Talay nunca da consejos médicos.</p></details>
+          <details><summary>¿Y si un buceador pregunta algo que Talay no puede responder?</summary><p>Le dice que un compañero responderá y avisa a tu equipo. Las preguntas médicas, los grupos grandes y los cambios de horario siempre te llegan a ti. En cuanto tu equipo responde, Talay se aparta en ese chat.</p></details>
+          <details><summary>¿Podemos dejarlo cuando queramos?</summary><p>Sí. Pausa el asistente o apágalo cuando quieras. Sin contrato ni preaviso.</p></details>
           <details><summary>¿Talay nos trae clientes nuevos?</summary><p>No. Hace que pierdas menos de las consultas que ya recibes.</p></details>
         </div>
       </div>
@@ -773,6 +800,7 @@ footer a:hover{text-decoration:underline}
       <p class="lead-in">Te enseñamos Talay con el nombre, los precios y los cursos de tu centro.</p>
       <p class="free">Demo gratis de 20 minutos, por videollamada o en persona. Sin compromiso.</p>
       <p class="alt">¿Prefieres WhatsApp? <a href="https://wa.me/32456953907?text=Hola%20Talay%2C%20tengo%20un%20centro%20de%20buceo%20y%20me%20gustar%C3%ADa%20ver%20una%20demo.">Escríbenos</a> o envía un email a <a href="mailto:info@talay.io?subject=Demo%20de%20Talay">info@talay.io</a>.</p>
+      <p class="alt try">¿Quieres probarlo antes? <a href="/demo/ridgefin-divers/">Chatea con nuestro asistente de demo</a> en WhatsApp, Instagram o Messenger.</p>
     </div>
 
     <div class="form-card">
