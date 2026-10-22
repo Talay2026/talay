@@ -237,7 +237,12 @@ async function at(env, table, { formula, fields, sort, max = 500 } = {}) {
     });
     api.searchParams.set("pageSize", "100");
     if (offset) api.searchParams.set("offset", offset);
-    const res = await fetch(api, { headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` } });
+    let res = await fetch(api, { headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` } });
+    // Airtable allows 5 calls per second per base; the zone loads several panels at once.
+    for (let i = 0; res.status === 429 && i < 2; i++) {
+      await new Promise((r) => setTimeout(r, 1200 * (i + 1)));
+      res = await fetch(api, { headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` } });
+    }
     if (!res.ok) throw new Error(`Airtable ${table}: ${res.status} ${await res.text()}`);
     const body = await res.json();
     out.push(...(body.records || []));
@@ -342,6 +347,9 @@ async function leadsFor(env, center, ids) {
   // One respond.io contact can talk to several centers: a lead is contact + center.
   // Leads change rarely between messages: keep each one 5 minutes in the cache.
   const key = (id) => new Request(CACHE_HOST + env.AIRTABLE_BASE + "/lead/" + center.slug + "/" + id);
+  // Each cache read and write is a subrequest (Workers cap them per request): with many contacts
+  // (the "All" view) fetch straight from Airtable instead.
+  if (ids.length > 15) return leadsFetch(env, center, ids);
   const missing = [];
   await Promise.all(ids.map(async (id) => {
     const hit = await caches.default.match(key(id));
