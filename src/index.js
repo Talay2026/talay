@@ -4,7 +4,7 @@
 // Everything outside /b/ is served from /public by the assets binding.
 //
 // Languages: English, French, German, Spanish, Dutch. The page follows ?l=fr|de|es|nl|en
-// if present, otherwise the language of the diver's phone or browser.
+// if present, otherwise the language of the diver's phone or browser. The diver can switch in the menu at the top.
 // Optional Airtable fields per language (fallback to English when empty):
 //   Products: "Name FR", "Duration FR", "Included FR", "Check-in FR" (also DE, ES, NL)
 //   Centers:  "Meeting point FR" (also DE, ES, NL)
@@ -772,6 +772,7 @@ ${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
     <p class="center-name">${esc(centerName)}</p>
     ${island ? `<p class="island">${esc(island)}</p>` : ""}
   </div>
+  ${langMenu(lang)}
 </header>
 
 <main>
@@ -912,6 +913,13 @@ function closedPage(c, p, lang) {
   return `<main class="empty"><h1>${esc(t.title)}</h1><p>${esc(name)}</p><p>${esc(t.text(assistant))}</p></main>`;
 }
 
+// Language menu on the booking page: reloads the same page with ?l=, so product, ref and checkout follow it
+const LANG_LABEL = { en: "Language", fr: "Langue", de: "Sprache", es: "Idioma", nl: "Taal" };
+function langMenu(lang) {
+  const opts = LANGS.map((l) => `<option value="${l}"${l === lang ? " selected" : ""}>${l.toUpperCase()}</option>`).join("");
+  return `<select class="lang" aria-label="${LANG_LABEL[lang]}" onchange="var u=new URL(location.href);u.searchParams.set('l',this.value);location.href=u">${opts}</select>`;
+}
+
 function notFound(lang) {
   const t = T[lang];
   return `<main class="empty"><h1>${esc(t.notFoundTitle)}</h1>
@@ -953,6 +961,8 @@ body{margin:0;background:var(--page);color:var(--ink);font:400 17px/1.5 "Instrum
 .logo{width:52px;height:52px;object-fit:contain;border-radius:12px;background:#fff;border:1px solid var(--line)}
 .center-name{margin:0;font-weight:600}
 .island{margin:0;color:var(--muted);font-size:.9rem}
+.lang{margin-left:auto;align-self:flex-start;-webkit-appearance:none;appearance:none;font:inherit;font-size:.85rem;font-weight:600;color:var(--sea);padding:.35rem 1.7rem .35rem .7rem;border:1.5px solid var(--line);border-radius:999px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%231C6E7D' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right .65rem center;cursor:pointer}
+.lang:focus-visible{outline:3px solid var(--sea);outline-offset:2px}
 h1{font-size:2.1rem;line-height:1.1;letter-spacing:-.02em;margin:0 0 .6rem;font-weight:700}
 .intro{margin:0 0 2rem;color:var(--muted)}
 .intro strong{color:var(--ink);font-weight:600}
