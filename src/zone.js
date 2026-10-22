@@ -1580,7 +1580,7 @@ async function saveProduct(env, center, email, b) {
 // Optional Centers field "Type" (Demo, Test, Pilot, Live): Demo and Test centers stay out
 // of the totals unless "Ook demo/test" is ticked.
 
-const ADMIN_CACHE = "admin/overview/v3";
+const ADMIN_CACHE = "admin/overview/v4";
 const SORRY = /^sorry, something went wrong on our side/i; // v2 error handler (HTTP 3 → Respond.io 13)
 const WAIT_MIN = 15; // a diver's message without any answer for this long counts as waiting
 const HQ_ROLES = ["Owner", "Staff"];
@@ -1618,11 +1618,22 @@ async function handleAdmin(request, env, url, p, email, role) {
   }
   if (get && p === "/zone/admin/api/intake") return json(await adminIntake(env));
   if (get && p === "/zone/admin/api/team") return json(await adminTeam(env));
+  if (get && p === "/zone/admin/api/pipeline") return json(await adminPipeline(env));
+  if (get && p === "/zone/admin/api/conversion") {
+    const per = /^\d{4}-\d{2}$/.test(url.searchParams.get("period") || "") ? url.searchParams.get("period") : "";
+    return json(await adminConversion(env, per, fresh));
+  }
+  if (get && p === "/zone/admin/api/costs") {
+    const m = /^\d{4}-\d{2}$/.test(url.searchParams.get("month") || "") ? url.searchParams.get("month") : thaiMonth(Date.now());
+    return json(await cached(env, `admin/costs/${m}`, 600, () => adminCosts(env, m), fresh));
+  }
   if (request.method === "POST") {
     const body = await readBody(request);
     if (!body) return json({ error: "Bad request" }, 400);
     if (p === "/zone/admin/api/pause") return await adminPause(env, email, body);
     if (p === "/zone/admin/api/intake") return await adminIntakeStatus(env, body);
+    if (p === "/zone/admin/api/pipeline") return await adminPipelineChange(env, email, body);
+    if (p === "/zone/admin/api/alert-test") return await adminAlertTest(env);
     if (p === "/zone/admin/api/team") {
       if (role !== "owner") return json({ error: "Alleen een eigenaar kan het team aanpassen." }, 403);
       return await adminTeamChange(env, email, body);
@@ -1804,14 +1815,15 @@ async function adminOverview(env) {
     }
     const open = ls.filter((l) => handedOver(l) && madeAt(l) >= now - 7 * DAY &&
       !l.fields["Opted out"] && !l.fields["Human took over"] && !first(l.fields["Human took over at"]) &&
-      !/booked|lost|closed|spam/i.test(str(l.fields, "Status"))).length;
+      !/booked|lost|closed|spam/i.test(str(l.fields, "Status")));
+    const late = open.filter((l) => msOf(l.fields["Handover at"]) < now - ALERT_HANDOVER_MIN * 60000 && msOf(l.fields["Handover at"]) > now - DAY).length;
     const last = ls.reduce((a, l) => Math.max(a, madeAt(l)), 0);
     return {
       ...c, channel: num(f["Channel ID"]) || null, paused: !!f["Mia paused"],
       staff: splitEmails(f["Staff emails"]).length, admins: splitEmails(f["Admin emails"]).length,
       validSlug: /^[a-z0-9-]{1,60}$/.test(c.slug), logo: first(f["Logo"])?.thumbnails?.small?.url || "",
       periods: periodStats(ls, bs, c.slug), daily: daily(ls, bs),
-      health, openHandovers: open, lastConversation: last ? isoT(last) : null,
+      health, openHandovers: open.length, lateHandovers: late, lastConversation: last ? isoT(last) : null,
     };
   });
 
@@ -1855,6 +1867,7 @@ function adminSystem(env) {
     // "live" = a live key is set; it only takes payments for centers with "Stripe live" ticked.
     stripe: /^(sk|rk)_live_/.test(liveKey) ? "live" : /^(sk|rk)_live_/.test(key) ? "live" : key ? "test" : "missing",
     push: !!env.VAPID_PRIVATE, respondio: !!env.RESPONDIO_TOKEN, accessAud: !!env.ACCESS_AUD,
+    alerts: !!env.ALERT_WEBHOOK, alertsTest: env.ALERT_INCLUDE_TEST === "1", budget: Number(env.CLAUDE_BUDGET_USD) || 0,
     base: String(env.AIRTABLE_BASE || ""),
   };
 }
@@ -2028,6 +2041,277 @@ async function adminTeamChange(env, email, b) {
   return json({ ok: true });
 }
 
+// ---------- Pijplijn: the dive centers Talay is talking to ----------
+// Airtable table "Prospects": Name (primary), Stage (To contact, Pitched, Talking, Trial,
+// Signed, Live, No), Priority (number), Area, Language, Contact person, WhatsApp, Email,
+// Instagram, Owner (who at Talay follows up), Next step, Next date (date), Last contact (date),
+// Notes (long text, newest line first). Stage options are made by typecast when missing.
+const STAGES = ["To contact", "Pitched", "Talking", "Trial", "Signed", "Live", "No"];
+const STAGE_NL = { "To contact": "Te benaderen", Pitched: "Gepitcht", Talking: "In gesprek", Trial: "Proef", Signed: "Getekend", Live: "Live", No: "Nee" };
+const PROSPECT_TEXT = {
+  area: "Area", language: "Language", contact: "Contact person", whatsapp: "WhatsApp", email: "Email",
+  instagram: "Instagram", owner: "Owner", next: "Next step",
+};
+const thaiDay = (ms) => new Date(ms + TZ_MS).toISOString().slice(0, 10);
+const thaiStamp = (ms) => new Date(ms + TZ_MS).toISOString().slice(0, 16).replace("T", " ");
+const missingTable = (e) => /NOT_FOUND|404|INVALID_PERMISSIONS|403/.test(String(e && e.message));
+
+function prospectOut(r) {
+  const f = r.fields, out = { id: r.id, name: str(f, "Name"), created: r.createdTime };
+  out.stage = STAGES.find((s) => s === str(f, "Stage")) || "To contact";
+  out.priority = num(f["Priority"]) || null;
+  for (const [k, field] of Object.entries(PROSPECT_TEXT)) out[k] = str(f, field);
+  out.nextDate = str(f, "Next date").slice(0, 10);
+  out.last = str(f, "Last contact").slice(0, 10);
+  out.notes = str(f, "Notes");
+  return out;
+}
+async function adminPipeline(env) {
+  try {
+    const recs = await at(env, "Prospects", { max: 2000 });
+    return { today: thaiDay(Date.now()), items: recs.map(prospectOut).filter((p) => p.name) };
+  } catch (e) {
+    if (missingTable(e)) return { missing: true, today: thaiDay(Date.now()), items: [] };
+    throw e;
+  }
+}
+// add: a new center; update: any of the fields above, plus "note" (added on top of Notes,
+// with date and who, and Last contact = today). A stage change is noted in Notes too.
+async function adminPipelineChange(env, email, b) {
+  const now = Date.now(), who = email.split("@")[0], fields = {};
+  if (b.stage !== undefined) {
+    if (!STAGES.includes(b.stage)) return json({ error: "Onbekende fase." }, 400);
+    fields["Stage"] = b.stage;
+  }
+  for (const [k, field] of Object.entries(PROSPECT_TEXT)) if (b[k] !== undefined) fields[field] = String(b[k] ?? "").trim().slice(0, 500);
+  if (b.nextDate !== undefined) {
+    const d = String(b.nextDate || "");
+    if (d && !/^\d{4}-\d{2}-\d{2}$/.test(d)) return json({ error: "Datum klopt niet." }, 400);
+    fields["Next date"] = d || null;
+  }
+  if (b.priority !== undefined) fields["Priority"] = Number(b.priority) || null;
+  const note = String(b.note || "").trim().slice(0, 2000);
+  try {
+    if (b.action === "add") {
+      const name = String(b.name || "").trim().slice(0, 120);
+      if (!name) return json({ error: "Geef de naam van het center." }, 400);
+      const { items } = await adminPipeline(env);
+      if (items.some((p) => p.name.toLowerCase() === name.toLowerCase())) return json({ error: "Dit center staat al in de pijplijn." }, 400);
+      fields["Name"] = name;
+      fields["Stage"] = fields["Stage"] || "To contact";
+      if (note) { fields["Notes"] = `${thaiStamp(now)} ${who}: ${note}`; fields["Last contact"] = thaiDay(now); }
+      await atWrite(env, "Prospects", "POST", [{ fields }]);
+    } else if (b.action === "update" && okRec(b.id)) {
+      const cur = await at(env, "Prospects", { formula: `RECORD_ID() = '${b.id}'`, max: 1 });
+      if (!cur.length) return json({ error: "Dit center bestaat niet meer." }, 404);
+      const old = prospectOut(cur[0]), lines = [];
+      if (fields["Stage"] && fields["Stage"] !== old.stage) lines.push(`${thaiStamp(now)} ${who}: fase ${STAGE_NL[old.stage]} → ${STAGE_NL[fields["Stage"]]}`);
+      if (note) { lines.unshift(`${thaiStamp(now)} ${who}: ${note}`); fields["Last contact"] = thaiDay(now); }
+      if (lines.length) fields["Notes"] = (lines.join("\n") + (old.notes ? "\n" + old.notes : "")).slice(0, 90000);
+      if (Object.keys(fields).length) await atPatch(env, "Prospects", b.id, fields);
+    } else {
+      return json({ error: "Onbekende actie." }, 400);
+    }
+  } catch (e) {
+    console.error("pipeline", e);
+    if (missingTable(e)) return json({ error: "De tabel Prospects bestaat nog niet in Airtable." }, 500);
+    return json({ error: "Opslaan lukte niet. Probeer opnieuw." }, 502);
+  }
+  return json({ ok: true });
+}
+
+// ---------- Conversie: from question to booking, per center ----------
+// The same numbers as the dashboard in each center's zone (and the same cache).
+async function hqCenters(env) {
+  const recs = await at(env, "Centers", { sort: [{ field: "Name" }] });
+  return recs.map((r) => ({ ...centerOut(r, true), ...centerMeta(r), outsideOnly: !!r.fields["Outside hours only"], paused: !!r.fields["Mia paused"] }))
+    .filter((c) => /^[a-z0-9-]{1,60}$/.test(c.slug));
+}
+async function adminConversion(env, per, fresh) {
+  const centers = await hqCenters(env);
+  const { label, months } = periodRange(per);
+  const rows = await Promise.all(centers.map(async (c) => {
+    try {
+      const d = await cached(env, `dash/v5/${c.slug}/${per || "30d"}`, 120, () => dashboard(env, c, per), fresh);
+      const k = d.kpi || {};
+      return {
+        slug: c.slug, name: c.name, type: c.type, test: c.test, funnel: d.funnel,
+        conversations: k.conversations || 0, outsideHours: k.outsideHours || 0, handedOver: k.handedOver || 0,
+        bookings: k.bookings || 0, divers: k.divers || 0, afterFollowUp: k.afterFollowUp || 0,
+        value: k.revenue || 0, commission: k.commission || 0,
+      };
+    } catch (e) {
+      console.error("conversion", c.slug, e);
+      return { slug: c.slug, name: c.name, type: c.type, test: c.test, error: true };
+    }
+  }));
+  return { period: per || "30d", label: per ? label : "Laatste 30 dagen", months, centers: rows };
+}
+
+// ---------- Claude costs, from the Log table ----------
+// Make (inbound v2, Airtable 51 "Create in Log") writes per message: Center (slug) and from the
+// Anthropic call: Input tokens, Cache read tokens, Cache write tokens, Output tokens.
+// Older rows without Center are matched to a center through Leads → External ID.
+// Prices of claude-sonnet-5-5 in USD per million tokens (cache write = 5-minute cache).
+const CLAUDE_PRICE = { input: 2, write: 2.5, read: 0.2, output: 10 };
+const THB_PER_USD = 33; // rough, only to compare with the commission in baht
+const usdOf = (t) => (t.input * CLAUDE_PRICE.input + t.write * CLAUDE_PRICE.write + t.read * CLAUDE_PRICE.read + t.output * CLAUDE_PRICE.output) / 1e6;
+async function adminCosts(env, month) {
+  const now = Date.now();
+  const cur = thaiMonth(now), m = /^\d{4}-\d{2}$/.test(month || "") ? month : cur;
+  const { start, end, months } = periodRange(m);
+  const stop = Math.min(end, now);
+  const inP = `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${isoT(start - 1000)}')), IS_BEFORE(CREATED_TIME(), DATETIME_PARSE('${isoT(end)}'))`;
+  const [centers, logs, leads, books] = await Promise.all([
+    hqCenters(env),
+    at(env, "Log", { formula: `AND(${inP})`, max: 50000 }),
+    at(env, "Leads", { formula: `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${isoT(start - 90 * DAY)}'))`, max: 50000 }),
+    at(env, "Bookings", { formula: `AND(${inP})`, max: 20000 }),
+  ]);
+  const bySlug = {};
+  centers.forEach((c) => { bySlug[c.slug] = c; });
+  const leadCenter = {};
+  leads.forEach((l) => {
+    const c = centers.find((x) => ownedBy(l, x)), id = str(l.fields, "External ID");
+    if (c && id && !leadCenter[id]) leadCenter[id] = c.slug;
+  });
+  const zero = () => ({ calls: 0, tracked: 0, input: 0, read: 0, write: 0, output: 0 });
+  const per = {}, days = Math.max(1, Math.ceil((end - start) / DAY)), daily = Array.from({ length: days }, () => 0);
+  for (const r of logs) {
+    const f = r.fields;
+    const slug = String(first(f["Center"]) || "").toLowerCase() || leadCenter[str(f, "Contact")] || "";
+    const k = bySlug[slug] ? slug : "";
+    const t = per[k] = per[k] || zero();
+    t.calls++;
+    const u = { input: num(f["Input tokens"]), read: num(f["Cache read tokens"]), write: num(f["Cache write tokens"]), output: num(f["Output tokens"]) };
+    if (u.input + u.read + u.write + u.output > 0) {
+      t.tracked++; t.input += u.input; t.read += u.read; t.write += u.write; t.output += u.output;
+      const i = Math.floor((madeAt(r) - start) / DAY);
+      if (i >= 0 && i < days) daily[i] += usdOf(u);
+    }
+  }
+  const rows = centers.map((c) => {
+    const t = per[c.slug] || zero();
+    const ls = leads.filter((l) => ownedBy(l, c) && madeAt(l) >= start && madeAt(l) < end);
+    const bs = books.filter((b) => ownedBy(b, c) && !cancelled(b));
+    return { slug: c.slug, name: c.name, type: c.type, test: c.test, ...t, usd: usdOf(t),
+      conversations: ls.length, bookings: bs.length, commission: bs.reduce((a, b) => a + commissionOf(b), 0) };
+  });
+  if (per[""]) rows.push({ slug: "", name: "Zonder center", type: "", test: false, ...per[""], usd: usdOf(per[""]), conversations: 0, bookings: 0, commission: 0 });
+  const budget = Number(env.CLAUDE_BUDGET_USD) || 0;
+  return {
+    month: m, months, current: m === cur, day0: isoT(start), days: Math.ceil((stop - start) / DAY), daily,
+    price: CLAUDE_PRICE, thbPerUsd: THB_PER_USD, budget, centers: rows,
+  };
+}
+
+// ---------- Alerts (e-mail through Make) ----------
+// Every 15 minutes (Cloudflare cron, see wrangler.jsonc) Talay HQ looks for:
+//   - a handover nobody picked up: Handover at more than 30 min ago, no team reply, not handled;
+//   - the assistant's "sorry" message (Anthropic credit or Make failing);
+//   - a diver without any answer for 30 min (not for centers in outside-hours mode, and not
+//     after a short "ok" or "thanks");
+//   - once a day at 08:00 Koh Tao time: Claude costs this month above 80% of CLAUDE_BUDGET_USD.
+// Each run only reports what crossed its limit in the last 15 minutes, so nothing is sent twice
+// and nothing needs to be remembered. New alerts are POSTed as one JSON message to
+// ALERT_WEBHOOK (a Make custom webhook, which sends the e-mail). Without ALERT_WEBHOOK it does
+// nothing. Demo and Test centers only count with ALERT_INCLUDE_TEST = 1.
+const ALERT_EVERY = 15 * 60000, ALERT_HANDOVER_MIN = 30, ALERT_WAIT_MIN = 30;
+const SMALL_TALK = /^(ok(ay)?|oke|k|thanks?( you)?|thx|ty|merci|danke|gracias|dank ?je(wel)?|bedankt|perfect|great|cool|super|top|nice|👍|🙏|❤️|😊|🙂)[\s!.👍🙏😊🙂❤️]*$/i;
+async function hqAlerts(env, at0, { since, withTest = false } = {}) {
+  const from = since || at0 - ALERT_EVERY;
+  const [centers, leads, chat] = await Promise.all([
+    hqCenters(env),
+    at(env, "Leads", { formula: `IS_AFTER({Handover at}, DATETIME_PARSE('${isoT(from - ALERT_HANDOVER_MIN * 60000 - 60000)}'))`, max: 500 }),
+    at(env, "Chat", {
+      formula: `IS_AFTER({Sent at}, DATETIME_PARSE('${isoT(from - Math.max(ALERT_HANDOVER_MIN, ALERT_WAIT_MIN) * 60000 - 3 * 3600000)}'))`,
+      fields: ["Direction", "Contact ID", "Center", "Sent at", "Text"], sort: [{ field: "Sent at" }], max: 5000,
+    }),
+  ]);
+  const use = centers.filter((c) => withTest || !c.test);
+  const bySlug = {};
+  use.forEach((c) => { bySlug[c.slug] = c; });
+  const of = (r) => use.find((c) => ownedBy(r, c));
+  const crossed = (t, min) => t && t + min * 60000 >= from && t + min * 60000 < at0;
+  const msgs = {};
+  chat.forEach((m) => {
+    const slug = String(m.fields["Center"] || "").toLowerCase(), id = String(m.fields["Contact ID"] || "");
+    if (bySlug[slug] && id) (msgs[slug + "/" + id] = msgs[slug + "/" + id] || []).push(m);
+  });
+  const leadOf = {};
+  const alerts = [];
+  for (const l of leads) {
+    const c = of(l), f = l.fields, id = str(f, "External ID");
+    if (!c || !id) continue;
+    leadOf[c.slug + "/" + id] = l;
+    const t = msOf(f["Handover at"]);
+    if (!crossed(t, ALERT_HANDOVER_MIN) || f["Human took over"] || f["Opted out"] || msOf(f["Human took over at"]) >= t) continue;
+    if (/booked|lost|closed|spam/i.test(str(f, "Status"))) continue;
+    if ((msgs[c.slug + "/" + id] || []).some((m) => m.fields["Direction"] === "Team" && msOf(m.fields["Sent at"]) >= t)) continue;
+    alerts.push({ kind: "handover", center: c.name, slug: c.slug, id, name: str(f, "Name") || str(f, "Contact") || "Een duiker", at: isoT(t),
+      text: `${str(f, "Name") || "Een duiker"} wacht al ${ALERT_HANDOVER_MIN} min op het team van ${c.name}.` });
+  }
+  for (const [k, list] of Object.entries(msgs)) {
+    const [slug, id] = k.split("/"), c = bySlug[slug];
+    list.forEach((m) => {
+      const t = msOf(m.fields["Sent at"]);
+      if (m.fields["Direction"] === "Mia" && t >= from && t < at0 && SORRY.test(String(m.fields["Text"] || "").trim()))
+        alerts.push({ kind: "sorry", center: c.name, slug, id, at: isoT(t), text: `${c.assistant} stuurde het sorry-bericht bij ${c.name}. Kijk eerst naar het API-tegoed van Anthropic en Make (inbound v2).` });
+    });
+    if (c.paused || c.outsideOnly) continue;
+    const last = list[list.length - 1], t = msOf(last.fields["Sent at"]), l = leadOf[k];
+    if (last.fields["Direction"] !== "Customer" || !crossed(t, ALERT_WAIT_MIN)) continue;
+    if (SMALL_TALK.test(String(last.fields["Text"] || "").trim())) continue;
+    if (l && (l.fields["Human took over"] || l.fields["Opted out"])) continue;
+    alerts.push({ kind: "waiting", center: c.name, slug, id, at: isoT(t),
+      text: `Een duiker bij ${c.name} kreeg ${ALERT_WAIT_MIN} min geen antwoord: “${String(last.fields["Text"] || "").slice(0, 120)}”` });
+  }
+  // Claude budget, once a day in the run that starts at 08:00 Koh Tao time.
+  const budget = Number(env.CLAUDE_BUDGET_USD) || 0, th = new Date(at0 + TZ_MS);
+  if (budget && (since || (th.getUTCHours() === 8 && th.getUTCMinutes() < 15))) {
+    const d = await adminCosts(env, thaiMonth(at0)).catch(() => null);
+    const usd = d ? d.centers.reduce((a, c) => a + c.usd, 0) : 0;
+    if (usd >= budget * 0.8) alerts.push({ kind: "budget", center: "", slug: "", at: isoT(at0),
+      text: `Claude-kosten deze maand: $${usd.toFixed(2)} van een budget van $${budget} (${Math.round(usd / budget * 100)}%). Kijk het tegoed na in de Anthropic Console.` });
+  }
+  return alerts;
+}
+const ALERT_TITLE = { handover: "Overdracht zonder reactie", sorry: "Sorry-bericht", waiting: "Duiker zonder antwoord", budget: "Claude-budget" };
+function alertMessage(alerts, test) {
+  const link = (a) => a.slug && a.id ? `https://talay.io/zone?center=${encodeURIComponent(a.slug)}&c=${encodeURIComponent(a.id)}` : "https://talay.io/zone/admin";
+  const subject = (test ? "[Test] " : "") + (alerts.length === 1 ? `Talay HQ: ${ALERT_TITLE[alerts[0].kind]}${alerts[0].center ? " bij " + alerts[0].center : ""}` : `Talay HQ: ${alerts.length} meldingen`);
+  const text = alerts.map((a) => `- ${ALERT_TITLE[a.kind]}: ${a.text}\n  ${link(a)}`).join("\n");
+  const html = `<div style="font-family:system-ui,sans-serif;font-size:15px;color:#09262F">` +
+    (test ? `<p style="color:#B4561B"><b>Test vanuit Talay HQ.</b> Hieronder wat er de laatste 24 uur gemeld zou zijn${alerts.length ? "" : " (niets)"}.</p>` : "") +
+    alerts.map((a) => `<p style="margin:0 0 14px"><b>${esc(ALERT_TITLE[a.kind])}</b>${a.center ? " · " + esc(a.center) : ""}<br>${esc(a.text)}<br><a href="${esc(link(a))}">Open het gesprek</a></p>`).join("") +
+    `<p style="color:#5B6B70;font-size:13px">Talay HQ · <a href="https://talay.io/zone/admin">talay.io/zone/admin</a></p></div>`;
+  return { subject, text, html, count: alerts.length, alerts };
+}
+async function sendAlerts(env, msg) {
+  const res = await fetch(env.ALERT_WEBHOOK, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(msg) });
+  if (!res.ok) throw new Error(`Alert webhook: ${res.status}`);
+}
+// Cloudflare cron (src/index.js → scheduled).
+export async function runHqAlerts(env, scheduledTime) {
+  if (!env.ALERT_WEBHOOK || !env.AIRTABLE_TOKEN) return;
+  const at0 = Math.floor((scheduledTime || Date.now()) / 60000) * 60000;
+  const alerts = await hqAlerts(env, at0, { withTest: env.ALERT_INCLUDE_TEST === "1" });
+  if (alerts.length) await sendAlerts(env, alertMessage(alerts, false));
+}
+// "Stuur een testmelding" on the Systeem page: the last 24 hours, demo and test included.
+async function adminAlertTest(env) {
+  if (!env.ALERT_WEBHOOK) return json({ error: "ALERT_WEBHOOK is nog niet ingesteld in Cloudflare." }, 400);
+  const now = Date.now();
+  try {
+    const alerts = await hqAlerts(env, now, { since: now - DAY, withTest: true });
+    await sendAlerts(env, alertMessage(alerts, true));
+    return json({ ok: true, count: alerts.length });
+  } catch (e) {
+    console.error("alert test", e);
+    return json({ error: "Versturen lukte niet: " + String(e.message || e).slice(0, 120) }, 502);
+  }
+}
+
 const HQ_ICONS = {
   home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>',
   inbox: '<path d="M3 13h5l1.5 3h5L16 13h5"/><path d="M5 5h14l2 8v6H3v-6z"/>',
@@ -2041,13 +2325,17 @@ const HQ_ICONS = {
   zone: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
   out: '<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 17l5-5-5-5M15 12H3"/>',
   refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
+  pipeline: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/>',
+  funnel: '<path d="M3 4h18l-7 8v6l-4 2v-8z"/>',
+  cost: '<circle cx="12" cy="12" r="9"/><path d="M15 9.2a3 3 0 0 0-3-1.7c-1.7 0-3 .9-3 2.2 0 3 6 1.6 6 4.6 0 1.3-1.3 2.2-3 2.2a3.2 3.2 0 0 1-3.2-1.8M12 6v1.5M12 16.5V18"/>',
 };
 const hqIcon = (k) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${HQ_ICONS[k]}</svg>`;
 
 function adminApp(email, role) {
   const nav = [
     ["overzicht", "Overzicht", "home"], ["inbox", "Inbox", "inbox"], ["zoeken", "Zoeken", "search"],
-    ["centra", "Centra", "centers"], ["boekingen", "Boekingen", "bookings"], ["commissie", "Commissie", "money"],
+    ["pijplijn", "Pijplijn", "pipeline"], ["centra", "Centra", "centers"], ["conversie", "Conversie", "funnel"],
+    ["boekingen", "Boekingen", "bookings"], ["commissie", "Commissie", "money"], ["kosten", "Claude-kosten", "cost"],
     ["aanmeldingen", "Aanmeldingen", "intake"], ["systeem", "Systeem", "system"],
   ];
   if (role === "owner") nav.push(["team", "Team", "team"]);
@@ -2208,6 +2496,40 @@ a.row:hover{background:var(--paper-2)}
 .big{width:100%;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:12px 14px;font-size:16px;box-shadow:var(--shadow)}
 .sum{white-space:pre-wrap;font-size:13.5px;color:var(--muted);margin-top:8px;max-height:0;overflow:hidden}
 .sum.open{max-height:none}
+/* demo/test band */
+.tb{padding:0 28px;max-width:1240px}
+.tb .alert{margin:14px 0 0;flex-wrap:wrap}
+.tb .alert .btn{margin-left:auto;flex:none}
+@media (max-width:860px){.tb{padding:0 16px}}
+/* pipeline */
+.fol .row{align-items:center}
+.due{font-size:12.5px;font-weight:600;white-space:nowrap}.due.late{color:var(--bad)}.due.today{color:var(--warn)}
+.st-To{background:var(--paper)}.pill.st-Pitched{background:#E4EEF6;color:#2E5F86;border-color:transparent}.pill.st-Talking{background:var(--sand);color:#09262F;border-color:transparent}
+.pill.st-Trial,.pill.st-Signed,.pill.st-Live{background:var(--okbg);color:var(--ok);border-color:transparent}.pill.st-No{background:var(--badbg);color:var(--bad);border-color:transparent}
+@media (prefers-color-scheme:dark){.pill.st-Pitched{background:#1D3546;color:#9CC3E4}}
+dialog.dlg{border:0;border-radius:18px;padding:0;width:min(640px,calc(100vw - 24px));max-height:calc(100vh - 32px);background:var(--card);color:var(--deep);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+dialog.dlg::backdrop{background:rgba(9,38,47,.45)}
+.dlg form{display:flex;flex-direction:column;gap:12px;padding:18px}
+.dlg h3{margin:0;font-size:18px;display:flex;align-items:center;gap:10px}
+.dlg h3 .x{margin-left:auto}
+.dlg .fg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:560px){.dlg .fg{grid-template-columns:1fr}}
+.dlg label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:600}
+.dlg label .in,.dlg textarea{width:100%}
+.dlg textarea{border:1px solid var(--line);background:var(--card);border-radius:9px;padding:8px 10px;font-size:14px;min-height:64px;resize:vertical}
+.dlg .links{display:flex;gap:8px;flex-wrap:wrap}
+.dlg .acts{display:flex;gap:8px;justify-content:flex-end}
+.dlg .log{max-height:200px;border:1px solid var(--line);border-radius:10px;padding:10px}
+/* funnel */
+.fun{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding:14px 16px}
+@media (max-width:700px){.fun{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.fun .st b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+.fun .st span{display:block;font-size:12.5px;color:var(--muted)}
+.fun .st i{display:block;height:8px;border-radius:5px;background:var(--paper);margin:6px 0 4px;overflow:hidden}
+.fun .st i em{display:block;height:100%;background:var(--bar);border-radius:5px}
+.fun .st small{font-size:12px;color:var(--muted)}
+.meter{height:10px;border-radius:6px;background:var(--paper);overflow:hidden;margin-top:6px}
+.meter span{display:block;height:100%;background:var(--bar)}.meter span.warn{background:var(--warn)}.meter span.bad{background:var(--bad)}
 </style></head><body>
 <aside class="side">
   <div class="brand"><svg width="30" height="30" viewBox="0 0 100 100" aria-hidden="true"><path d="M 12 50 A 38 38 0 0 0 88 50 Z" fill="#DCA44A"/><circle cx="50" cy="50" r="38" fill="none" stroke="#F7F3EA" stroke-width="10"/><line x1="6" y1="50" x2="94" y2="50" stroke="#F7F3EA" stroke-width="10" stroke-linecap="round"/></svg>
@@ -2224,6 +2546,7 @@ a.row:hover{background:var(--paper-2)}
   <div class="top"><h1 id="title">Overzicht</h1><span class="upd" id="upd"></span><label class="chk mob"><input type="checkbox" id="withTest2"> Ook demo/test</label>
   <form class="gsearch" id="gs"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" id="gq" placeholder="Zoek duiker, nummer of ref" aria-label="Zoeken"></form>
   <button class="btn" id="refresh" type="button" title="Vernieuwen">${hqIcon("refresh")}<span>Vernieuwen</span></button></div>
+  <div class="tb" id="tb"></div>
   <div class="page" id="page"><div class="skel"></div></div>
 </main>
 <div class="tip" id="tip"></div>
@@ -2276,7 +2599,7 @@ function hqClient(cfg) {
     return api(path + (fresh ? (path.indexOf("?") > -1 ? "&" : "?") + "fresh=1" : "")).then(function (v) { state.cache[key] = { t: Date.now(), v: v }; return v; });
   }
   function overview(fresh) {
-    return load("ov", "overview", fresh).then(function (d) { state.ov = d; badges(); return d; });
+    return load("ov", "overview", fresh).then(function (d) { state.ov = d; badges(); banner(); return d; });
   }
 
   // ---------- helpers for the pages ----------
@@ -2330,7 +2653,7 @@ function hqClient(cfg) {
 
   // ---------- bar chart (one series, hover tooltip) ----------
   var charts = {};
-  function chart(id, values, fmt, day0) {
+  function chart(id, values, fmt, day0, endLabel) {
     charts[id] = { values: values, fmt: fmt, day0: day0 };
     var max = Math.max.apply(null, values.concat([1])), n = values.length, W = 600, H = 150, pb = 18;
     var bw = W / n, h = "";
@@ -2340,9 +2663,9 @@ function hqClient(cfg) {
       h += '<rect x="' + (i * bw) + '" y="0" width="' + bw + '" height="' + H + '" fill="transparent" data-i="' + i + '" tabindex="-1"/>';
     });
     h += '<line x1="0" x2="' + W + '" y1="' + (H - pb) + '" y2="' + (H - pb) + '" stroke="var(--line)"/>';
-    var d0 = new Date(day0), dN = new Date(Date.parse(day0) + (n - 1) * 864e5);
+    var d0 = new Date(Date.parse(day0) + 12 * 36e5), dN = new Date(Date.parse(day0) + (n - 1) * 864e5);
     h += '<text class="axis" x="0" y="' + (H - 3) + '">' + esc(date(d0.toISOString())) + "</text>";
-    h += '<text class="axis" x="' + W + '" y="' + (H - 3) + '" text-anchor="end">vandaag</text>';
+    h += '<text class="axis" x="' + W + '" y="' + (H - 3) + '" text-anchor="end">' + esc(endLabel || "vandaag") + "</text>";
     return '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" data-chart="' + id + '" role="img" aria-label="Staafdiagram per dag, laatste ' + n + ' dagen">' + h + "</svg>";
   }
   document.addEventListener("pointermove", function (e) {
@@ -2400,7 +2723,7 @@ function hqClient(cfg) {
           var x = c.periods[state.per], hl = c.health || {}, sig = [];
           if (hl.errors) sig.push('<span class="pill bad">' + hl.errors + " fout" + (hl.errors > 1 ? "en" : "") + "</span>");
           if (hl.waiting && !c.paused) sig.push('<span class="pill warn">' + hl.waiting + " wacht</span>");
-          if (c.openHandovers) sig.push('<span class="pill sand">' + c.openHandovers + " overdracht</span>");
+          if (c.openHandovers) sig.push('<span class="pill ' + (c.lateHandovers ? "warn" : "sand") + '">' + c.openHandovers + " overdracht" + (c.lateHandovers ? ", " + c.lateHandovers + " te laat" : "") + "</span>");
           return '<tr class="link' + (c.test && !state.withTest ? " muted" : "") + '" data-href="#/centra/' + esc(c.slug) + '"><td class="nm"><b>' + esc(c.name) + "</b><small>" + esc(c.type || c.slug) + "</small></td><td>" + miaPill(c) + '</td><td class="n">' + nf.format(x.conversations) +
             '</td><td class="n">' + nf.format(x.bookings) + '</td><td class="n">' + thb(x.value) + '</td><td class="n">' + thb(x.commission) + '</td><td class="n">' + secs(x.replySeconds) + "</td><td>" + (sig.join(" ") || '<span class="muted">–</span>') + "</td></tr>";
         }).join("") + "</tbody></table></div></div>";
@@ -2418,11 +2741,14 @@ function hqClient(cfg) {
     var errs = ov.centers.filter(function (c) { return c.health && c.health.errors; });
     var wait = ov.centers.filter(function (c) { return c.health && c.health.waiting && !c.paused; });
     var paused = ov.centers.filter(function (c) { return c.paused && !c.test; });
+    var late = ov.centers.filter(function (c) { return c.lateHandovers && (state.withTest || !c.test); });
     var h = "";
     if (errs.length) h += '<div class="alert bad"><div class="x"><b>' + esc(ov.centers[0] && errs[0].assistant || "Mia") + ' stuurde het sorry-bericht</b>' +
       errs.map(function (c) { return esc(c.name) + ": " + c.health.errors + "×"; }).join(" · ") + " in de laatste 24 uur. Kijk eerst naar het API-tegoed van Anthropic en Make (inbound v2).</div></div>";
     if (wait.length) h += '<div class="alert warn"><div class="x"><b>Duikers zonder antwoord</b>' +
       wait.map(function (c) { return esc(c.name) + ": " + c.health.waiting; }).join(" · ") + " (langer dan " + ov.waitMin + ' min). <a href="#/inbox">Open de inbox →</a></div></div>';
+    if (late.length) h += '<div class="alert warn"><div class="x"><b>Overdracht zonder reactie</b>' +
+      late.map(function (c) { return esc(c.name) + ": " + c.lateHandovers; }).join(" · ") + ' (langer dan 30 min, niemand van het team nam over). <a href="#/inbox">Open de inbox →</a></div></div>';
     if (paused.length && full) h += '<div class="alert warn"><div class="x"><b>Gepauzeerd</b>' + paused.map(function (c) { return esc(c.name); }).join(", ") + "</div></div>";
     if (!h) {
       var replies = ov.centers.reduce(function (a, c) { return a + (c.health ? c.health.replies : 0); }, 0);
@@ -2631,6 +2957,182 @@ function hqClient(cfg) {
     }).catch(fail);
   }
 
+  // ---------- Pijplijn ----------
+  var STAGES = ["To contact", "Pitched", "Talking", "Trial", "Signed", "Live", "No"];
+  var STAGE_NL = { "To contact": "Te benaderen", Pitched: "Gepitcht", Talking: "In gesprek", Trial: "Proef", Signed: "Getekend", Live: "Live", No: "Nee" };
+  var pipeStage = store.get("pipe", "active"), pipeQ = "";
+  function stagePill(s) { return '<span class="pill st-' + esc(s.split(" ")[0]) + '">' + esc(STAGE_NL[s] || s) + "</span>"; }
+  function pipeOpen(p) { return p.stage !== "No" && p.stage !== "Live"; }
+  function dueOf(p, today) { return p.nextDate && pipeOpen(p) ? (p.nextDate < today ? "late" : p.nextDate === today ? "today" : "later") : ""; }
+  function dueText(p, today) {
+    var k = dueOf(p, today); if (!k) return p.nextDate ? esc(date(p.nextDate + "T12:00:00Z")) : "";
+    var days = Math.round((Date.parse(p.nextDate + "T12:00:00Z") - Date.parse(today + "T12:00:00Z")) / 864e5);
+    return '<span class="due ' + k + '">' + (k === "today" ? "vandaag" : k === "late" ? -days + " d te laat" : esc(date(p.nextDate + "T12:00:00Z"))) + "</span>";
+  }
+  function pipeBadge(d) {
+    var n = $("#n-pijplijn"); if (!n || !d || d.missing) return;
+    var k = d.items.filter(function (p) { var x = dueOf(p, d.today); return x === "late" || x === "today"; }).length;
+    n.hidden = !k; n.className = "count"; n.textContent = k;
+  }
+  function pPipeline(fresh) {
+    if (!state.cache.pipe) setPage("Pijplijn", '<div class="skel"></div>');
+    load("pipe", "pipeline", fresh).then(function (d) {
+      pipeBadge(d);
+      if (route().k !== "pijplijn") return;
+      if (d.missing) { setPage("Pijplijn", '<div class="alert warn"><div class="x"><b>Nog niet ingesteld</b>De pijplijn staat in de Airtable-tabel Prospects. Die tabel bestaat nog niet: maak hem aan en importeer de CSV uit de leadlijst (zie de stappen in de PR).</div></div>'); return; }
+      var today = d.today, all = d.items;
+      var count = function (f) { return all.filter(f).length; };
+      var follow = all.filter(function (p) { var k = dueOf(p, today); return k === "late" || k === "today"; })
+        .sort(function (a, b) { return a.nextDate.localeCompare(b.nextDate); });
+      var h = '<div class="kpis">' +
+        kpi("Gepitcht", nf.format(count(function (p) { return p.stage === "Pitched"; }))) +
+        kpi("In gesprek", nf.format(count(function (p) { return p.stage === "Talking"; }))) +
+        kpi("Proef", nf.format(count(function (p) { return p.stage === "Trial"; }))) +
+        kpi("Getekend of live", nf.format(count(function (p) { return p.stage === "Signed" || p.stage === "Live"; }))) +
+        kpi("Op te volgen", nf.format(follow.length), '<span class="d' + (follow.some(function (p) { return dueOf(p, today) === "late"; }) ? " down" : "") + '">vandaag of te laat</span>') +
+        kpi("Nee", nf.format(count(function (p) { return p.stage === "No"; }))) + "</div>";
+      if (follow.length) h += '<div class="sec"><h2>Vandaag opvolgen</h2><div class="card rows fol">' + follow.map(function (p) {
+        return '<a class="row" href="#/pijplijn" data-p="' + esc(p.id) + '"><div class="x"><div class="l1"><b>' + esc(p.name) + "</b>" + stagePill(p.stage) + (p.owner ? '<span class="muted">' + esc(p.owner) + "</span>" : "") +
+          '</div><div class="pv">' + esc(p.next || "Geen volgende stap ingevuld") + "</div></div>" + dueText(p, today) + "</a>";
+      }).join("") + "</div></div>";
+      var chips = [["active", "Actief", count(pipeOpen)]].concat(STAGES.map(function (s) { return [s, STAGE_NL[s], count(function (p) { return p.stage === s; })]; })).concat([["all", "Alle", all.length]]);
+      h += '<div class="sec bar"><div class="chips">' + chips.map(function (c) {
+        return '<button class="chip' + (pipeStage === c[0] ? " on" : "") + '" data-st="' + esc(c[0]) + '">' + esc(c[1]) + '<span class="c">' + c[2] + "</span></button>";
+      }).join("") + '</div></div><div class="bar"><input class="in" id="pq" type="search" placeholder="Zoek center" value="' + esc(pipeQ) + '"><span class="sp"></span><button class="btn" id="px">CSV</button><button class="btn primary" id="padd">+ Center</button></div>';
+      var list = all.filter(function (p) { return pipeStage === "all" ? true : pipeStage === "active" ? pipeOpen(p) : p.stage === pipeStage; });
+      if (pipeQ) list = list.filter(function (p) { return (p.name + " " + p.area + " " + p.contact).toLowerCase().indexOf(pipeQ.toLowerCase()) > -1; });
+      var ord = function (p) { return STAGES.indexOf(p.stage); };
+      list.sort(function (a, b) {
+        return (ord(b) - ord(a)) || ((a.nextDate || "9") > (b.nextDate || "9") ? 1 : (a.nextDate || "9") < (b.nextDate || "9") ? -1 : 0) || ((a.priority || 9) - (b.priority || 9)) || a.name.localeCompare(b.name);
+      });
+      h += '<div class="card tw"><table class="t"><thead><tr><th>Center</th><th>Fase</th><th>Volgende stap</th><th>Wanneer</th><th>Wie</th><th>Laatste contact</th></tr></thead><tbody>' +
+        (list.map(function (p) {
+          return '<tr class="link" data-p="' + esc(p.id) + '"><td class="nm"><b>' + esc(p.name) + "</b><small>" + esc([p.area, p.language].filter(Boolean).join(" · ")) + "</small></td><td>" + stagePill(p.stage) +
+            "</td><td>" + esc(p.next) + "</td><td>" + dueText(p, today) + "</td><td>" + esc(p.owner) + "</td><td>" + (p.last ? esc(date(p.last + "T12:00:00Z")) : '<span class="muted">–</span>') + "</td></tr>";
+        }).join("") || '<tr><td colspan="6" class="empty">Geen centra in deze selectie.</td></tr>') + "</tbody></table></div>";
+      h += '<p class="muted" style="font-size:13.5px">Klik op een center om de fase, de volgende stap of een notitie te bewaren. Alles staat in de Airtable-tabel Prospects.</p>';
+      setPage("Pijplijn", h);
+      $$(".chip[data-st]").forEach(function (b) { b.onclick = function () { pipeStage = b.getAttribute("data-st"); store.set("pipe", pipeStage); pPipeline(); }; });
+      $("#pq").oninput = function () { var v = this.value, pos = this.selectionStart; pipeQ = v; pPipeline(); var i = $("#pq"); i.focus(); try { i.setSelectionRange(pos, pos); } catch (e) {} };
+      $$("[data-p]").forEach(function (r) { r.onclick = function (e) { e.preventDefault(); prospectDialog(all.find(function (p) { return p.id === r.getAttribute("data-p"); }), today); }; });
+      $("#padd").onclick = function () { prospectDialog(null, today); };
+      $("#px").onclick = function () {
+        csv("talay-pijplijn-" + today + ".csv", [["Center", "Fase", "Prioriteit", "Gebied", "Taal", "Contactpersoon", "WhatsApp", "E-mail", "Instagram", "Wie", "Volgende stap", "Datum", "Laatste contact", "Notities"]].concat(
+          all.map(function (p) { return [p.name, STAGE_NL[p.stage], p.priority || "", p.area, p.language, p.contact, p.whatsapp, p.email, p.instagram, p.owner, p.next, p.nextDate, p.last, p.notes]; })));
+      };
+    }).catch(fail);
+  }
+  function prospectDialog(p, today) {
+    var isNew = !p; p = p || { stage: "To contact" };
+    var dlg = $("#pdlg");
+    if (!dlg) { dlg = document.createElement("dialog"); dlg.id = "pdlg"; dlg.className = "dlg"; document.body.appendChild(dlg); }
+    var wa = String(p.whatsapp || "").replace(/[^\d]/g, ""), ig = String(p.instagram || "").replace(/^https?:\/\//, "");
+    var field = function (k, label, type) { return '<label>' + label + '<input class="in" name="' + k + '" type="' + (type || "text") + '" value="' + esc(p[k] || "") + '"></label>'; };
+    dlg.innerHTML = '<form method="dialog" id="pf"><h3>' + (isNew ? '<input class="in" name="name" placeholder="Naam van het center" required style="flex:1">' : esc(p.name) + " " + stagePill(p.stage)) + '<button type="button" class="btn x" id="pc">Sluiten</button></h3>' +
+      (isNew ? "" : '<div class="links">' + (wa ? '<a class="btn" target="_blank" rel="noopener" href="https://wa.me/' + wa + '">WhatsApp</a>' : "") + (p.email ? '<a class="btn" href="mailto:' + esc(p.email) + '">E-mail</a>' : "") + (ig ? '<a class="btn" target="_blank" rel="noopener" href="https://' + esc(ig) + '">Instagram</a>' : "") + "</div>") +
+      '<div class="fg"><label>Fase<select class="in" name="stage">' + STAGES.map(function (s) { return '<option value="' + s + '"' + (s === p.stage ? " selected" : "") + ">" + STAGE_NL[s] + "</option>"; }).join("") + "</select></label>" +
+      field("owner", "Wie volgt op") + '<label>Volgende stap<input class="in" name="next" value="' + esc(p.next || "") + '" placeholder="bv. John gaat langs"></label>' + field("nextDate", "Wanneer", "date") +
+      field("contact", "Contactpersoon") + field("whatsapp", "WhatsApp") + field("email", "E-mail", "email") + field("instagram", "Instagram") + field("area", "Gebied") + field("language", "Taal") + "</div>" +
+      '<label>Notitie toevoegen<textarea name="note" placeholder="Wat werd er gezegd? Komt bovenaan de notities, met datum en je naam."></textarea></label>' +
+      (p.notes ? '<div class="log">' + esc(p.notes) + "</div>" : "") +
+      '<div class="err" id="perr" hidden></div><div class="acts"><button type="submit" class="btn primary" id="ps">Bewaren</button></div></form>';
+    dlg.showModal();
+    $("#pc").onclick = function () { dlg.close(); };
+    $("#pf").onsubmit = function (e) {
+      e.preventDefault();
+      var f = e.target, body = { action: isNew ? "add" : "update", id: p.id };
+      ["stage", "owner", "next", "nextDate", "contact", "whatsapp", "email", "instagram", "area", "language", "note"].forEach(function (k) { body[k] = f.elements[k].value; });
+      if (isNew) body.name = f.elements.name.value;
+      var b = $("#ps"); b.disabled = true;
+      post("pipeline", body).then(function () { dlg.close(); delete state.cache.pipe; pPipeline(true); })
+        .catch(function (x) { b.disabled = false; var er = $("#perr"); er.hidden = false; er.textContent = x.message; });
+    };
+  }
+
+  // ---------- Conversie ----------
+  var convPer = "";
+  function pConversion(fresh) {
+    setPage("Conversie", '<div class="skel"></div>');
+    load("conv:" + (convPer || "30d"), "conversion" + (convPer ? "?period=" + convPer : ""), fresh).then(function (d) {
+      if (route().k !== "conversie") return;
+      var rows = d.centers.filter(function (c) { return state.withTest || !c.test; });
+      var t = { conversations: 0, linkSent: 0, opened: 0, booked: 0, outsideHours: 0, afterFollowUp: 0, handedOver: 0, value: 0 };
+      rows.forEach(function (c) {
+        if (c.error) return;
+        t.conversations += c.conversations; t.linkSent += c.funnel.linkSent; t.opened += c.funnel.opened; t.booked += c.funnel.booked;
+        t.outsideHours += c.outsideHours; t.afterFollowUp += c.afterFollowUp; t.handedOver += c.handedOver; t.value += c.value;
+      });
+      var pct = function (a, b) { return b ? nf.format(Math.round(a / b * 1000) / 10) + " %" : "–"; };
+      var h = '<div class="bar"><select class="in" id="cp"><option value="">Laatste 30 dagen</option>' + d.months.map(function (m) { return '<option value="' + m.value + '"' + (m.value === convPer ? " selected" : "") + ">" + esc(monthName(m.value)) + "</option>"; }).join("") + "</select></div>";
+      var steps = [["Gesprekken", t.conversations, "duikers die schreven"], ["Boekingslink gekregen", t.linkSent, "van de assistent of het team"], ["Betaalpagina geopend", t.opened, "datum en duikers gekozen"], ["Geboekt", t.booked, "aanbetaling betaald"]];
+      h += '<div class="card"><h2>Van vraag tot boeking</h2><div class="fun">' + steps.map(function (s, i) {
+        return '<div class="st"><b>' + nf.format(s[1]) + "</b><span>" + s[0] + '</span><i><em style="width:' + (t.conversations ? Math.max(2, Math.round(s[1] / t.conversations * 100)) : 0) + '%"></em></i><small>' +
+          (i ? pct(s[1], steps[i - 1][1]) + " van de stap ervoor" : esc(s[2])) + "</small></div>";
+      }).join("") + "</div></div>";
+      h += '<div class="kpis sec">' + kpi("Conversie", pct(t.booked, t.conversations), '<span class="d">gesprek → boeking</span>') +
+        kpi("Buiten kantooruren", nf.format(t.outsideHours), '<span class="d">' + pct(t.outsideHours, t.conversations) + " van de gesprekken</span>") +
+        kpi("Geboekt na follow-up", nf.format(t.afterFollowUp), '<span class="d">zonder follow-up gemist</span>') +
+        kpi("Overdrachten", nf.format(t.handedOver), '<span class="d">' + pct(t.handedOver, t.conversations) + " naar het team</span>") +
+        kpi("Boekingswaarde", thb(t.value)) + kpi("Waarde per gesprek", t.conversations ? thb(t.value / t.conversations) : "–") + "</div>";
+      h += '<div class="sec card tw"><table class="t"><thead><tr><th>Center</th><th class="n">Gesprekken</th><th class="n">Link</th><th class="n">Betaalpagina</th><th class="n">Geboekt</th><th class="n">Conversie</th><th class="n">Buiten uren</th><th class="n">Na follow-up</th><th class="n">Overdracht</th><th class="n">Waarde</th></tr></thead><tbody>' +
+        (rows.map(function (c) {
+          if (c.error) return '<tr><td class="nm"><b>' + esc(c.name) + '</b></td><td colspan="9" class="muted">Cijfers konden niet geladen worden.</td></tr>';
+          return '<tr class="link' + (c.test && !state.withTest ? " muted" : "") + '" data-href="#/centra/' + esc(c.slug) + '"><td class="nm"><b>' + esc(c.name) + "</b><small>" + esc(c.type || c.slug) + '</small></td><td class="n">' + nf.format(c.conversations) +
+            '</td><td class="n">' + nf.format(c.funnel.linkSent) + '</td><td class="n">' + nf.format(c.funnel.opened) + '</td><td class="n">' + nf.format(c.funnel.booked) + '</td><td class="n"><b>' + pct(c.funnel.booked, c.conversations) +
+            '</b></td><td class="n">' + nf.format(c.outsideHours) + '</td><td class="n">' + nf.format(c.afterFollowUp) + '</td><td class="n">' + nf.format(c.handedOver) + '</td><td class="n">' + thb(c.value) + "</td></tr>";
+        }).join("") || '<tr><td colspan="10" class="empty">Geen centra.</td></tr>') + "</tbody></table></div>";
+      h += '<p class="muted" style="font-size:13.5px">Dezelfde cijfers als het dashboard in de zone van elk center (' + esc(d.label.toLowerCase()) + '). "Link" telt duikers die een talay.io/b/-link kregen, "Betaalpagina" telt geopende Stripe-betaalpagina\'s, "Geboekt" telt betaalde boekingen.</p>';
+      setPage("Conversie", h);
+      $("#cp").onchange = function () { convPer = this.value; pConversion(); };
+      $$("tr[data-href]").forEach(function (r) { r.onclick = function () { location.hash = r.getAttribute("data-href"); }; });
+    }).catch(fail);
+  }
+
+  // ---------- Claude-kosten ----------
+  var costMonth = "";
+  function usd(v) { return "$ " + (v || 0).toLocaleString("nl-BE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function tok(v) { return v >= 1e6 ? nf.format(Math.round(v / 1e5) / 10) + " M" : v >= 1e3 ? nf.format(Math.round(v / 100) / 10) + " k" : nf.format(v); }
+  function pCosts(fresh) {
+    setPage("Claude-kosten", '<div class="skel"></div>');
+    load("cost:" + (costMonth || "now"), "costs" + (costMonth ? "?month=" + costMonth : ""), fresh).then(function (d) {
+      if (route().k !== "kosten") return;
+      costMonth = d.month;
+      var rows = d.centers.filter(function (c) { return state.withTest || !c.test; });
+      var t = rows.reduce(function (a, c) { ["calls", "tracked", "input", "read", "write", "output", "usd", "conversations", "bookings", "commission"].forEach(function (k) { a[k] += c[k] || 0; }); return a; },
+        { calls: 0, tracked: 0, input: 0, read: 0, write: 0, output: 0, usd: 0, conversations: 0, bookings: 0, commission: 0 });
+      var cacheHit = t.input + t.read + t.write ? Math.round(t.read / (t.input + t.read + t.write) * 100) : null;
+      var h = '<div class="bar"><select class="in" id="km">' + d.months.map(function (m) { return '<option value="' + m.value + '"' + (m.value === d.month ? " selected" : "") + ">" + esc(monthName(m.value)) + "</option>"; }).join("") + "</select></div>";
+      if (!t.tracked) h += '<div class="alert warn"><div class="x"><b>Nog geen verbruik gemeten</b>' + (t.calls ? nf.format(t.calls) + " berichten staan in Log, maar zonder tokens. " : "") +
+        "Make schrijft het verbruik van Claude nog niet in de tabel Log. Zodra Center, Input tokens, Cache read tokens, Cache write tokens en Output tokens in Airtable 51 van inbound v2 staan, verschijnen hier de kosten per center.</div></div>";
+      else if (t.tracked < t.calls) h += '<div class="alert warn"><div class="x"><b>Deels gemeten</b>' + nf.format(t.calls - t.tracked) + " van de " + nf.format(t.calls) + " berichten hebben nog geen tokens (van voor de meting). Die tellen niet mee in de kosten.</div></div>";
+      var spent = d.budget ? t.usd / d.budget : 0;
+      h += '<div class="kpis">' + kpi("Kosten", usd(t.usd), '<span class="d">≈ ' + thb(t.usd * d.thbPerUsd) + "</span>") +
+        kpi("Berichten", nf.format(t.tracked || t.calls), '<span class="d">' + (t.tracked ? "met gemeten verbruik" : "in Log") + "</span>") +
+        kpi("Per bericht", t.tracked ? usd(t.usd / t.tracked) : "–") +
+        kpi("Per gesprek", t.conversations && t.tracked ? usd(t.usd / t.conversations) : "–") +
+        kpi("Per boeking", t.bookings && t.tracked ? usd(t.usd / t.bookings) : "–", t.commission && t.tracked ? '<span class="d">' + nf.format(Math.round(t.usd * d.thbPerUsd / t.commission * 1000) / 10) + " % van de commissie</span>" : "") +
+        kpi("Uit de cache", cacheHit == null ? "–" : cacheHit + " %", '<span class="d">van de invoertokens</span>') + "</div>";
+      h += '<div class="grid2 sec"><div class="card"><h2>Kosten per dag</h2><div class="chart">' + chart("usd", d.daily.slice(0, Math.max(1, d.days)), usd, d.day0, d.current ? "vandaag" : "einde maand") + "</div></div>" +
+        '<div class="card"><h2>Verbruik</h2><div class="pad"><dl class="dl">' +
+        "<dt>Invoer (volle prijs)</dt><dd>" + tok(t.input) + " tokens · " + usd(t.input * d.price.input / 1e6) + "</dd>" +
+        "<dt>Cache gelezen</dt><dd>" + tok(t.read) + " tokens · " + usd(t.read * d.price.read / 1e6) + "</dd>" +
+        "<dt>Cache geschreven</dt><dd>" + tok(t.write) + " tokens · " + usd(t.write * d.price.write / 1e6) + "</dd>" +
+        "<dt>Uitvoer</dt><dd>" + tok(t.output) + " tokens · " + usd(t.output * d.price.output / 1e6) + "</dd></dl>" +
+        (d.budget ? '<div style="margin-top:14px"><b>Budget deze maand</b> <span class="muted">' + usd(t.usd) + " van " + usd(d.budget) + " (" + Math.round(spent * 100) + ' %)</span><div class="meter"><span class="' + (spent >= 1 ? "bad" : spent >= .8 ? "warn" : "") + '" style="width:' + Math.min(100, Math.round(spent * 100)) + '%"></span></div></div>' :
+          '<p class="muted" style="font-size:13px;margin:14px 0 0">Zet CLAUDE_BUDGET_USD in Cloudflare om hier een budget te zien en een melding te krijgen boven 80%.</p>') + "</div></div></div>";
+      h += '<div class="sec card tw"><table class="t"><thead><tr><th>Center</th><th class="n">Berichten</th><th class="n">Invoer</th><th class="n">Cache gelezen</th><th class="n">Cache geschreven</th><th class="n">Uitvoer</th><th class="n">Kosten</th><th class="n">Per gesprek</th><th class="n">Per boeking</th><th class="n">Commissie</th></tr></thead><tbody>' +
+        (rows.map(function (c) {
+          return '<tr><td class="nm"><b>' + esc(c.name) + "</b><small>" + esc(c.type || c.slug || "niet te koppelen aan een center") + '</small></td><td class="n">' + nf.format(c.tracked) + (c.calls > c.tracked ? ' <small class="muted">/ ' + nf.format(c.calls) + "</small>" : "") +
+            '</td><td class="n">' + tok(c.input) + '</td><td class="n">' + tok(c.read) + '</td><td class="n">' + tok(c.write) + '</td><td class="n">' + tok(c.output) + '</td><td class="n"><b>' + usd(c.usd) +
+            '</b></td><td class="n">' + (c.conversations && c.tracked ? usd(c.usd / c.conversations) : "–") + '</td><td class="n">' + (c.bookings && c.tracked ? usd(c.usd / c.bookings) : "–") + '</td><td class="n">' + thb(c.commission) + "</td></tr>";
+        }).join("") || '<tr><td colspan="10" class="empty">Geen centra.</td></tr>') + "</tbody></table></div>";
+      h += '<p class="muted" style="font-size:13.5px">Berekend met de prijzen van claude-sonnet-5-5 per miljoen tokens: invoer $' + d.price.input + ", cache schrijven $" + d.price.write + ", cache lezen $" + d.price.read + ", uitvoer $" + d.price.output +
+        ". Alleen de antwoorden van de assistent (inbound v2); de regressietest staat niet in Log. Baht ≈ " + d.thbPerUsd + " per dollar. Het echte tegoed staat in de Anthropic Console.</p>";
+      setPage("Claude-kosten", h);
+      $("#km").onchange = function () { costMonth = this.value; pCosts(); };
+    }).catch(fail);
+  }
+
   // ---------- Aanmeldingen ----------
   function pIntake(fresh) {
     setPage("Aanmeldingen", '<div class="skel"></div>');
@@ -2667,6 +3169,8 @@ function hqClient(cfg) {
         item(s.stripe === "live" ? true : s.stripe === "test" ? "warn" : false, "Stripe", s.stripe === "live" ? "Live sleutel staat klaar: centers met het vinkje Stripe live betalen echt, de rest blijft test." : s.stripe === "test" ? "Testmodus: er wordt niets echt betaald." : "Geen sleutel ingesteld.") +
         item(s.respondio, "respond.io", s.respondio ? "Token ingesteld: antwoorden vanuit de zone werken." : "RESPONDIO_TOKEN ontbreekt.") +
         item(s.push ? true : "warn", "Pushmeldingen", s.push ? "Ingesteld." : "VAPID-sleutel ontbreekt: geen meldingen op telefoons.") +
+        item(s.alerts ? true : "warn", "Meldingen per e-mail", s.alerts ? "Elke 15 minuten: overdracht zonder reactie, sorry-bericht, duiker zonder antwoord" + (s.budget ? ", Claude-kosten boven 80% van $" + s.budget : "") + "." + (s.alertsTest ? " Demo en test tellen mee." : "") : "ALERT_WEBHOOK ontbreekt: geen e-mails bij problemen.") +
+        (s.alerts ? '<div class="row"><div class="x"><button class="btn" id="atest" type="button">Stuur een testmelding</button> <span class="muted" style="font-size:13px">met alles van de laatste 24 uur, demo en test inbegrepen</span></div></div>' : "") +
         item(s.accessAud ? true : "warn", "Cloudflare Access", s.accessAud ? "Beperkt tot de app van de zone (AUD)." : "ACCESS_AUD niet ingesteld: elke Access-app van Talay telt.") +
         '</div></div><div class="card"><h2>Snel naar</h2><div class="rows">' +
         [["Airtable", "https://airtable.com/" + s.base], ["Make", "https://www.make.com/en/login"], ["respond.io", "https://app.respond.io/"], ["Stripe", "https://dashboard.stripe.com/" + (s.stripe === "test" ? "test/" : "") + "payments"], ["Cloudflare", "https://dash.cloudflare.com/"], ["Anthropic Console (API-tegoed)", "https://console.anthropic.com/settings/billing"]].map(function (l) {
@@ -2680,6 +3184,12 @@ function hqClient(cfg) {
         }).join("") + "</tbody></table></div></div>";
       h += '<div class="sec"><h2>Wijzigingen in de zones</h2><div class="card rows">' + (ov.activity.map(actRow).join("") || '<div class="empty">Nog geen wijzigingen.</div>') + "</div></div>";
       setPage("Systeem", h);
+      var at = $("#atest");
+      if (at) at.onclick = function () {
+        at.disabled = true;
+        post("alert-test", {}).then(function (d) { at.textContent = "Verstuurd (" + d.count + (d.count === 1 ? " melding" : " meldingen") + " in 24 u)"; })
+          .catch(function (e) { at.disabled = false; alert(e.message); });
+      };
       $$("tr[data-href]").forEach(function (r) { r.onclick = function () { location.hash = r.getAttribute("data-href"); }; });
     }).catch(fail);
   }
@@ -2715,7 +3225,7 @@ function hqClient(cfg) {
     var h = (location.hash || "#/overzicht").slice(2).split("?")[0].split("/");
     return { k: h[0] || "overzicht", id: h[1] ? decodeURIComponent(h[1]) : "" };
   }
-  var PAGES = { overzicht: pOverview, inbox: pInbox, zoeken: pSearch, centra: pCenters, boekingen: pBookings, commissie: pCommission, aanmeldingen: pIntake, systeem: pSystem, team: pTeam };
+  var PAGES = { overzicht: pOverview, inbox: pInbox, zoeken: pSearch, pijplijn: pPipeline, centra: pCenters, conversie: pConversion, boekingen: pBookings, commissie: pCommission, kosten: pCosts, aanmeldingen: pIntake, systeem: pSystem, team: pTeam };
   function render(fresh) {
     var r = route();
     $$("#nav a").forEach(function (a) { a.classList.toggle("on", a.getAttribute("data-k") === r.k); });
@@ -2723,7 +3233,27 @@ function hqClient(cfg) {
     if (r.k === "centra" && r.id) return pCenter(r.id, fresh);
     (PAGES[r.k] || pOverview)(fresh);
     if (fresh || !state.cache.inbox) load("inbox", "inbox", fresh).then(function (d) { inboxBadge(d.items); }).catch(function () {});
+    if (r.k !== "pijplijn" && (fresh || !state.cache.pipe)) load("pipe", "pipeline", fresh).then(pipeBadge).catch(function () {});
+    banner();
     stamp();
+  }
+  // Demo and test centers: say so whenever they are counted, and explain the zeros when no
+  // real center exists yet (pilot phase).
+  var NUM_PAGES = { overzicht: 1, inbox: 1, centra: 1, conversie: 1, boekingen: 1, commissie: 1, kosten: 1 };
+  function banner() {
+    var tb = $("#tb"), ov = state.ov, k = route().k;
+    if (!tb) return;
+    if (!ov || !NUM_PAGES[k]) { tb.innerHTML = ""; return; }
+    var tests = ov.centers.filter(function (c) { return c.test; }), real = ov.centers.length - tests.length;
+    if (state.withTest && tests.length) {
+      tb.innerHTML = '<div class="alert warn"><div class="x"><b>Demo- en testcijfers tellen mee</b>' + tests.map(function (c) { return esc(c.name) + " (" + esc(c.type) + ")"; }).join(", ") +
+        " staan in de cijfers. Dat zijn geen echte duikers.</div><button class=\"btn\" id=\"tbo\" type=\"button\">Alleen echte centra</button></div>";
+      $("#tbo").onclick = function () { setTest(false); };
+    } else if (!state.withTest && !real && tests.length) {
+      tb.innerHTML = '<div class="alert ok"><div class="x"><b>Nog geen pilot- of live-center</b>De cijfers blijven 0 tot het eerste echte center live gaat. Demo en test (' + tests.map(function (c) { return esc(c.name); }).join(", ") +
+        ") tellen niet mee.</div><button class=\"btn\" id=\"tbo\" type=\"button\">Toon demo/test</button></div>";
+      $("#tbo").onclick = function () { setTest(true); };
+    } else tb.innerHTML = "";
   }
   function stamp() { $("#upd").textContent = state.ov ? "Bijgewerkt " + new Date(state.ov.updated).toLocaleTimeString("nl-BE", { hour: "2-digit", minute: "2-digit" }) : ""; }
   function setTest(v) { state.withTest = v; store.set("test", v ? "1" : ""); $("#withTest").checked = v; $("#withTest2").checked = v; render(); }

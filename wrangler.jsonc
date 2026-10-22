@@ -12,6 +12,8 @@
   "vars": {
     "AIRTABLE_BASE": "appEXBMOJa73WiQHb"
   },
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  // Talay HQ: elke 15 minuten nakijken of er een melding nodig is (src/zone.js → runHqAlerts).
+  "triggers": { "crons": ["*/15 * * * *"] }
   // De Airtable-sleutel staat als geheim AIRTABLE_TOKEN in Cloudflare, nooit hier.
 }
