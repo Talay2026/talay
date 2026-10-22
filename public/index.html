@@ -9,6 +9,28 @@
 <meta property="og:description" content="The inquiry assistant for dive centres. Instant replies, automatic follow-ups and online booking, under your centre's name. Free to use.">
 <meta property="og:type" content="website">
 <link rel="canonical" href="https://talay.io/">
+<!-- i18n:alternates -->
+<link rel="alternate" hreflang="en" href="https://talay.io/">
+<link rel="alternate" hreflang="fr" href="https://talay.io/fr/">
+<link rel="alternate" hreflang="de" href="https://talay.io/de/">
+<link rel="alternate" hreflang="es" href="https://talay.io/es/">
+<link rel="alternate" hreflang="nl" href="https://talay.io/nl/">
+<link rel="alternate" hreflang="th" href="https://talay.io/th/">
+<link rel="alternate" hreflang="x-default" href="https://talay.io/">
+<!-- /i18n:alternates -->
+<!-- i18n:redirect -->
+<script>
+// Language: send a first-time visitor to their browser language; a choice in the menu is remembered
+(function () {
+  try {
+    if (/[?&]l=en\b/.test(location.search)) { localStorage.setItem("talay-lang", "en"); return; }
+    var other = ["fr", "de", "es", "nl", "th"];
+    var l = localStorage.getItem("talay-lang") || (navigator.languages || [navigator.language]).map(function (x) { return String(x).slice(0, 2).toLowerCase(); }).filter(function (x) { return x === "en" || other.indexOf(x) > -1; })[0];
+    if (other.indexOf(l) > -1) location.replace("/" + l + "/" + location.hash);
+  } catch (e) {}
+})();
+</script>
+<!-- /i18n:redirect -->
 <meta property="og:url" content="https://talay.io/">
 <meta property="og:site_name" content="Talay">
 <meta property="og:image" content="https://talay.io/og-image.png">
@@ -33,7 +55,7 @@
 [hidden]{display:none !important}
 html{font-size:16px;-webkit-text-size-adjust:100%;scroll-behavior:smooth;scroll-padding-top:var(--s4)}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
-body{margin:0;background:var(--deep);color:var(--shore);font-family:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:var(--t-body);line-height:1.6;-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--deep);color:var(--shore);font-family:"Schibsted Grotesk","Noto Sans Thai",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:var(--t-body);line-height:1.6;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-underline-offset:4px}
 p,h1,h2,h3,figure,ul,ol{margin:0}
 ul,ol{padding:0;list-style:none}
@@ -66,6 +88,12 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 .mast .cta{min-height:40px;padding:8px 16px;font-size:.92rem}
 .mast nav .login{display:inline-flex;align-items:center;gap:6px;min-height:40px;color:var(--shore);font-weight:500;font-size:.92rem;text-decoration:none}
 .mast nav .login:hover{text-decoration:underline}
+.lang select{appearance:none;-webkit-appearance:none;min-height:40px;padding:0 26px 0 10px;border:1px solid var(--ridge);border-radius:999px;background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23C9D6D9' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 10px center;color:var(--shore);font:inherit;font-size:.86rem;font-weight:600;cursor:pointer}
+.lang select:hover{border-color:var(--on-deep)}
+.lang option{color:#09262F;background:#F7F3EA}
+.mast .cta{white-space:nowrap}
+@media(max-width:560px){.mast{gap:var(--s3)}.mast nav{gap:var(--s3)}.mast nav .login .lbl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}.mast nav .login{min-width:32px;justify-content:center}}
+@media(max-width:400px){.mast nav .login{display:none}.brand b{font-size:1.3rem}.mast .cta{padding:8px 12px}}
 
 /* Hero */
 .hero{display:grid;gap:var(--s12);padding-block:var(--s12) var(--s8);align-items:center}
@@ -166,7 +194,7 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 .zone-head span{color:var(--on-deep)}
 .zone-grid{display:grid;gap:var(--s4);margin-top:var(--s4)}
 .zone-col h4{margin:0 0 var(--s2);font-size:.75rem;font-weight:600;color:var(--on-deep)}
-.tabs{display:flex;gap:var(--s2);margin-bottom:var(--s3);font-size:.72rem}
+.tabs{display:flex;flex-wrap:wrap;gap:var(--s2);margin-bottom:var(--s3);font-size:.72rem}
 .tabs span{padding:3px 9px;border-radius:999px;border:1px solid var(--ridge);color:var(--on-deep)}
 .tabs span:first-child{background:var(--shelf);color:var(--shore)}
 .row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px var(--s3);padding:var(--s2) 0;border-top:1px solid var(--ridge);font-size:.8rem;line-height:1.4}
@@ -199,6 +227,7 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 @media(prefers-reduced-motion:reduce){.zp{animation:none}}
 .zp h4{margin:0 0 var(--s2);font-size:.75rem;font-weight:600;color:var(--on-deep)}
 .zp-grid{display:grid;gap:var(--s4)}
+.zp-grid>*{min-width:0}
 .lead{padding:var(--s3);border-radius:10px;background:var(--shelf);font-size:.78rem;line-height:1.45}
 .lead-top{display:flex;justify-content:space-between;align-items:center;gap:var(--s2);margin-bottom:var(--s2)}
 .lead-top b{font-size:.85rem}
@@ -265,7 +294,7 @@ h3{font-size:1.0625rem;line-height:1.35;letter-spacing:-.01em;font-weight:600}
 .zc-ctrl{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);margin-top:var(--s4);padding-top:var(--s3);border-top:1px solid var(--ridge)}
 .zc-arrow{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--ridge);border-radius:50%;background:none;color:var(--shore);cursor:pointer}
 .zc-arrow:hover{background:var(--shelf)}
-.zc-dots{display:flex;gap:var(--s2)}
+.zc-dots{display:flex;flex-wrap:wrap;gap:var(--s2)}
 .zc-dots button{position:relative;display:flex;align-items:center;gap:6px;padding:6px 10px;border:0;border-radius:999px;background:var(--shelf);color:var(--on-deep);font:inherit;font-size:.74rem;font-weight:600;cursor:pointer;overflow:hidden}
 .zc-dots button[aria-current="true"]{background:var(--shore);color:var(--deep)}
 .zc-dots button::after{content:"";position:absolute;left:0;bottom:0;height:3px;width:100%;background:var(--sand);transform:scaleX(0);transform-origin:left}
@@ -448,7 +477,10 @@ footer a:hover{text-decoration:underline}
       <a href="#your-way">Your bookings</a>
       <a href="#pricing">Pricing</a>
       <a href="#faq">FAQ</a>
-      <a class="login" href="/zone" aria-label="Log in to the customer zone"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Log in</a>
+      <label class="lang"><span class="sr-only">Language</span><select id="lang">
+        <option value="en" selected>EN</option><option value="fr">FR</option><option value="de">DE</option><option value="es">ES</option><option value="nl">NL</option><option value="th">TH</option>
+      </select></label>
+      <a class="login" href="/zone" aria-label="Log in to the customer zone"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span class="lbl">Log in</span></a>
       <a class="cta" href="#demo">Book a demo</a>
     </nav>
   </header>
@@ -807,6 +839,13 @@ const TURNSTILE_SITEKEY = "0x4AAAAAAFXZnn0VWocS_nWR";  // Cloudflare Turnstile s
 /* ---------------------------------------------- */
 
 (() => {
+  // Language menu: remember the choice and open that version of the page
+  document.getElementById('lang').addEventListener('change', e => {
+    const l = e.target.value;
+    try { localStorage.setItem('talay-lang', l); } catch {}
+    location.href = (l === 'en' ? '/' : '/' + l + '/') + location.hash;
+  });
+
   // Chat demo in the hero: messages appear one by one and scroll inside the phone
   const chat = document.getElementById('chat');
   const replay = document.getElementById('replay');
