@@ -914,10 +914,11 @@ function closedPage(c, p, lang) {
 }
 
 // Language menu on the booking page: reloads the same page with ?l=, so product, ref and checkout follow it
+// (window.URL: inside an inline handler, plain URL means document.URL)
 const LANG_LABEL = { en: "Language", fr: "Langue", de: "Sprache", es: "Idioma", nl: "Taal" };
 function langMenu(lang) {
   const opts = LANGS.map((l) => `<option value="${l}"${l === lang ? " selected" : ""}>${l.toUpperCase()}</option>`).join("");
-  return `<select class="lang" aria-label="${LANG_LABEL[lang]}" onchange="var u=new URL(location.href);u.searchParams.set('l',this.value);location.href=u">${opts}</select>`;
+  return `<select class="lang" aria-label="${LANG_LABEL[lang]}" onchange="var u=new window.URL(location.href);u.searchParams.set('l',this.value);location.href=u">${opts}</select>`;
 }
 
 function notFound(lang) {
