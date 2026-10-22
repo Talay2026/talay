@@ -366,7 +366,7 @@ function leadInfo(r) {
     name: s("Name"), language: s("Language"), cert: s("Cert level"), status: s("Status"),
     dates: s("Dates on island"), group: s("Group size"), interested: s("Interested in"), contact: s("Contact"),
     handoverAt: s("Handover at"), humanAt: s("Human took over at"),
-    human: !!f["Human took over"], optedOut: !!f["Opted out"],
+    human: !!f["Human took over"], optedOut: !!f["Opted out"], channel: s("Channel"),
   };
 }
 
@@ -500,19 +500,21 @@ async function reply(request, env, center) {
   const c = await chat(env, center, id);
   if (c.error) return json({ error: c.error }, 404);
   if (!c.canReply) {
-    return json({ error: "More than 24 hours since the diver's last message: WhatsApp no longer allows a free reply." }, 409);
+    return json({ error: "More than 24 hours since the diver's last message: WhatsApp and Instagram no longer allow a free reply." }, 409);
   }
 
   const contact = id.includes(":") ? id : `id:${id}`;
+  const channel = Number(first(c._leadRec?.fields?.["Lead channel ID"])) || center.channel;
   const res = await fetch(`https://api.respond.io/v2/contact/${encodeURIComponent(contact)}/message`, {
     method: "POST",
     headers: { Authorization: `Bearer ${env.RESPONDIO_TOKEN}`, "Content-Type": "application/json" },
-    // Send from this center's own number; without channelId respond.io uses the contact's last channel.
-    body: JSON.stringify({ ...(center.channel ? { channelId: center.channel } : {}), message: { type: "text", text: msg } }),
+    // Send on the channel the diver wrote on (WhatsApp, Instagram, Messenger), else this center's number;
+    // without channelId respond.io uses the contact's last channel.
+    body: JSON.stringify({ ...(channel ? { channelId: channel } : {}), message: { type: "text", text: msg } }),
   });
   if (!res.ok) {
     console.error("respond.io", res.status, await res.text());
-    return json({ error: "WhatsApp did not accept the message. Try again, or answer in respond.io." }, 502);
+    return json({ error: "The message was not accepted. Try again, or answer in respond.io." }, 502);
   }
 
   const now = new Date().toISOString();
@@ -3756,7 +3758,7 @@ function zoneClient(cfg) {
       var actions = "";
       if (d.hasLead && L.human) actions += '<button class="ghost" id="handback">Let ' + esc(cfg.assistant) + " take over</button>";
       if (d.hasLead && d.needsYou && !L.human) actions += '<button class="ghost" id="handled">Mark as handled</button>';
-      var facts = fact("Language", L.language && langName(L.language)) + fact("Level", human(L.cert)) + fact("On the island", prettyDates(L.dates)) +
+      var facts = fact("Channel", L.channel && L.channel !== "WhatsApp" ? L.channel : "") + fact("Language", L.language && langName(L.language)) + fact("Level", human(L.cert)) + fact("On the island", prettyDates(L.dates)) +
         fact("Group", L.group) + fact("Interested in", /^rec[A-Za-z0-9]{14}$/.test(L.interested) ? "" : L.interested) + fact("Status", human(L.status)) + fact("WhatsApp", L.contact && L.name && L.contact !== L.name ? prettyPhone(L.contact) : "") +
         (L.human ? "<span><b>Team is handling this.</b> " + esc(cfg.assistant) + " is paused for this diver.</span>" : "");
 
