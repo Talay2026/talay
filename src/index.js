@@ -31,7 +31,7 @@ const T = {
     diversLabel: "Number of divers",
     less: "One diver less",
     more: "One diver more",
-    group: (a) => `Coming with more than ${MAX_DIVERS}? Message ${a} on WhatsApp and the team will plan it with you.`,
+    group: (a) => `Coming with more than ${MAX_DIVERS}? Message ${a} in your chat and the team will plan it with you.`,
     diver: "diver", divers: "divers",
     totalFor: "Total for",
     payNow: "Pay now to secure your spot",
@@ -44,8 +44,8 @@ const T = {
     meeting: "Meeting point",
     chooseDate: "Choose a date first.",
     tooSoon: (m) => `That date is too soon to book online. Choose ${m} or later.`,
-    tooFar: (a) => `That date is too far ahead to book online. Message ${a} on WhatsApp.`,
-    noPay: (a) => `Online payment opens soon. For now, reply to ${a} on WhatsApp with your date and number of divers, and the team will book you in.`,
+    tooFar: (a) => `That date is too far ahead to book online. Message ${a} in your chat.`,
+    noPay: (a) => `Online payment opens soon. For now, reply to ${a} in your chat with your date and number of divers, and the team will book you in.`,
     opening: "Opening secure payment…",
     wrong: "Something went wrong. Try again.",
     noConn: "No connection. Check your internet and try again.",
@@ -58,10 +58,10 @@ const T = {
     booked: "You're booked",
     paidNow: "Paid now",
     change: "If the team needs to change your booking, they'll message you within two hours.",
-    questions: (a) => `Questions? Reply to ${a} on WhatsApp.`,
+    questions: (a) => `Questions? Reply to ${a} in your chat.`,
     notPaid: "We haven't received your payment. Open the booking link again to try once more.",
     notFoundTitle: "This booking link doesn't work",
-    notFoundText: "Open the link again from your WhatsApp chat with the dive center, or send them a message and they'll send a new one.",
+    notFoundText: "Open the link again from your chat with the dive center, or send them a message and they'll send a new one.",
     problemTitle: "Booking page unavailable",
     missingKey: "The booking page is not set up yet (missing key).",
     loadFail: "We couldn't load this booking right now. Try again in a minute.",
@@ -76,7 +76,7 @@ const T = {
     diversLabel: "Nombre de plongeurs",
     less: "Un plongeur de moins",
     more: "Un plongeur de plus",
-    group: (a) => `Vous êtes plus de ${MAX_DIVERS} ? Écrivez à ${a} sur WhatsApp et l'équipe organisera tout avec vous.`,
+    group: (a) => `Vous êtes plus de ${MAX_DIVERS} ? Écrivez à ${a} dans votre conversation et l'équipe organisera tout avec vous.`,
     diver: "plongeur", divers: "plongeurs",
     totalFor: "Total pour",
     payNow: "À payer maintenant pour réserver votre place",
@@ -89,8 +89,8 @@ const T = {
     meeting: "Point de rendez-vous",
     chooseDate: "Choisissez d'abord une date.",
     tooSoon: (m) => `Cette date est trop proche pour réserver en ligne. Choisissez le ${m} ou plus tard.`,
-    tooFar: (a) => `Cette date est trop lointaine pour réserver en ligne. Écrivez à ${a} sur WhatsApp.`,
-    noPay: (a) => `Le paiement en ligne arrive bientôt. En attendant, envoyez à ${a} sur WhatsApp votre date et le nombre de plongeurs, et l'équipe s'occupe de votre réservation.`,
+    tooFar: (a) => `Cette date est trop lointaine pour réserver en ligne. Écrivez à ${a} dans votre conversation.`,
+    noPay: (a) => `Le paiement en ligne arrive bientôt. En attendant, envoyez à ${a} dans votre conversation votre date et le nombre de plongeurs, et l'équipe s'occupe de votre réservation.`,
     opening: "Ouverture du paiement sécurisé…",
     wrong: "Une erreur s'est produite. Réessayez.",
     noConn: "Pas de connexion. Vérifiez votre connexion internet et réessayez.",
@@ -103,10 +103,10 @@ const T = {
     booked: "Votre réservation est confirmée",
     paidNow: "Payé maintenant",
     change: "Si l'équipe doit modifier votre réservation, elle vous écrira dans les deux heures.",
-    questions: (a) => `Des questions ? Répondez à ${a} sur WhatsApp.`,
+    questions: (a) => `Des questions ? Répondez à ${a} dans votre conversation.`,
     notPaid: "Nous n'avons pas reçu votre paiement. Ouvrez à nouveau le lien de réservation pour réessayer.",
     notFoundTitle: "Ce lien de réservation ne fonctionne pas",
-    notFoundText: "Ouvrez à nouveau le lien depuis votre conversation WhatsApp avec le centre de plongée, ou envoyez-leur un message et ils vous enverront un nouveau lien.",
+    notFoundText: "Ouvrez à nouveau le lien depuis votre conversation avec le centre de plongée, ou envoyez-leur un message et ils vous enverront un nouveau lien.",
     problemTitle: "Page de réservation indisponible",
     missingKey: "La page de réservation n'est pas encore configurée (clé manquante).",
     loadFail: "Impossible de charger cette réservation pour le moment. Réessayez dans une minute.",
@@ -121,7 +121,7 @@ const T = {
     diversLabel: "Anzahl Taucher",
     less: "Ein Taucher weniger",
     more: "Ein Taucher mehr",
-    group: (a) => `Ihr seid mehr als ${MAX_DIVERS}? Schreib ${a} auf WhatsApp, dann plant das Team alles mit euch.`,
+    group: (a) => `Ihr seid mehr als ${MAX_DIVERS}? Schreib ${a} im Chat, dann plant das Team alles mit euch.`,
     diver: "Taucher", divers: "Taucher",
     totalFor: "Gesamt für",
     payNow: "Jetzt zahlen und Platz sichern",
@@ -134,8 +134,8 @@ const T = {
     meeting: "Treffpunkt",
     chooseDate: "Wähle zuerst ein Datum.",
     tooSoon: (m) => `Dieses Datum ist zu früh für eine Online-Buchung. Wähle ${m} oder später.`,
-    tooFar: (a) => `Dieses Datum liegt zu weit in der Zukunft für eine Online-Buchung. Schreib ${a} auf WhatsApp.`,
-    noPay: (a) => `Online-Zahlung kommt bald. Schick ${a} bis dahin auf WhatsApp dein Datum und die Anzahl Taucher, dann bucht das Team für dich.`,
+    tooFar: (a) => `Dieses Datum liegt zu weit in der Zukunft für eine Online-Buchung. Schreib ${a} im Chat.`,
+    noPay: (a) => `Online-Zahlung kommt bald. Schick ${a} bis dahin im Chat dein Datum und die Anzahl Taucher, dann bucht das Team für dich.`,
     opening: "Sichere Zahlung wird geöffnet…",
     wrong: "Etwas ist schiefgelaufen. Versuch es noch einmal.",
     noConn: "Keine Verbindung. Prüfe dein Internet und versuch es noch einmal.",
@@ -148,10 +148,10 @@ const T = {
     booked: "Du bist gebucht",
     paidNow: "Jetzt bezahlt",
     change: "Falls das Team deine Buchung ändern muss, meldet es sich innerhalb von zwei Stunden bei dir.",
-    questions: (a) => `Fragen? Antworte ${a} auf WhatsApp.`,
+    questions: (a) => `Fragen? Antworte ${a} im Chat.`,
     notPaid: "Wir haben deine Zahlung nicht erhalten. Öffne den Buchungslink noch einmal, um es erneut zu versuchen.",
     notFoundTitle: "Dieser Buchungslink funktioniert nicht",
-    notFoundText: "Öffne den Link noch einmal aus deinem WhatsApp-Chat mit der Tauchbasis, oder schreib ihnen, dann bekommst du einen neuen Link.",
+    notFoundText: "Öffne den Link noch einmal aus deinem Chat mit der Tauchbasis, oder schreib ihnen, dann bekommst du einen neuen Link.",
     problemTitle: "Buchungsseite nicht verfügbar",
     missingKey: "Die Buchungsseite ist noch nicht eingerichtet (Schlüssel fehlt).",
     loadFail: "Diese Buchung kann gerade nicht geladen werden. Versuch es in einer Minute noch einmal.",
@@ -166,7 +166,7 @@ const T = {
     diversLabel: "Número de buceadores",
     less: "Un buceador menos",
     more: "Un buceador más",
-    group: (a) => `¿Sois más de ${MAX_DIVERS}? Escribe a ${a} por WhatsApp y el equipo lo organizará con vosotros.`,
+    group: (a) => `¿Sois más de ${MAX_DIVERS}? Escribe a ${a} en el chat y el equipo lo organizará con vosotros.`,
     diver: "buceador", divers: "buceadores",
     totalFor: "Total para",
     payNow: "Paga ahora para asegurar tu plaza",
@@ -179,8 +179,8 @@ const T = {
     meeting: "Punto de encuentro",
     chooseDate: "Elige primero una fecha.",
     tooSoon: (m) => `Esa fecha es demasiado pronto para reservar online. Elige el ${m} o una fecha posterior.`,
-    tooFar: (a) => `Esa fecha está demasiado lejos para reservar online. Escribe a ${a} por WhatsApp.`,
-    noPay: (a) => `El pago online llegará pronto. Mientras tanto, envía a ${a} por WhatsApp tu fecha y el número de buceadores, y el equipo te hará la reserva.`,
+    tooFar: (a) => `Esa fecha está demasiado lejos para reservar online. Escribe a ${a} en el chat.`,
+    noPay: (a) => `El pago online llegará pronto. Mientras tanto, envía a ${a} en el chat tu fecha y el número de buceadores, y el equipo te hará la reserva.`,
     opening: "Abriendo el pago seguro…",
     wrong: "Algo salió mal. Inténtalo de nuevo.",
     noConn: "Sin conexión. Revisa tu internet e inténtalo de nuevo.",
@@ -193,10 +193,10 @@ const T = {
     booked: "Tu reserva está confirmada",
     paidNow: "Pagado ahora",
     change: "Si el equipo necesita cambiar tu reserva, te escribirá en un plazo de dos horas.",
-    questions: (a) => `¿Preguntas? Responde a ${a} por WhatsApp.`,
+    questions: (a) => `¿Preguntas? Responde a ${a} en el chat.`,
     notPaid: "No hemos recibido tu pago. Abre de nuevo el enlace de reserva para volver a intentarlo.",
     notFoundTitle: "Este enlace de reserva no funciona",
-    notFoundText: "Abre de nuevo el enlace desde tu chat de WhatsApp con el centro de buceo, o escríbeles y te enviarán uno nuevo.",
+    notFoundText: "Abre de nuevo el enlace desde tu chat con el centro de buceo, o escríbeles y te enviarán uno nuevo.",
     problemTitle: "Página de reserva no disponible",
     missingKey: "La página de reserva aún no está configurada (falta la clave).",
     loadFail: "No hemos podido cargar esta reserva ahora mismo. Inténtalo de nuevo en un minuto.",
@@ -211,7 +211,7 @@ const T = {
     diversLabel: "Aantal duikers",
     less: "Eén duiker minder",
     more: "Eén duiker meer",
-    group: (a) => `Met meer dan ${MAX_DIVERS}? Stuur ${a} een bericht op WhatsApp, dan plant het team alles met jullie.`,
+    group: (a) => `Met meer dan ${MAX_DIVERS}? Stuur ${a} een bericht in je chat, dan plant het team alles met jullie.`,
     diver: "duiker", divers: "duikers",
     totalFor: "Totaal voor",
     payNow: "Nu betalen om je plaats vast te leggen",
@@ -224,8 +224,8 @@ const T = {
     meeting: "Afspraakpunt",
     chooseDate: "Kies eerst een datum.",
     tooSoon: (m) => `Die datum is te vroeg om online te boeken. Kies ${m} of later.`,
-    tooFar: (a) => `Die datum ligt te ver vooruit om online te boeken. Stuur ${a} een bericht op WhatsApp.`,
-    noPay: (a) => `Online betalen komt binnenkort. Stuur ${a} intussen op WhatsApp je datum en het aantal duikers, dan boekt het team je in.`,
+    tooFar: (a) => `Die datum ligt te ver vooruit om online te boeken. Stuur ${a} een bericht in je chat.`,
+    noPay: (a) => `Online betalen komt binnenkort. Stuur ${a} intussen in je chat je datum en het aantal duikers, dan boekt het team je in.`,
     opening: "Beveiligde betaling wordt geopend…",
     wrong: "Er ging iets mis. Probeer het opnieuw.",
     noConn: "Geen verbinding. Controleer je internet en probeer het opnieuw.",
@@ -238,10 +238,10 @@ const T = {
     booked: "Je boeking staat vast",
     paidNow: "Nu betaald",
     change: "Moet het team je boeking aanpassen, dan stuurt het je binnen twee uur een bericht.",
-    questions: (a) => `Vragen? Antwoord ${a} op WhatsApp.`,
+    questions: (a) => `Vragen? Antwoord ${a} in je chat.`,
     notPaid: "We hebben je betaling niet ontvangen. Open de boekingslink opnieuw om het nog eens te proberen.",
     notFoundTitle: "Deze boekingslink werkt niet",
-    notFoundText: "Open de link opnieuw vanuit je WhatsApp-gesprek met het duikcentrum, of stuur hen een bericht, dan krijg je een nieuwe link.",
+    notFoundText: "Open de link opnieuw vanuit je gesprek met het duikcentrum, of stuur hen een bericht, dan krijg je een nieuwe link.",
     problemTitle: "Boekingspagina niet beschikbaar",
     missingKey: "De boekingspagina is nog niet ingesteld (sleutel ontbreekt).",
     loadFail: "We konden deze boeking nu niet laden. Probeer het over een minuut opnieuw.",
@@ -580,12 +580,12 @@ async function managePage(env, ctx, url) {
     <input id="date" type="date" min="${minDate}" max="${maxDate}" aria-describedby="date-error">
     <p id="date-error" class="error" role="alert" hidden></p>
     <button type="button" id="move" class="book" style="margin-top:1rem">Move booking</button>
-    <p class="hint">The diver gets a WhatsApp message with the new date.</p>
+    <p class="hint">If the diver wrote on WhatsApp, they get a WhatsApp message with the new date.</p>
   </section>
   <section class="field" style="margin-top:2.5rem;padding-top:1.5rem;border-top:1px solid var(--line)">
     <label>Cancel</label>
     <button type="button" id="cancel" class="book danger">Cancel and refund ${thb(paid)} THB</button>
-    <p class="hint">The full deposit goes back to the diver's card, and the diver gets a WhatsApp message.</p>
+    <p class="hint">The full deposit goes back to the diver's card, and a diver who wrote on WhatsApp gets a WhatsApp message.</p>
   </section>
   </div>`}
 </main>
@@ -664,7 +664,7 @@ async function manageAction(request, env, ctx) {
       return json({ error: `Choose a date between ${fmtDate(minDate, "en")} and ${fmtDate(maxDate, "en")}.` }, 400);
     }
     await tellMake("move", date);
-    return json({ ok: true, message: `Booking moved to ${fmtDate(date, "en")}. The diver gets a WhatsApp message.` });
+    return json({ ok: true, message: `Booking moved to ${fmtDate(date, "en")}. A diver who wrote on WhatsApp gets a WhatsApp message.` });
   }
 
   if (input.action === "cancel") {
@@ -678,7 +678,7 @@ async function manageAction(request, env, ctx) {
       if (!/already.?refunded/i.test(String(err.message))) throw err;
     }
     await tellMake("cancel");
-    return json({ ok: true, message: "Booking cancelled. The full deposit is refunded to the diver's card, and the diver gets a WhatsApp message." });
+    return json({ ok: true, message: "Booking cancelled. The full deposit is refunded to the diver's card. A diver who wrote on WhatsApp gets a WhatsApp message." });
   }
   return json({ error: "Unknown action." }, 400);
 }
@@ -899,11 +899,11 @@ function fmtDate(iso, lang = "en") {
 
 // A product switched off in the customer zone (Products → Active) can't be booked online.
 const CLOSED = {
-  en: { title: "Online booking is closed for now", text: (a) => `Send ${a} a message on WhatsApp and we'll help you further.` },
-  nl: { title: "Online boeken is even niet mogelijk", text: (a) => `Stuur ${a} een bericht op WhatsApp, dan helpen we je verder.` },
-  fr: { title: "La réservation en ligne est fermée pour le moment", text: (a) => `Envoyez un message à ${a} sur WhatsApp et nous vous aiderons.` },
-  de: { title: "Online-Buchung ist gerade geschlossen", text: (a) => `Schreib ${a} eine Nachricht auf WhatsApp, dann helfen wir dir weiter.` },
-  es: { title: "La reserva online está cerrada por ahora", text: (a) => `Envía un mensaje a ${a} por WhatsApp y te ayudamos.` },
+  en: { title: "Online booking is closed for now", text: (a) => `Send ${a} a message in your chat and we'll help you further.` },
+  nl: { title: "Online boeken is even niet mogelijk", text: (a) => `Stuur ${a} een bericht in je chat, dan helpen we je verder.` },
+  fr: { title: "La réservation en ligne est fermée pour le moment", text: (a) => `Envoyez un message à ${a} dans votre conversation et nous vous aiderons.` },
+  de: { title: "Online-Buchung ist gerade geschlossen", text: (a) => `Schreib ${a} eine Nachricht im Chat, dann helfen wir dir weiter.` },
+  es: { title: "La reserva online está cerrada por ahora", text: (a) => `Envía un mensaje a ${a} en el chat y te ayudamos.` },
 };
 function closedPage(c, p, lang) {
   const t = CLOSED[lang] || CLOSED.en;
