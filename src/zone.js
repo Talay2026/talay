@@ -246,6 +246,18 @@ async function at(env, table, { formula, fields, sort, max = 500 } = {}) {
   return out;
 }
 
+// Leads and Bookings → "Made at" (formula: IF({Seed at}, {Seed at}, CREATED_TIME())) is when a row
+// counts as made, so demo rows can be dated in the past. Without that field: CREATED_TIME().
+async function atMade(env, table, opts, build) {
+  try {
+    return await at(env, table, { ...opts, formula: build("{Made at}"), fields: opts.fields && [...opts.fields, "Made at"] });
+  } catch (e) {
+    if (!/: 422 /.test(String(e.message))) throw e;
+    return at(env, table, { ...opts, formula: build("CREATED_TIME()") });
+  }
+}
+const madeOf = (r) => String(first(r.fields["Made at"]) || r.createdTime);
+
 async function atWrite(env, table, method, records) {
   const res = await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/${encodeURIComponent(table)}`, {
     method,
@@ -708,10 +720,10 @@ async function checkoutSessions(env, center, start, end) {
 async function dashboard(env, center, period) {
   const { start, end, label, months } = periodRange(period);
   const iso = (ms) => new Date(ms).toISOString();
-  const inPeriod = `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE(CREATED_TIME(), DATETIME_PARSE('${iso(end)}'))`;
+  const inPeriod = (m) => `IS_AFTER(${m}, DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE(${m}, DATETIME_PARSE('${iso(end)}'))`;
   const [leads, books, linkMsgs, sessions] = await Promise.all([
-    at(env, "Leads", { formula: `AND(${ofCenter(center)}, ${inPeriod})`, max: 5000 }),
-    at(env, "Bookings", { formula: `AND(${ofCenter(center)}, ${inPeriod})`, max: 5000 }),
+    atMade(env, "Leads", { max: 5000 }, (m) => `AND(${ofCenter(center)}, ${inPeriod(m)})`),
+    atMade(env, "Bookings", { max: 5000 }, (m) => `AND(${ofCenter(center)}, ${inPeriod(m)})`),
     at(env, "Chat", {
       formula: `AND({Center} = '${q(center.slug)}', FIND('talay.io/b/', {Text}), {Direction} != 'Customer', IS_AFTER({Sent at}, DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE({Sent at}, DATETIME_PARSE('${iso(end)}')))`,
       fields: ["Contact ID"], max: 5000,
@@ -737,14 +749,14 @@ async function dashboard(env, center, period) {
   const weekKey = (ms) => { const d = new Date(ms + TZ); const day = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - day); return d.toISOString().slice(0, 10); };
   const weeks = {};
   for (let t = start; t < end; t += DAY) weeks[weekKey(t)] = { week: weekKey(t), conversations: 0, bookings: 0 };
-  leads.forEach((l) => { const k = weekKey(Date.parse(l.createdTime)); if (weeks[k]) weeks[k].conversations++; });
-  live.forEach((b) => { const k = weekKey(Date.parse(b.createdTime)); if (weeks[k]) weeks[k].bookings++; });
+  leads.forEach((l) => { const k = weekKey(Date.parse(madeOf(l))); if (weeks[k]) weeks[k].conversations++; });
+  live.forEach((b) => { const k = weekKey(Date.parse(madeOf(b))); if (weeks[k]) weeks[k].bookings++; });
 
   const sum = (arr, k) => arr.reduce((a, b) => a + n(b.fields[k]), 0);
   const statement = books.map((b) => {
     const f = b.fields;
     return {
-      ref: first(f["Ref"]) || "", created: b.createdTime, date: first(f["Activity date"]) || "",
+      ref: first(f["Ref"]) || "", created: madeOf(b), date: first(f["Activity date"]) || "",
       product: String(first(f["P name"]) || ""), name: first(f["Payer name"]) || "",
       divers: n(f["Group size"]) || 1, total: n(f["Total value THB"]), commission: n(f["Commission THB"]) || n(f["Deposit paid THB"]),
       refunded: n(f["Refunded THB"]), status: first(f["Status"]) || "Confirmed", cancelled: cx(b),
@@ -756,10 +768,10 @@ async function dashboard(env, center, period) {
     kpiPrev: await (async () => {
       try {
         const len = end - start, ps = start - len, pe = start;
-        const inPrev = `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${iso(ps - 1000)}')), IS_BEFORE(CREATED_TIME(), DATETIME_PARSE('${iso(pe)}'))`;
+        const inPrev = (m) => `IS_AFTER(${m}, DATETIME_PARSE('${iso(ps - 1000)}')), IS_BEFORE(${m}, DATETIME_PARSE('${iso(pe)}'))`;
         const [pl, pb] = await Promise.all([
-          at(env, "Leads", { formula: `AND(${ofCenter(center)}, ${inPrev})`, fields: ["Status", "Response seconds", "Outside hours"], max: 5000 }),
-          at(env, "Bookings", { formula: `AND(${ofCenter(center)}, ${inPrev})`, fields: ["Status", "Group size", "Total value THB", "Balance at shop"], max: 5000 }),
+          atMade(env, "Leads", { fields: ["Status", "Response seconds", "Outside hours"], max: 5000 }, (m) => `AND(${ofCenter(center)}, ${inPrev(m)})`),
+          atMade(env, "Bookings", { fields: ["Status", "Group size", "Total value THB", "Balance at shop"], max: 5000 }, (m) => `AND(${ofCenter(center)}, ${inPrev(m)})`),
         ]);
         const pLive = pb.filter((b) => !cx(b));
         const pResp = pl.map((l) => n(l.fields["Response seconds"])).filter((x) => x > 0 && x < 3600);
@@ -795,14 +807,14 @@ async function dashboard(env, center, period) {
       return {
         conversations: leads.length,
         linkSent: new Set(linkMsgs.map((m) => String(m.fields["Contact ID"] || "")).filter(Boolean)).size,
-        opened,
+        opened: Math.max(opened, live.length),
         booked: live.length,
       };
     })(),
     languages: Object.entries(langs).sort((a, b) => b[1] - a[1]),
     heat: (() => {
       const h = Array.from({ length: 7 }, () => Array(24).fill(0));
-      leads.forEach((l) => { const d = new Date(Date.parse(l.createdTime) + 7 * 3600 * 1000); h[(d.getUTCDay() + 6) % 7][d.getUTCHours()]++; });
+      leads.forEach((l) => { const d = new Date(Date.parse(madeOf(l)) + 7 * 3600 * 1000); h[(d.getUTCDay() + 6) % 7][d.getUTCHours()]++; });
       return h;
     })(),
     countries: (() => {
@@ -871,10 +883,7 @@ function parseStay(text, createdMs) {
   return [from, to];
 }
 async function arriving(env, center) {
-  const leads = await at(env, "Leads", {
-    formula: `AND(${ofCenter(center)}, IS_AFTER(CREATED_TIME(), DATEADD(NOW(), -60, 'days')))`,
-    max: 3000,
-  });
+  const leads = await atMade(env, "Leads", { max: 3000 }, (m) => `AND(${ofCenter(center)}, IS_AFTER(${m}, DATEADD(NOW(), -60, 'days')))`);
   const today = thaiDate(Date.now());
   const limit = thaiDate(Date.now() + 14 * DAY);
   const s = (f, k) => { const v = first(f[k]); return v == null ? "" : String(v); };
@@ -883,7 +892,7 @@ async function arriving(env, center) {
     const f = r.fields;
     if (/booked|lost|closed|spam/i.test(s(f, "Status")) || f["Opted out"]) continue;
     const text = s(f, "Dates on island");
-    const range = parseStay(s(f, "Arrival date") || text, Date.parse(r.createdTime));
+    const range = parseStay(s(f, "Arrival date") || text, Date.parse(madeOf(r)));
     if (!range) continue;
     const [from, to] = range;
     if (to < today || from > limit) continue;
@@ -911,16 +920,16 @@ const MS_STEPS = {
 };
 async function milestones(env, center) {
   const [books, leads] = await Promise.all([
-    at(env, "Bookings", { formula: `${ofCenter(center)}`, fields: ["Group size", "Total value THB", "Status"], max: 10000 }),
-    at(env, "Leads", { formula: `${ofCenter(center)}`, fields: ["Status"], max: 20000 }),
+    atMade(env, "Bookings", { fields: ["Group size", "Total value THB", "Status"], max: 10000 }, () => ofCenter(center)),
+    atMade(env, "Leads", { fields: ["Status"], max: 20000 }, () => ofCenter(center)),
   ]);
   const n = (v) => Number(first(v)) || 0;
   const live = books.filter((b) => !/cancel|refund/i.test(String(first(b.fields["Status"]) || "")))
-    .sort((a, b) => a.createdTime.localeCompare(b.createdTime));
+    .sort((a, b) => madeOf(a).localeCompare(madeOf(b)));
   const series = {
-    divers: live.map((b) => [b.createdTime, n(b.fields["Group size"]) || 1]),
-    revenue: live.map((b) => [b.createdTime, n(b.fields["Total value THB"])]),
-    conversations: [...leads].sort((a, b) => a.createdTime.localeCompare(b.createdTime)).map((l) => [l.createdTime, 1]),
+    divers: live.map((b) => [madeOf(b), n(b.fields["Group size"]) || 1]),
+    revenue: live.map((b) => [madeOf(b), n(b.fields["Total value THB"])]),
+    conversations: [...leads].sort((a, b) => madeOf(a).localeCompare(madeOf(b))).map((l) => [madeOf(l), 1]),
   };
   const out = {};
   for (const [k, rows] of Object.entries(series)) {
@@ -1056,10 +1065,10 @@ export async function handleWeekly(request, env, ctx) {
 
 async function weekStats(env, center, start, end) {
   const iso = (ms) => new Date(ms).toISOString();
-  const inP = `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE(CREATED_TIME(), DATETIME_PARSE('${iso(end)}'))`;
+  const inP = (m) => `IS_AFTER(${m}, DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE(${m}, DATETIME_PARSE('${iso(end)}'))`;
   const [leads, books, arr] = await Promise.all([
-    at(env, "Leads", { formula: `AND(${ofCenter(center)}, ${inP})`, max: 5000 }),
-    at(env, "Bookings", { formula: `AND(${ofCenter(center)}, ${inP})`, max: 5000 }),
+    atMade(env, "Leads", { max: 5000 }, (m) => `AND(${ofCenter(center)}, ${inP(m)})`),
+    atMade(env, "Bookings", { max: 5000 }, (m) => `AND(${ofCenter(center)}, ${inP(m)})`),
     arriving(env, center).catch(() => ({ items: [] })),
   ]);
   const n = (v) => Number(first(v)) || 0;
@@ -1136,14 +1145,14 @@ async function dayStats(env, center) {
   const win = (field) => `IS_AFTER(${field}, DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE(${field}, DATETIME_PARSE('${iso(now + 60000)}'))`;
   const [msgs, leads, books] = await Promise.all([
     at(env, "Chat", { formula: `AND({Center} = '${q(center.slug)}', ${win("{Sent at}")})`, fields: ["Direction", "Contact ID"], max: 3000 }),
-    at(env, "Leads", { formula: `AND(${ofCenter(center)}, ${win("CREATED_TIME()")})`, fields: ["Handed over", "Handover at"], max: 2000 }),
-    at(env, "Bookings", { formula: `AND(${ofCenter(center)}, ${win("CREATED_TIME()")})`, fields: ["Group size", "Total value THB", "Status"], max: 1000 }),
+    atMade(env, "Leads", { fields: ["Handed over", "Handover at"], max: 2000 }, (m) => `AND(${ofCenter(center)}, ${win(m)})`),
+    atMade(env, "Bookings", { fields: ["Group size", "Total value THB", "Status"], max: 1000 }, (m) => `AND(${ofCenter(center)}, ${win(m)})`),
   ]);
   const n = (v) => Number(first(v)) || 0;
   const people = new Set(msgs.filter((m) => m.fields["Direction"] === "Customer").map((m) => String(m.fields["Contact ID"] || "")));
   people.delete("");
   const live = books.filter((b) => !/cancel|refund/i.test(String(first(b.fields["Status"]) || "")));
-  const outside = live.filter((b) => { const d = new Date(Date.parse(b.createdTime) + TZ); const m = d.getUTCHours() * 60 + d.getUTCMinutes(); return m < open || m >= close; });
+  const outside = live.filter((b) => { const d = new Date(Date.parse(madeOf(b)) + TZ); const m = d.getUTCHours() * 60 + d.getUTCMinutes(); return m < open || m >= close; });
   return {
     date: iso(start),
     conversations: people.size,
@@ -1179,8 +1188,8 @@ async function overnight(env, center) {
   const win = (field) => `IS_AFTER(${field}, DATETIME_PARSE('${iso(start - 1000)}')), IS_BEFORE(${field}, DATETIME_PARSE('${iso(end)}'))`;
   const [msgs, leads, books] = await Promise.all([
     at(env, "Chat", { formula: `AND({Center} = '${q(center.slug)}', ${win("{Sent at}")})`, fields: ["Direction", "Contact ID"], max: 3000 }),
-    at(env, "Leads", { formula: `AND(${ofCenter(center)}, ${win("CREATED_TIME()")})`, max: 2000 }),
-    at(env, "Bookings", { formula: `AND(${ofCenter(center)}, ${win("CREATED_TIME()")})`, max: 1000 }),
+    atMade(env, "Leads", { max: 2000 }, (m) => `AND(${ofCenter(center)}, ${win(m)})`),
+    atMade(env, "Bookings", { max: 1000 }, (m) => `AND(${ofCenter(center)}, ${win(m)})`),
   ]);
   const n = (v) => Number(first(v)) || 0;
   const people = new Set(msgs.filter((m) => m.fields["Direction"] === "Customer").map((m) => String(m.fields["Contact ID"] || "")));
