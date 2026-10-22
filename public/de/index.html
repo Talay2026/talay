@@ -472,6 +472,19 @@ footer a:hover{text-decoration:underline}
  .zs-phone{position:static;width:min(270px,78%);margin:0 auto}
  .zs-video{width:min(400px,88vw)}
 }
+
+/* Try it yourself, Koh Tao numbers */
+.cta.ghost{background:none;color:var(--shore);box-shadow:inset 0 0 0 1.5px var(--ridge)}
+.cta.ghost:hover{background:var(--shelf);color:var(--shore)}
+.alt.try{margin-top:var(--s3)}
+.faq details p a{color:inherit;font-weight:600}
+.proof{margin-top:var(--s12);padding-top:var(--s8);border-top:1px solid var(--ridge)}
+.proof-head{color:var(--on-deep);max-width:60ch}
+.proof-stats{display:grid;gap:var(--s6);margin-top:var(--s6)}
+.proof-stats div{display:grid;gap:var(--s1)}
+.proof-stats b{color:var(--sand);font-size:2.1rem;line-height:1.1;letter-spacing:-.01em}
+.proof-stats span{color:var(--on-deep);max-width:30ch}
+@media(min-width:780px){.proof-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
 </style>
 </head>
 <body id="top">
@@ -504,6 +517,7 @@ footer a:hover{text-decoration:underline}
       <p class="lede">Talay beantwortet Ihre Anfragen in Sekunden, fasst nach und lässt Taucher online buchen. Alles unter dem Namen Ihrer Basis.</p>
       <div class="cta-row">
         <a class="cta" href="#demo">Kostenlose Demo buchen</a>
+        <a class="cta ghost" href="/demo/ridgefin-divers/">Selbst ausprobieren</a>
       </div>
       <ul class="assure" aria-label="Bedingungen">
         <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5"/></svg>Kostenlos</li>
@@ -557,6 +571,14 @@ footer a:hover{text-decoration:underline}
       <article><svg class="problem-art" viewBox="0 0 104 104" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h47a8 8 0 0 1 8 8v25a8 8 0 0 1-8 8H41L24 70V58h-5a8 8 0 0 1-8-8V25a8 8 0 0 1 8-8Z"/><circle cx="29" cy="38" r="2" fill="#DCA44A" stroke="#DCA44A"/><circle cx="43" cy="38" r="2" fill="#DCA44A" stroke="#DCA44A"/><circle cx="57" cy="38" r="2" fill="#DCA44A" stroke="#DCA44A"/><path d="M49 71h26m-26 9h17M82 45v19l10 8V45" stroke-dasharray="3 5" opacity=".55"/></svg><h3>„Ich überlege es mir.“<br>Dann nichts mehr.</h3><p>Niemand fasst nach, und die Buchung verschwindet still und leise.</p></article>
       <article><svg class="problem-art" viewBox="0 0 104 104" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="22" y="18" width="56" height="70" rx="7"/><rect x="36" y="12" width="28" height="13" rx="4" fill="#0A2029"/><path d="M34 71V58m15 13V47m15 24V37" stroke="#DCA44A" stroke-width="4"/><path d="M33 79h34M84 30h10m-10 10h7"/><path d="M11 47h6m-9 10h9" opacity=".5"/></svg><h3>Viele Nachrichten.<br>Wenig Überblick.</h3><p>Welche Anfragen wurden zu Buchungen? Niemand weiß es so genau.</p></article>
     </div>
+    <div class="proof">
+      <p class="proof-head">Im Oktober 2026 haben wir 57 Tauchbasen auf Koh Tao angeschrieben. Das kam zurück:</p>
+      <div class="proof-stats">
+        <div><b>7,2 Stunden</b><span>mittlere Wartezeit auf eine echte Antwort auf eine Nachricht in der Nacht</span></div>
+        <div><b>0 von 38</b><span>Nachrichten in der Nacht innerhalb einer Stunde beantwortet</span></div>
+        <div><b>0 von 67</b><span>Antworten mit einer Möglichkeit zu buchen oder zu bezahlen</span></div>
+      </div>
+    </div>
   </section>
 </div>
 
@@ -606,7 +628,7 @@ footer a:hover{text-decoration:underline}
         <article>
           <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3 5 6.5V13c0 5.5 3.8 9.7 9 11.5 5.2-1.8 9-6 9-11.5V6.5Z"/><path d="m10 14 3 3 5-6" stroke="#DCA44A"/></svg>
           <h3>Behalten Sie die Kontrolle</h3>
-          <p>Ihr Team kann jedes Gespräch übernehmen. Medizinische Fragen und Beschwerden gehen immer an Sie.</p>
+          <p>Talay antwortet Tag und Nacht oder nur, wenn Sie geschlossen haben. Ihr Team kann jedes Gespräch übernehmen, und medizinische Fragen gehen immer an Sie.</p>
         </article>
         <article>
           <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="22" height="17" rx="3"/><path d="M10 25h8M14 21v4"/><path d="M8 16v-3m4 3V9m4 7v-5m4 5V8" stroke="#DCA44A"/></svg>
@@ -753,12 +775,17 @@ footer a:hover{text-decoration:underline}
           <details><summary>Ist Talay ein Buchungssystem?</summary><p>Nein. Talay kümmert sich um die Anfrage, bis der Taucher bucht. Ihr Buchungssystem und CRM bleiben gleich.</p></details>
           <details><summary>Müssen Taucher über Talay buchen?</summary><p>Nein. Sie können weiterhin vorbeikommen, anrufen oder direkt bei Ihnen buchen. Nur Buchungen über Talay kosten Provision.</p></details>
           <details><summary>Was kostet es?</summary><p>Die Nutzung kostet nichts. Talay verdient nur eine Provision auf Buchungen über Talay, zu vorab mit Ihnen vereinbarten Sätzen.</p></details>
+          <details><summary>Kann ich es zuerst ausprobieren?</summary><p>Ja. <a href="/demo/ridgefin-divers/">Schreiben Sie unserer Demo-Tauchbasis</a> auf WhatsApp, Instagram oder Messenger, als wären Sie ein Taucher, und sehen Sie, wie sie antwortet.</p></details>
+          <details><summary>Kann Talay nur antworten, wenn wir geschlossen haben?</summary><p>Ja. Wählen Sie Tag und Nacht oder nur außerhalb Ihrer Bürozeiten. Während der Bürozeiten wartet jede Nachricht auf Ihr Team, und Sie können jederzeit im Kundenbereich umschalten.</p></details>
+          <details><summary>Wie lange dauert der Start?</summary><p>Etwa 20 Minuten, um uns Ihre Kurse, Preise und Regeln zu nennen. Wir richten Ihren Assistenten ein und schicken Ihnen eine Testnummer, damit Sie ihn selbst testen, bevor etwas live geht.</p></details>
           <details><summary>Mit welchen Kanälen arbeitet Talay?</summary><p>Heute WhatsApp, Instagram und Facebook Messenger, jeweils unter dem Namen Ihrer Basis. LINE, Telegram, Website-Formulare und E-Mail folgen.</p></details>
         </div>
         <div class="faq-col">
           <details><summary>Welche Sprachen spricht es?</summary><p>Heute Englisch, Niederländisch, Französisch, Deutsch und Spanisch. Andere Sprachen bekommen vorerst Englisch, weitere können hinzukommen.</p></details>
           <details><summary>Kann unser Team ein Gespräch übernehmen?</summary><p>Ja, jederzeit. Antworten Sie aus dem Kundenbereich oder Posteingang, und Talay hält sich zurück.</p></details>
           <details><summary>Und medizinische Fragen oder Beschwerden?</summary><p>Die gehen immer an Ihr Team. Talay gibt nie medizinische Ratschläge.</p></details>
+          <details><summary>Was, wenn ein Taucher etwas fragt, das Talay nicht beantworten kann?</summary><p>Talay sagt dem Taucher, dass ein Kollege antwortet, und informiert Ihr Team. Medizinische Fragen, große Gruppen und Terminänderungen gehen immer an Sie. Sobald Ihr Team antwortet, hält sich Talay in diesem Chat zurück.</p></details>
+          <details><summary>Können wir jederzeit aufhören?</summary><p>Ja. Pausieren oder deaktivieren Sie den Assistenten, wann Sie wollen. Kein Vertrag, keine Kündigungsfrist.</p></details>
           <details><summary>Bringt Talay uns neue Kunden?</summary><p>Nein. Es sorgt dafür, dass weniger der Anfragen verloren gehen, die Sie schon bekommen.</p></details>
         </div>
       </div>
@@ -773,6 +800,7 @@ footer a:hover{text-decoration:underline}
       <p class="lead-in">Wir zeigen Ihnen Talay mit dem Namen, den Preisen und Kursen Ihrer Basis.</p>
       <p class="free">Kostenlose 20-Minuten-Demo, per Video oder persönlich. Unverbindlich.</p>
       <p class="alt">Lieber WhatsApp? <a href="https://wa.me/32456953907?text=Hallo%20Talay%2C%20ich%20leite%20eine%20Tauchbasis%20und%20m%C3%B6chte%20gern%20eine%20Demo%20sehen.">Schreiben Sie uns</a> oder mailen Sie an <a href="mailto:info@talay.io?subject=Talay-Demo">info@talay.io</a>.</p>
+      <p class="alt try">Erst ausprobieren? <a href="/demo/ridgefin-divers/">Chatten Sie mit unserem Demo-Assistenten</a> auf WhatsApp, Instagram oder Messenger.</p>
     </div>
 
     <div class="form-card">
