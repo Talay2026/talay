@@ -59,6 +59,20 @@ const T = {
     paidNow: "Paid now",
     change: "If the team needs to change your booking, they'll message you within two hours.",
     questions: (a) => `Questions? Reply to ${a} in your chat.`,
+    policyTitle: "Good to know",
+    policy: [
+      "Free to move to another date within 6 months.",
+      "If you cancel, your deposit stays valid for another date within 6 months.",
+      "If the dive centre cancels or the weather stops the dive and no new date works, you get your deposit back.",
+    ],
+    secure: "Secure payment by Stripe.",
+    backToChat: "Back to the chat",
+    askFirst: (a) => `Questions first? Message ${a}.`,
+    nextTitle: "Before you come",
+    courseNote: "For a course, there is usually a short welcome and paperwork at the shop before the first lesson. The team confirms the time in the chat.",
+    bring: "What to bring",
+    bringText: "Swimwear, a towel, sun cream and your passport or ID. Certified divers: your certification card (or the app) and logbook.",
+    map: "Open in Google Maps",
     notPaid: "We haven't received your payment. Open the booking link again to try once more.",
     notFoundTitle: "This booking link doesn't work",
     notFoundText: "Open the link again from your chat with the dive center, or send them a message and they'll send a new one.",
@@ -83,7 +97,7 @@ const T = {
     payShop: "À payer au centre le jour même",
     never: "Vous ne payez jamais plus que le prix du centre.",
     terms: ["Réservation et paiement via Talay. ", "Conditions de réservation"],
-    termsStripe: "En payant, vous acceptez les [conditions de réservation](https://talay.io/terms/).",
+    termsStripe: "En payant, vous acceptez les [conditions de réservation](https://talay.io/terms/fr/).",
     btn: ["Payer ", " THB et réserver"],
     checkIn: "Check-in",
     meeting: "Point de rendez-vous",
@@ -104,6 +118,20 @@ const T = {
     paidNow: "Payé maintenant",
     change: "Si l'équipe doit modifier votre réservation, elle vous écrira dans les deux heures.",
     questions: (a) => `Des questions ? Répondez à ${a} dans votre conversation.`,
+    policyTitle: "Bon à savoir",
+    policy: [
+      "Changement de date gratuit dans les 6 mois.",
+      "Si vous annulez, votre acompte reste valable pour une autre date dans les 6 mois.",
+      "Si le centre annule ou si la météo empêche la plongée et qu'aucune autre date ne convient, votre acompte vous est remboursé.",
+    ],
+    secure: "Paiement sécurisé par Stripe.",
+    backToChat: "Retour à la conversation",
+    askFirst: (a) => `Une question avant ? Écrivez à ${a}.`,
+    nextTitle: "Avant de venir",
+    courseNote: "Pour un cours, il y a en général un court accueil et quelques formalités au centre avant la première leçon. L'équipe vous confirme l'heure dans la conversation.",
+    bring: "À apporter",
+    bringText: "Maillot de bain, serviette, crème solaire et passeport ou pièce d'identité. Plongeurs certifiés : votre carte de certification (ou l'appli) et votre carnet de plongée.",
+    map: "Ouvrir dans Google Maps",
     notPaid: "Nous n'avons pas reçu votre paiement. Ouvrez à nouveau le lien de réservation pour réessayer.",
     notFoundTitle: "Ce lien de réservation ne fonctionne pas",
     notFoundText: "Ouvrez à nouveau le lien depuis votre conversation avec le centre de plongée, ou envoyez-leur un message et ils vous enverront un nouveau lien.",
@@ -128,7 +156,7 @@ const T = {
     payShop: "Am Tag selbst im Shop zahlen",
     never: "Du zahlst nie mehr als den Preis im Shop.",
     terms: ["Buchung und Zahlung über Talay. ", "Buchungsbedingungen"],
-    termsStripe: "Mit der Zahlung akzeptierst du die [Buchungsbedingungen](https://talay.io/terms/).",
+    termsStripe: "Mit der Zahlung akzeptierst du die [Buchungsbedingungen](https://talay.io/terms/de/).",
     btn: ["", " THB zahlen und buchen"],
     checkIn: "Check-in",
     meeting: "Treffpunkt",
@@ -149,6 +177,20 @@ const T = {
     paidNow: "Jetzt bezahlt",
     change: "Falls das Team deine Buchung ändern muss, meldet es sich innerhalb von zwei Stunden bei dir.",
     questions: (a) => `Fragen? Antworte ${a} im Chat.`,
+    policyTitle: "Gut zu wissen",
+    policy: [
+      "Kostenlos auf ein anderes Datum innerhalb von 6 Monaten verschieben.",
+      "Wenn du stornierst, bleibt deine Anzahlung 6 Monate lang für ein anderes Datum gültig.",
+      "Sagt das Tauchcenter ab oder verhindert das Wetter den Tauchgang und passt kein neues Datum, bekommst du die Anzahlung zurück.",
+    ],
+    secure: "Sichere Zahlung über Stripe.",
+    backToChat: "Zurück zum Chat",
+    askFirst: (a) => `Vorher noch Fragen? Schreib ${a}.`,
+    nextTitle: "Bevor du kommst",
+    courseNote: "Bei einem Kurs gibt es meist vor der ersten Lektion eine kurze Begrüßung und Formalitäten im Shop. Das Team bestätigt dir die Uhrzeit im Chat.",
+    bring: "Mitbringen",
+    bringText: "Badesachen, Handtuch, Sonnencreme und Reisepass oder Ausweis. Zertifizierte Taucher: Brevet (oder App) und Logbuch.",
+    map: "In Google Maps öffnen",
     notPaid: "Wir haben deine Zahlung nicht erhalten. Öffne den Buchungslink noch einmal, um es erneut zu versuchen.",
     notFoundTitle: "Dieser Buchungslink funktioniert nicht",
     notFoundText: "Öffne den Link noch einmal aus deinem Chat mit der Tauchbasis, oder schreib ihnen, dann bekommst du einen neuen Link.",
@@ -173,7 +215,7 @@ const T = {
     payShop: "Paga en el centro el mismo día",
     never: "Nunca pagas más que el precio del centro.",
     terms: ["Reserva y pago a través de Talay. ", "Condiciones de reserva"],
-    termsStripe: "Al pagar aceptas las [condiciones de reserva](https://talay.io/terms/).",
+    termsStripe: "Al pagar aceptas las [condiciones de reserva](https://talay.io/terms/es/).",
     btn: ["Pagar ", " THB y reservar"],
     checkIn: "Check-in",
     meeting: "Punto de encuentro",
@@ -194,6 +236,20 @@ const T = {
     paidNow: "Pagado ahora",
     change: "Si el equipo necesita cambiar tu reserva, te escribirá en un plazo de dos horas.",
     questions: (a) => `¿Preguntas? Responde a ${a} en el chat.`,
+    policyTitle: "Bueno saber",
+    policy: [
+      "Cambio de fecha gratis dentro de 6 meses.",
+      "Si cancelas, tu depósito sigue siendo válido para otra fecha dentro de 6 meses.",
+      "Si el centro cancela o el tiempo impide la inmersión y no hay otra fecha posible, te devolvemos el depósito.",
+    ],
+    secure: "Pago seguro con Stripe.",
+    backToChat: "Volver al chat",
+    askFirst: (a) => `¿Preguntas antes? Escribe a ${a}.`,
+    nextTitle: "Antes de venir",
+    courseNote: "En un curso suele haber una breve bienvenida y papeleo en el centro antes de la primera clase. El equipo te confirma la hora en el chat.",
+    bring: "Qué traer",
+    bringText: "Bañador, toalla, crema solar y pasaporte o documento de identidad. Buceadores certificados: tu tarjeta de certificación (o la app) y tu logbook.",
+    map: "Abrir en Google Maps",
     notPaid: "No hemos recibido tu pago. Abre de nuevo el enlace de reserva para volver a intentarlo.",
     notFoundTitle: "Este enlace de reserva no funciona",
     notFoundText: "Abre de nuevo el enlace desde tu chat con el centro de buceo, o escríbeles y te enviarán uno nuevo.",
@@ -218,7 +274,7 @@ const T = {
     payShop: "Op de dag zelf te betalen in het duikcentrum",
     never: "Je betaalt nooit meer dan de prijs in het duikcentrum.",
     terms: ["Boeking en betaling via Talay. ", "Boekingsvoorwaarden"],
-    termsStripe: "Door te betalen aanvaard je de [boekingsvoorwaarden](https://talay.io/terms/).",
+    termsStripe: "Door te betalen aanvaard je de [boekingsvoorwaarden](https://talay.io/terms/nl/).",
     btn: ["Betaal ", " THB en boek"],
     checkIn: "Check-in",
     meeting: "Afspraakpunt",
@@ -239,6 +295,20 @@ const T = {
     paidNow: "Nu betaald",
     change: "Moet het team je boeking aanpassen, dan stuurt het je binnen twee uur een bericht.",
     questions: (a) => `Vragen? Antwoord ${a} in je chat.`,
+    policyTitle: "Goed om te weten",
+    policy: [
+      "Gratis verplaatsen naar een andere datum binnen 6 maanden.",
+      "Annuleer je, dan blijft je voorschot 6 maanden geldig voor een andere datum.",
+      "Annuleert het duikcentrum of houdt het weer de duik tegen en past geen nieuwe datum, dan krijg je je voorschot terug.",
+    ],
+    secure: "Veilig betalen via Stripe.",
+    backToChat: "Terug naar de chat",
+    askFirst: (a) => `Eerst nog een vraag? Stuur ${a} een bericht.`,
+    nextTitle: "Voor je komt",
+    courseNote: "Bij een cursus is er meestal een korte ontvangst en wat papierwerk in de shop voor de eerste les. Het team bevestigt het uur in de chat.",
+    bring: "Meebrengen",
+    bringText: "Zwemkleding, een handdoek, zonnecrème en je paspoort of identiteitskaart. Gebrevetteerde duikers: je brevet (of de app) en je logboek.",
+    map: "Openen in Google Maps",
     notPaid: "We hebben je betaling niet ontvangen. Open de boekingslink opnieuw om het nog eens te proberen.",
     notFoundTitle: "Deze boekingslink werkt niet",
     notFoundText: "Open de link opnieuw vanuit je gesprek met het duikcentrum, of stuur hen een bericht, dan krijg je een nieuwe link.",
@@ -269,6 +339,27 @@ function pickLang(request, url) {
 const diversLabel = (n, lang) => `${n} ${n === 1 ? T[lang].diver : T[lang].divers}`;
 
 // Airtable field in the diver's language, falling back to the English field.
+// Booking terms in the diver's language (public/terms/ is English, the rest in a subfolder).
+function termsUrl(lang) {
+  return lang === "en" ? "/terms/" : `/terms/${lang}/`;
+}
+
+// Link back to the chat the diver came from: WhatsApp number first, then Instagram handle.
+function chatLink(c) {
+  const wa = String(first(c["WhatsApp number"]) || "").replace(/\D/g, "");
+  if (wa.length >= 8) return `https://wa.me/${wa}`;
+  const ig = String(first(c["Instagram handle"]) || "").trim().replace(/^@/, "").replace(/^https?:\/\/(www\.)?instagram\.com\//, "").replace(/\/.*$/, "");
+  return /^[A-Za-z0-9._]{2,30}$/.test(ig) ? `https://ig.me/m/${ig}` : "";
+}
+
+// Google Maps link for the meeting point. Centers field "Map link" (optional) wins over a search on the name.
+function mapLink(c, name, island, t) {
+  const own = String(first(c["Map link"]) || "").trim();
+  const url = /^https:\/\//.test(own) ? own
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([name, island].filter(Boolean).join(", "))}`;
+  return `<br><a class="map" href="${esc(url)}" target="_blank" rel="noopener">${esc(t.map)}</a>`;
+}
+
 function tr(rec, field, lang) {
   if (lang !== "en") {
     const v = first(rec[`${field} ${lang.toUpperCase()}`]);
@@ -463,6 +554,8 @@ async function thanks(request, env, ctx, url) {
   const meeting = cap(tr(c, "Meeting point", lang).v);
   const checkIn = cap(tr(p, "Check-in", lang).v);
   const productName = tr(p, "Name", lang).v || m.product_name;
+  const isCourse = m.product_code === "OW" || /course|diver/i.test(first(p["Name"]) || m.product_name || "");
+  const chat = chatLink(c);
   const n = Number(m.divers) || 1;
 
   return page(`
@@ -485,11 +578,15 @@ async function thanks(request, env, ctx, url) {
     </div>
   </section>
   <p class="msg">${esc(t.change)}</p>
-  ${(checkIn || meeting) ? `<dl class="practical">
+  <h2 class="next">${esc(t.nextTitle)}</h2>
+  ${isCourse ? `<p class="course">${esc(t.courseNote)}</p>` : ""}
+  <dl class="practical">
     ${checkIn ? `<div><dt>${esc(t.checkIn)}</dt><dd>${esc(checkIn)}</dd></div>` : ""}
-    ${meeting ? `<div><dt>${esc(t.meeting)}</dt><dd>${esc(meeting)}</dd></div>` : ""}
-  </dl>` : ""}
+    ${meeting ? `<div><dt>${esc(t.meeting)}</dt><dd>${esc(meeting)}${mapLink(c, m.center_name, first(c["Island"]) || "", t)}</dd></div>` : ""}
+    <div><dt>${esc(t.bring)}</dt><dd>${esc(t.bringText)}</dd></div>
+  </dl>
   <p class="hint" style="margin-top:2rem">${esc(t.questions(assistant))}</p>
+  ${chat ? `<a class="book chat" href="${esc(chat)}">${esc(t.backToChat)}</a>` : ""}
 </main>`, 200, lang);
 }
 
@@ -747,6 +844,7 @@ function bookingPage(c, p, code, slug, env, lang, ref = "") {
   const includesWord = inc.translated ? t.includes : T.en.includes;
   const checkIn = cap(tr(p, "Check-in", lang).v);
   const cutoff = num(p["Cutoff hour"]) || 15;
+  const chat = chatLink(c);
 
   const minDate = earliestDate(cutoff);
   const maxDate = plusDays(minDate, 180);
@@ -813,14 +911,20 @@ ${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
     </div>
   </section>
 
+  <section class="policy" aria-label="${esc(t.policyTitle)}">
+    <p class="policy-title">${esc(t.policyTitle)}</p>
+    <ul>${t.policy.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+  </section>
+
   <button type="button" id="book" class="book">${esc(t.btn[0])}<span id="btn-amount">${thb(deposit, lang)}</span>${esc(t.btn[1])}</button>
   <p id="msg" class="msg" role="status" hidden></p>
-  <p class="terms">${esc(t.terms[0])}<a href="/terms/" target="_blank" rel="noopener">${esc(t.terms[1])}</a></p>
+  <p class="terms"><span class="lock" aria-hidden="true">🔒</span> ${esc(t.secure)} ${esc(t.terms[0])}<a href="${termsUrl(lang)}" target="_blank" rel="noopener">${esc(t.terms[1])}</a></p>
 
   ${(checkIn || meeting) ? `<dl class="practical">
     ${checkIn ? `<div><dt>${esc(t.checkIn)}</dt><dd>${esc(checkIn)}</dd></div>` : ""}
-    ${meeting ? `<div><dt>${esc(t.meeting)}</dt><dd>${esc(meeting)}</dd></div>` : ""}
+    ${meeting ? `<div><dt>${esc(t.meeting)}</dt><dd>${esc(meeting)}${mapLink(c, centerName, island, t)}</dd></div>` : ""}
   </dl>` : ""}
+  ${chat ? `<p class="ask">${esc(t.askFirst(assistant))} <a href="${esc(chat)}">${esc(t.backToChat)}</a></p>` : ""}
 </main>
 
 <script id="data" type="application/json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>
@@ -1005,6 +1109,18 @@ input[type=date]::-webkit-date-and-time-value{text-align:left}
 .practical div{display:grid;grid-template-columns:7.5rem 1fr;gap:.75rem}
 .practical dt{color:var(--muted)}
 .practical dd{margin:0}
+.practical a.map{font-size:.9rem;color:var(--sea);font-weight:600}
+.policy{margin:0 0 1rem;padding:.85rem 1rem;border:1.5px solid var(--line);border-radius:12px;background:#fff;font-size:.9rem}
+.policy-title{margin:0 0 .3rem;font-weight:600}
+.policy ul{margin:0;padding-left:1.1rem;color:var(--muted)}
+.policy li+li{margin-top:.2rem}
+.lock{font-size:.75rem}
+.ask{margin:1.5rem 0 0;font-size:.9rem;color:var(--muted)}
+.ask a{color:var(--sea);font-weight:600}
+h2.next{font-size:1.15rem;margin:2.25rem 0 .5rem}
+.course{margin:0;color:var(--muted)}
+h2.next+.practical,.course+.practical{margin-top:1rem;padding-top:0;border-top:0}
+a.book.chat{display:flex;align-items:center;justify-content:center;text-decoration:none;margin-top:1rem}
 .empty{padding-top:3rem}
 .empty h1{font-size:1.6rem}
 .empty p{color:var(--muted)}
