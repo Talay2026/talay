@@ -1395,7 +1395,8 @@ async function ticketAction(request, env, center, email, kind) {
 }
 
 // ---------- Settings ----------
-// Centers fields: Staff emails, Alert Email, Escalation hours (+ FR/DE/ES/NL), Mia paused
+// Centers fields: Staff emails, Alert Email, Escalation hours (+ FR/DE/ES/NL), Mia paused,
+// Outside hours only (checkbox: the assistant stays silent during office hours, checked in Make)
 // (checkbox), and read-only info shown to the team.
 
 const EMAIL = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]{2,}$/;
@@ -1438,6 +1439,7 @@ async function settings(env, center) {
     from: hours ? hours[1].padStart(5, "0") : "09:00",
     to: hours ? hours[2].padStart(5, "0") : "18:00",
     paused: !!f["Mia paused"],
+    outsideOnly: !!f["Outside hours only"],
     info: {
       assistant: s("Assistant name"), languages: s("Languages spoken"), meeting: s("Meeting point"),
       sites: s("Dive sites"), boats: s("Boat departure times"), emergency: s("Center emergency phone"),
@@ -1468,6 +1470,8 @@ async function saveSettings(request, env, center, email) {
     const a = hhmm(body.from), b = hhmm(body.to);
     if (!a || !b) return json({ error: "Choose an opening and a closing time." }, 400);
     for (const [suffix, fn] of Object.entries(HOURS_TEXT)) fields[`Escalation hours${suffix ? " " + suffix : ""}`] = fn(a, b);
+  } else if (body.action === "mode") {
+    fields["Outside hours only"] = !!body.outsideOnly;
   } else if (body.action === "mia") {
     fields["Mia paused"] = !!body.paused;
   } else {
@@ -1493,6 +1497,7 @@ function describe(b) {
   if (b.action === "team") return `team: ${(b.emails || []).join(", ")}`;
   if (b.action === "alert") return `alert email: ${b.email}`;
   if (b.action === "hours") return `office hours: ${b.from}–${b.to}`;
+  if (b.action === "mode") return b.outsideOnly ? "assistant answers only outside office hours" : "assistant answers day and night";
   if (b.action === "mia") return b.paused ? "paused the assistant" : "turned the assistant back on";
   return b.action;
 }
@@ -1924,7 +1929,7 @@ async function adminCenter(env, slug) {
   return {
     slug, name: c.name, assistant: c.assistant, channel: c.channel, type: str(f, "Type"),
     paused: !!f["Mia paused"], logo: c.logo,
-    settings: { staff: set.staff, admins: set.admins, alert: set.alert, hours: set.hoursText, info: set.info },
+    settings: { staff: set.staff, admins: set.admins, alert: set.alert, hours: set.hoursText, outsideOnly: set.outsideOnly, info: set.info },
     products: set.products,
     leads: leads.sort((a, b) => madeAt(b) - madeAt(a)).slice(0, 30).map((l) => {
       const x = l.fields;
@@ -2536,7 +2541,7 @@ function hqClient(cfg) {
         }).join("") || '<tr><td class="empty">Geen boekingen in 30 dagen.</td></tr>') + "</tbody></table></div></div></div>";
       var s = d.settings, inf = s.info || {};
       h += '<div class="grid2 sec"><div class="card"><h2>Instellingen</h2><div class="pad"><dl class="dl">' +
-        "<dt>Assistent</dt><dd>" + esc(inf.assistant || d.assistant) + "</dd><dt>Kantooruren</dt><dd>" + esc(s.hours || "–") + "</dd><dt>Meldingen naar</dt><dd>" + esc(s.alert || "–") + "</dd>" +
+        "<dt>Assistent</dt><dd>" + esc(inf.assistant || d.assistant) + "</dd><dt>Kantooruren</dt><dd>" + esc(s.hours || "–") + "</dd><dt>Antwoordt</dt><dd>" + (s.outsideOnly ? "alleen buiten kantooruren" : "dag en nacht") + "</dd><dt>Meldingen naar</dt><dd>" + esc(s.alert || "–") + "</dd>" +
         "<dt>Admins</dt><dd>" + esc(s.admins.join(", ") || "–") + "</dd><dt>Team</dt><dd>" + esc(s.staff.join(", ") || "–") + "</dd>" +
         "<dt>Afspraakpunt</dt><dd>" + esc(inf.meeting || "–") + "</dd><dt>Talen</dt><dd>" + esc(inf.languages || "–") + "</dd><dt>Noodnummer</dt><dd>" + esc(inf.emergency || "–") + "</dd>" +
         "</dl></div></div>" +
@@ -2934,7 +2939,7 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 .ptable .muted{color:var(--muted);font-size:13px}
 .ptable tr.off td.nm{color:var(--muted)}
 .lock{font-size:13px;color:var(--muted);background:var(--paper-2);border:1px dashed var(--line);border-radius:10px;padding:8px 12px;margin-top:4px}
-.ro input,.ro select,.ro button.btn,.ro .people button{pointer-events:none;opacity:.55}
+.ro input,.ro select,.ro button.btn,.ro .people button,.ro .switch button{pointer-events:none;opacity:.55}
 
 #dash{flex-direction:column;overflow-y:auto}
 .psel{font:inherit;font-weight:700;font-size:15px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;background:var(--card);color:var(--deep)}
@@ -3545,9 +3550,12 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
     </div>
     <div class="scard adm">
       <h3>Office hours</h3>
-      <p class="d">${esc(center.assistant)} tells divers when your team answers personally (Thai time, every day). The text is updated in all five languages.</p>
+      <p class="d">When your team answers personally (Thai time, every day).</p>
       <div class="srow"><label>From <input type="time" id="hFrom" step="900"></label><label>to <input type="time" id="hTo" step="900"></label><button class="btn" id="hSave" type="button">Save</button></div>
       <div class="smsg" id="hMsg"></div>
+      <p class="d">Prefer to answer divers yourselves during the day? Then ${esc(center.assistant)} only answers outside these hours. During office hours she stays silent and every message waits for your team under <b>Conversations → Open</b>. Reminders follow the same rule.</p>
+      <div class="switch"><span class="pill" id="modeState">…</span><button class="ghost" id="modeToggle" type="button">…</button></div>
+      <div class="smsg" id="modeMsg"></div>
     </div>
     <div class="scard adm">
       <h3>Alert email</h3>
@@ -3984,6 +3992,9 @@ function zoneClient(cfg) {
       $("#miaState").className = "pill " + (d.paused ? "off" : "on");
       $("#miaToggle").textContent = d.paused ? "Turn " + cfg.assistant + " back on" : "Pause " + cfg.assistant;
       $("#hFrom").value = d.from; $("#hTo").value = d.to;
+      $("#modeState").textContent = d.outsideOnly ? "Only outside office hours" : "Day and night";
+      $("#modeState").className = "pill " + (d.outsideOnly ? "off" : "on");
+      $("#modeToggle").textContent = d.outsideOnly ? "Answer day and night" : "Answer only outside office hours";
       if (document.activeElement !== $("#aEmail")) $("#aEmail").value = d.alert;
       $("#team").innerHTML = d.staff.map(function (e) {
         return "<li><span>" + esc(e) + (e === ME ? " <small>(you)</small>" : "") + "</span>" +
@@ -4004,6 +4015,11 @@ function zoneClient(cfg) {
     var pause = !sdata.paused;
     if (pause && !confirm("Pause " + cfg.assistant + " for every diver? Your team then answers all messages.")) return;
     save({ action: "mia", paused: pause }, "#miaMsg", pause ? cfg.assistant + " is paused." : cfg.assistant + " is answering again.", this);
+  };
+  $("#modeToggle").onclick = function () {
+    if (!sdata) return;
+    var only = !sdata.outsideOnly;
+    save({ action: "mode", outsideOnly: only }, "#modeMsg", only ? cfg.assistant + " now only answers outside office hours." : cfg.assistant + " answers day and night again.", this);
   };
   $("#hSave").onclick = function () { save({ action: "hours", from: $("#hFrom").value, to: $("#hTo").value }, "#hMsg", "Saved in all five languages.", this); };
   $("#aSave").onclick = function () { save({ action: "alert", email: $("#aEmail").value }, "#aMsg", "Saved.", this); };
