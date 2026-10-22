@@ -1650,6 +1650,7 @@ async function handleAdmin(request, env, url, p, email, role) {
     if (p === "/zone/admin/api/pause") return await adminPause(env, email, body);
     if (p === "/zone/admin/api/intake") return await adminIntakeStatus(env, body);
     if (p === "/zone/admin/api/pipeline") return await adminPipelineChange(env, email, body);
+    if (p === "/zone/admin/api/pipeline/ai") return await adminPipelineAi(env, body);
     if (p === "/zone/admin/api/alert-test") return await adminAlertTest(env);
     if (p === "/zone/admin/api/team") {
       if (role !== "owner") return json({ error: "Alleen een eigenaar kan het team aanpassen." }, 403);
@@ -2137,6 +2138,95 @@ async function adminPipelineChange(env, email, b) {
   return json({ ok: true });
 }
 
+// ---------- Pijplijn: Claude proposes the next step ----------
+// Claude never sends anything. It drafts the next message (mode "next") or reads a reply that
+// Jonas pasted (mode "reply"), and proposes stage, next step, date and owner. HQ shows the
+// proposal; Jonas sends the message himself and takes the proposal over with one click.
+// Needs the Cloudflare secret ANTHROPIC_API_KEY.
+const MAX_NUDGES = 1; // reminders by message after the pitch without an answer; then John visits
+const SENT_RE = /\[verstuurd\]/, REPLY_RE = /\[antwoord\]/; // tags HQ writes in Notes
+const PROSPECT_KINDS = ["interested", "question", "later", "no", "human_touch", "no_real_answer", "none"];
+const PROSPECT_PROMPT = `You help Jonas, founder of Talay, follow up with dive centres on Koh Tao (Thailand). Talay is an assistant made only for dive centres: it answers their WhatsApp, Instagram and Facebook messages in seconds, under their own name, based on their own courses, prices, schedules and rules, with a booking link with a deposit.
+
+What Jonas may say (and nothing else about money): free, dashboard included; switch it on and off any time; direct bookings stay exactly as they are; nothing changes in how they work; only a small commission on bookings that come in through Talay, otherwise nothing; built only for diving; parameters set per centre; "we're choosing our first pilot centres now". Never write a percentage or a price. Never claim existing pilots or customers. A "night mode" exists: Talay can answer only outside office hours, so the team keeps every daytime chat. The demo centre is Ridgefin Divers: WhatsApp +32 456 90 00 33 or Instagram @ridgefin.divers, anyone can message the assistant Mia as if they were a diver. Mystery-shop finding on Koh Tao: messages sent at night waited about 7 hours for a real answer.
+
+Koh Tao is small and personal. Several centres said no because they prefer the human touch or "do it ourselves". So: write like one person to another, short (2 to 5 sentences), warm, no marketing tone, no emojis unless the centre used them, no bullet points, no links except the demo when it helps. Start with something specific to that centre when the notes give you something. Sign as Jonas only in an e-mail. Write in the centre's language (field Language; English when unknown). For a "no" or "human touch": thank them, respect it, mention the night-only mode at most once, and leave the door open; no further chasing. After the pitch, at most ${MAX_NUDGES} reminder by message; when that got no answer, the next step is a visit by John (he visits centres in person from 26 October 2026), not another message. Jonas himself is on Koh Tao from early November 2026.
+
+Channel: prefer the channel already used in the notes; otherwise WhatsApp when a number is known, then Instagram, then e-mail. Choose "Visit" when the next step is John (or Jonas) going by; then the message is a short briefing in Dutch for John instead of a message to the centre.
+
+Return: summary (Dutch, 1 or 2 sentences: what is going on and why this step), kind (for mode "reply": how the reply reads; "no_real_answer" for an auto-reply, a "seen" or something off-topic; for mode "next": "none"), stage, next (the next step in Dutch, short, like "John gaat langs" or "Wachten op antwoord, dan John"), days (days from today until the next action; 0 = today), owner (Jonas or John), channel, message (the text to send, ready to paste; empty when nothing should be sent).`;
+const PROSPECT_SCHEMA = {
+  type: "object", additionalProperties: false,
+  required: ["summary", "kind", "stage", "next", "days", "owner", "channel", "message"],
+  properties: {
+    summary: { type: "string" }, kind: { type: "string", enum: PROSPECT_KINDS }, stage: { type: "string", enum: STAGES },
+    next: { type: "string" }, days: { type: "integer" }, owner: { type: "string", enum: ["Jonas", "John"] },
+    channel: { type: "string", enum: ["WhatsApp", "Instagram", "Email", "Visit"] }, message: { type: "string" },
+  },
+};
+// Reminders sent since the last reply, read from Notes (newest line first).
+function nudgesSinceReply(notes) {
+  let n = 0;
+  for (const line of String(notes || "").split("\n")) {
+    if (REPLY_RE.test(line)) break;
+    if (SENT_RE.test(line)) n++;
+  }
+  return n;
+}
+async function adminPipelineAi(env, b) {
+  if (!env.ANTHROPIC_API_KEY) return json({ error: "Claude is nog niet gekoppeld: zet het geheim ANTHROPIC_API_KEY in Cloudflare." }, 500);
+  if (!okRec(b.id)) return json({ error: "Onbekend center." }, 400);
+  const mode = b.mode === "reply" ? "reply" : "next";
+  const reply = String(b.reply || "").trim().slice(0, 4000);
+  if (mode === "reply" && !reply) return json({ error: "Plak eerst het antwoord van het center." }, 400);
+  let p;
+  try {
+    const cur = await at(env, "Prospects", { formula: `RECORD_ID() = '${b.id}'`, max: 1 });
+    if (!cur.length) return json({ error: "Dit center bestaat niet meer." }, 404);
+    p = prospectOut(cur[0]);
+  } catch (e) {
+    console.error("pipeline ai", e);
+    return json({ error: "Airtable gaf een fout. Probeer opnieuw." }, 502);
+  }
+  const today = thaiDay(Date.now());
+  const card = [
+    `Today (Koh Tao): ${today}`, `Mode: ${mode}`, `Centre: ${p.name}`, `Stage: ${p.stage}`, `Area: ${p.area || "-"}`, `Language: ${p.language || "-"}`,
+    `Contact person: ${p.contact || "-"}`, `Known channels: ${[p.whatsapp && "WhatsApp", p.instagram && "Instagram", p.email && "Email"].filter(Boolean).join(", ") || "none"}`,
+    `Who follows up: ${p.owner || "-"}`, `Next step now: ${p.next || "-"} (${p.nextDate || "no date"})`, `Last contact: ${p.last || "-"}`,
+    `Reminders sent since the last reply (logged in HQ): ${nudgesSinceReply(p.notes)}`,
+    `Notes (newest first):\n${p.notes.slice(0, 6000) || "-"}`,
+  ];
+  if (mode === "reply") card.push(`\nThe centre just replied:\n"""${reply}"""`);
+  let r;
+  try {
+    r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2026-10-21" },
+      body: JSON.stringify({
+        model: "claude-opus-5-5", max_tokens: 4000, system: PROSPECT_PROMPT,
+        output_config: { effort: "low", format: { type: "json_schema", schema: PROSPECT_SCHEMA } },
+        messages: [{ role: "user", content: card.join("\n") }],
+      }),
+    });
+  } catch (e) {
+    return json({ error: "Claude is niet bereikbaar. Probeer opnieuw." }, 502);
+  }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    console.error("pipeline ai", r.status, JSON.stringify(d).slice(0, 500));
+    const credit = /credit|balance/i.test(String(d.error && d.error.message));
+    return json({ error: credit ? "Het API-tegoed van Claude is op." : `Claude gaf een fout (${r.status}).` }, 502);
+  }
+  if (d.stop_reason === "refusal") return json({ error: "Claude wilde hier geen voorstel voor maken." }, 502);
+  let out;
+  try { out = JSON.parse((d.content || []).filter((c) => c.type === "text").map((c) => c.text).join("")); } catch (e) { out = null; }
+  if (!out) return json({ error: "Claude gaf geen bruikbaar voorstel. Probeer opnieuw." }, 502);
+  const days = Math.max(0, Math.min(120, Number(out.days) || 0));
+  out.nextDate = thaiDay(Date.now() + days * 864e5);
+  out.mode = mode;
+  return json(out);
+}
+
 // ---------- Conversie: from question to booking, per center ----------
 // The same numbers as the dashboard in each center's zone (and the same cache).
 async function hqCenters(env) {
@@ -2537,6 +2627,18 @@ dialog.dlg::backdrop{background:rgba(9,38,47,.45)}
 .dlg .links{display:flex;gap:8px;flex-wrap:wrap}
 .dlg .acts{display:flex;gap:8px;justify-content:flex-end}
 .dlg .log{max-height:200px;border:1px solid var(--line);border-radius:10px;padding:10px}
+.ait{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.ait .btn{margin-left:auto}
+.fit{border-bottom:1px solid var(--line)}.fit:last-child{border-bottom:0}.fit .row{border-bottom:0}
+.aiw:empty{display:none}.aiw{padding:0 16px 14px}
+.aib{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:12px;padding:12px}
+.aip{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--paper)}
+.aip label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:600}
+.aip textarea{width:100%;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:8px 10px;font-size:14px;resize:vertical;font-weight:400;color:var(--deep)}
+.aip .in{width:100%}
+.aifg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:560px){.aifg{grid-template-columns:1fr}}
+.aisum{margin:0;font-size:14px}
+.aiacts{display:flex;gap:8px;flex-wrap:wrap}.aiacts.end{justify-content:flex-end}
 /* funnel */
 .fun{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding:14px 16px}
 @media (max-width:700px){.fun{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -2991,6 +3093,65 @@ function hqClient(cfg) {
     var k = d.items.filter(function (p) { var x = dueOf(p, d.today); return x === "late" || x === "today"; }).length;
     n.hidden = !k; n.className = "count"; n.textContent = k;
   }
+  // Claude's proposal for one center: a draft to send yourself, plus stage, next step, date and owner.
+  // Nothing is sent from HQ. "Verstuurd" logs the message in Notes with the tag [verstuurd],
+  // a pasted reply is logged with [antwoord]; the server counts reminders from those tags.
+  var drafts = {};
+  var CH_NL = { WhatsApp: "WhatsApp", Instagram: "Instagram", Email: "e-mail", Visit: "bezoek" };
+  function aiAsk(p, reply) {
+    return post("pipeline/ai", { id: p.id, mode: reply ? "reply" : "next", reply: reply || "" })
+      .then(function (r) { r.reply = reply || ""; drafts[p.id] = r; return r; });
+  }
+  function aiBox(p, r) {
+    var wa = String(p.whatsapp || "").replace(/[^\d]/g, ""), ig = String(p.instagram || "").replace(/^https?:\/\//, "").replace(/^@/, "");
+    if (ig && ig.indexOf("/") < 0) ig = "instagram.com/" + ig;
+    var send = r.channel !== "Visit" && r.message;
+    var h = '<div class="aip"><p class="aisum">' + esc(r.summary) + "</p>";
+    if (r.message) h += '<label>' + (r.channel === "Visit" ? "Briefing voor John" : "Bericht via " + esc(CH_NL[r.channel] || r.channel)) + '<textarea class="aim" rows="5">' + esc(r.message) + "</textarea></label>";
+    h += '<div class="aiacts">' + (r.message ? '<button type="button" class="btn" data-a="copy">Kopieer</button>' : "") +
+      (send && r.channel === "WhatsApp" && wa ? '<a class="btn" data-a="open" target="_blank" rel="noopener" href="#">Open in WhatsApp</a>' : "") +
+      (send && r.channel === "Email" && p.email ? '<a class="btn" data-a="open" href="#">Open mail</a>' : "") +
+      (send && r.channel === "Instagram" && ig ? '<a class="btn" data-a="open" target="_blank" rel="noopener" href="https://' + esc(ig) + '">Kopieer en open Instagram</a>' : "") + "</div>";
+    h += '<div class="fg aifg"><label>Fase<select class="in" data-f="stage">' + STAGES.map(function (s) { return '<option value="' + s + '"' + (s === r.stage ? " selected" : "") + ">" + STAGE_NL[s] + "</option>"; }).join("") + "</select></label>" +
+      '<label>Wie volgt op<input class="in" data-f="owner" value="' + esc(r.owner) + '"></label>' +
+      '<label>Volgende stap<input class="in" data-f="next" value="' + esc(r.next) + '"></label>' +
+      '<label>Wanneer<input class="in" type="date" data-f="nextDate" value="' + esc(r.nextDate) + '"></label></div>';
+    h += '<div class="err" hidden></div><div class="aiacts end">' + (send ? '<button type="button" class="btn primary" data-a="sent">Verstuurd, voorstel bewaren</button><button type="button" class="btn" data-a="save">Alleen voorstel bewaren</button>' : '<button type="button" class="btn primary" data-a="save">Voorstel bewaren</button>') +
+      '<button type="button" class="btn" data-a="drop">Weg</button></div></div>';
+    return h;
+  }
+  // Fills el with the proposal and wires its buttons; done() runs after saving or dropping.
+  function aiBind(el, p, r, done) {
+    el.innerHTML = aiBox(p, r);
+    var msg = function () { var t = el.querySelector(".aim"); return t ? t.value.trim() : ""; };
+    var copy = function () { try { navigator.clipboard.writeText(msg()); } catch (e) {} };
+    var a = function (k) { return el.querySelector('[data-a="' + k + '"]'); };
+    if (a("copy")) a("copy").onclick = function () { copy(); this.textContent = "Gekopieerd"; };
+    if (a("open")) a("open").onclick = function (e) {
+      var wa = String(p.whatsapp || "").replace(/[^\d]/g, "");
+      if (r.channel === "WhatsApp") this.href = "https://wa.me/" + wa + "?text=" + encodeURIComponent(msg());
+      else if (r.channel === "Email") this.href = "mailto:" + p.email + "?subject=" + encodeURIComponent("Talay") + "&body=" + encodeURIComponent(msg());
+      else copy();
+    };
+    var save = function (sent) {
+      var f = function (k) { return el.querySelector('[data-f="' + k + '"]').value; }, lines = [];
+      if (r.reply) lines.push("[antwoord] " + r.reply.replace(/\s+/g, " ").slice(0, 600));
+      lines.push("Claude: " + r.summary);
+      if (sent) lines.push("[verstuurd] via " + (CH_NL[r.channel] || r.channel) + ": " + msg().replace(/\s+/g, " ").slice(0, 600));
+      var body = { action: "update", id: p.id, stage: f("stage"), owner: f("owner"), next: f("next"), nextDate: f("nextDate"), note: lines.join("\n") };
+      el.querySelectorAll("button").forEach(function (b) { b.disabled = true; });
+      post("pipeline", body).then(function () { delete drafts[p.id]; delete state.cache.pipe; done(true); })
+        .catch(function (x) { el.querySelectorAll("button").forEach(function (b) { b.disabled = false; }); var er = el.querySelector(".err"); er.hidden = false; er.textContent = x.message; });
+    };
+    if (a("sent")) a("sent").onclick = function () { save(true); };
+    a("save").onclick = function () { save(false); };
+    a("drop").onclick = function () { delete drafts[p.id]; done(false); };
+  }
+  function aiFill(el, p, reply, done) {
+    el.innerHTML = '<p class="muted aisum">Claude denkt na…</p>';
+    return aiAsk(p, reply).then(function (r) { aiBind(el, p, r, done); })
+      .catch(function (x) { el.innerHTML = '<div class="err">' + esc(x.message) + "</div>"; });
+  }
   function pPipeline(fresh) {
     if (!state.cache.pipe) setPage("Pijplijn", '<div class="skel"></div>');
     load("pipe", "pipeline", fresh).then(function (d) {
@@ -3008,9 +3169,9 @@ function hqClient(cfg) {
         kpi("Getekend of live", nf.format(count(function (p) { return p.stage === "Signed" || p.stage === "Live"; }))) +
         kpi("Op te volgen", nf.format(follow.length), '<span class="d' + (follow.some(function (p) { return dueOf(p, today) === "late"; }) ? " down" : "") + '">vandaag of te laat</span>') +
         kpi("Nee", nf.format(count(function (p) { return p.stage === "No"; }))) + "</div>";
-      if (follow.length) h += '<div class="sec"><h2>Vandaag opvolgen</h2><div class="card rows fol">' + follow.map(function (p) {
-        return '<a class="row" href="#/pijplijn" data-p="' + esc(p.id) + '"><div class="x"><div class="l1"><b>' + esc(p.name) + "</b>" + stagePill(p.stage) + (p.owner ? '<span class="muted">' + esc(p.owner) + "</span>" : "") +
-          '</div><div class="pv">' + esc(p.next || "Geen volgende stap ingevuld") + "</div></div>" + dueText(p, today) + "</a>";
+      if (follow.length) h += '<div class="sec"><div class="ait"><h2>Vandaag opvolgen</h2><button class="btn" id="pall">Concepten klaarzetten</button></div><div class="card rows fol">' + follow.map(function (p) {
+        return '<div class="fit"><a class="row" href="#/pijplijn" data-p="' + esc(p.id) + '"><div class="x"><div class="l1"><b>' + esc(p.name) + "</b>" + stagePill(p.stage) + (p.owner ? '<span class="muted">' + esc(p.owner) + "</span>" : "") +
+          '</div><div class="pv">' + esc(p.next || "Geen volgende stap ingevuld") + "</div></div>" + dueText(p, today) + '<button class="btn" data-ai="' + esc(p.id) + '">Concept</button></a><div class="aiw" data-w="' + esc(p.id) + '"></div></div>';
       }).join("") + "</div></div>";
       var chips = [["active", "Actief", count(pipeOpen)]].concat(STAGES.map(function (s) { return [s, STAGE_NL[s], count(function (p) { return p.stage === s; })]; })).concat([["all", "Alle", all.length]]);
       h += '<div class="sec bar"><div class="chips">' + chips.map(function (c) {
@@ -3033,6 +3194,22 @@ function hqClient(cfg) {
       $("#pq").oninput = function () { var v = this.value, pos = this.selectionStart; pipeQ = v; pPipeline(); var i = $("#pq"); i.focus(); try { i.setSelectionRange(pos, pos); } catch (e) {} };
       $$("[data-p]").forEach(function (r) { r.onclick = function (e) { e.preventDefault(); prospectDialog(all.find(function (p) { return p.id === r.getAttribute("data-p"); }), today); }; });
       $("#padd").onclick = function () { prospectDialog(null, today); };
+      var box = function (id) { return document.querySelector('[data-w="' + id + '"]'); };
+      var after = function (saved) { if (saved) pPipeline(true); else pPipeline(); };
+      follow.forEach(function (p) { if (drafts[p.id]) aiBind(box(p.id), p, drafts[p.id], after); });
+      $$("[data-ai]").forEach(function (b) {
+        b.onclick = function (e) { e.preventDefault(); e.stopPropagation(); var p = all.find(function (x) { return x.id === b.getAttribute("data-ai"); }); aiFill(box(p.id), p, "", after); };
+      });
+      if ($("#pall")) $("#pall").onclick = function () {
+        var todo = follow.filter(function (p) { return !drafts[p.id]; }), btn = this, left = todo.length;
+        if (!left) return;
+        btn.disabled = true; btn.textContent = "Bezig: " + left + " te gaan";
+        var next = function () {
+          var p = todo.shift(); if (!p) return Promise.resolve();
+          return aiFill(box(p.id), p, "", after).then(function () { left--; btn.textContent = left ? "Bezig: " + left + " te gaan" : "Klaar"; return next(); });
+        };
+        Promise.all([next(), next()]);
+      };
       $("#px").onclick = function () {
         csv("talay-pijplijn-" + today + ".csv", [["Center", "Fase", "Prioriteit", "Gebied", "Taal", "Contactpersoon", "WhatsApp", "E-mail", "Instagram", "Wie", "Volgende stap", "Datum", "Laatste contact", "Notities"]].concat(
           all.map(function (p) { return [p.name, STAGE_NL[p.stage], p.priority || "", p.area, p.language, p.contact, p.whatsapp, p.email, p.instagram, p.owner, p.next, p.nextDate, p.last, p.notes]; })));
@@ -3047,6 +3224,9 @@ function hqClient(cfg) {
     var field = function (k, label, type) { return '<label>' + label + '<input class="in" name="' + k + '" type="' + (type || "text") + '" value="' + esc(p[k] || "") + '"></label>'; };
     dlg.innerHTML = '<form method="dialog" id="pf"><h3>' + (isNew ? '<input class="in" name="name" placeholder="Naam van het center" required style="flex:1">' : esc(p.name) + " " + stagePill(p.stage)) + '<button type="button" class="btn x" id="pc">Sluiten</button></h3>' +
       (isNew ? "" : '<div class="links">' + (wa ? '<a class="btn" target="_blank" rel="noopener" href="https://wa.me/' + wa + '">WhatsApp</a>' : "") + (p.email ? '<a class="btn" href="mailto:' + esc(p.email) + '">E-mail</a>' : "") + (ig ? '<a class="btn" target="_blank" rel="noopener" href="https://' + esc(ig) + '">Instagram</a>' : "") + "</div>") +
+      (isNew ? "" : '<div class="aib"><b>Claude</b><div class="aiacts"><button type="button" class="btn" id="pnx">Concept volgend bericht</button></div>' +
+        '<label>Antwoord van het center<textarea id="prp" placeholder="Plak hier wat ze antwoordden (of niet echt antwoordden). Claude vat het samen en stelt de volgende stap voor."></textarea></label>' +
+        '<div class="aiacts"><button type="button" class="btn" id="prb">Analyseer antwoord</button></div><div id="pai"></div></div>') +
       '<div class="fg"><label>Fase<select class="in" name="stage">' + STAGES.map(function (s) { return '<option value="' + s + '"' + (s === p.stage ? " selected" : "") + ">" + STAGE_NL[s] + "</option>"; }).join("") + "</select></label>" +
       field("owner", "Wie volgt op") + '<label>Volgende stap<input class="in" name="next" value="' + esc(p.next || "") + '" placeholder="bv. John gaat langs"></label>' + field("nextDate", "Wanneer", "date") +
       field("contact", "Contactpersoon") + field("whatsapp", "WhatsApp") + field("email", "E-mail", "email") + field("instagram", "Instagram") + field("area", "Gebied") + field("language", "Taal") + "</div>" +
@@ -3055,6 +3235,12 @@ function hqClient(cfg) {
       '<div class="err" id="perr" hidden></div><div class="acts"><button type="submit" class="btn primary" id="ps">Bewaren</button></div></form>';
     dlg.showModal();
     $("#pc").onclick = function () { dlg.close(); };
+    if (!isNew) {
+      var done = function (saved) { if (saved) { dlg.close(); pPipeline(true); } else $("#pai").innerHTML = ""; };
+      if (drafts[p.id]) aiBind($("#pai"), p, drafts[p.id], done);
+      $("#pnx").onclick = function () { aiFill($("#pai"), p, "", done); };
+      $("#prb").onclick = function () { var t = $("#prp").value.trim(); if (t) aiFill($("#pai"), p, t, done); else $("#prp").focus(); };
+    }
     $("#pf").onsubmit = function (e) {
       e.preventDefault();
       var f = e.target, body = { action: isNew ? "add" : "update", id: p.id };
