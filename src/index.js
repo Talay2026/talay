@@ -1050,6 +1050,7 @@ function page(body, status = 200, lang = "en", title = "") {
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>${CSS}</style>
+<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "d3d4dd17ea1747cbaac3011aa000a493"}'></script><!-- End Cloudflare Web Analytics -->
 </head>
 <body><div class="wrap">${body}</div></body>
 </html>`;
