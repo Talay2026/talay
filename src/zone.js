@@ -2630,7 +2630,15 @@ dialog.dlg::backdrop{background:rgba(9,38,47,.45)}
 .ait{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.ait .btn{margin-left:auto}
 .fit{border-bottom:1px solid var(--line)}.fit:last-child{border-bottom:0}.fit .row{border-bottom:0}
 .aiw:empty{display:none}.aiw{padding:0 16px 14px}
-.aib{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:12px;padding:12px}
+.ptop{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.ptop .sp{flex:1}
+.prw{display:flex;flex-direction:column;gap:8px}
+.dlg .fg3{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px}
+@media (max-width:560px){.dlg .fg3{grid-template-columns:1fr}}
+.dlg .pfull .in{width:100%}.dlg textarea[rows="2"]{min-height:44px}
+.pdet{border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.pdet summary{cursor:pointer;font-size:13.5px;font-weight:600;display:flex;gap:10px;align-items:baseline}
+.pdet summary .muted{font-weight:400;font-size:12.5px}
+.pdet[open] summary{margin-bottom:10px}
 .aip{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--paper)}
 .aip label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:600}
 .aip textarea{width:100%;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:8px 10px;font-size:14px;resize:vertical;font-weight:400;color:var(--deep)}
@@ -3222,15 +3230,17 @@ function hqClient(cfg) {
     if (!dlg) { dlg = document.createElement("dialog"); dlg.id = "pdlg"; dlg.className = "dlg"; document.body.appendChild(dlg); }
     var wa = String(p.whatsapp || "").replace(/[^\d]/g, ""), ig = String(p.instagram || "").replace(/^https?:\/\//, "");
     var field = function (k, label, type) { return '<label>' + label + '<input class="in" name="' + k + '" type="' + (type || "text") + '" value="' + esc(p[k] || "") + '"></label>'; };
+    var sel = '<select class="in" name="stage">' + STAGES.map(function (s) { return '<option value="' + s + '"' + (s === p.stage ? " selected" : "") + ">" + STAGE_NL[s] + "</option>"; }).join("") + "</select>";
     dlg.innerHTML = '<form method="dialog" id="pf"><h3>' + (isNew ? '<input class="in" name="name" placeholder="Naam van het center" required style="flex:1">' : esc(p.name) + " " + stagePill(p.stage)) + '<button type="button" class="btn x" id="pc">Sluiten</button></h3>' +
-      (isNew ? "" : '<div class="links">' + (wa ? '<a class="btn" target="_blank" rel="noopener" href="https://wa.me/' + wa + '">WhatsApp</a>' : "") + (p.email ? '<a class="btn" href="mailto:' + esc(p.email) + '">E-mail</a>' : "") + (ig ? '<a class="btn" target="_blank" rel="noopener" href="https://' + esc(ig) + '">Instagram</a>' : "") + "</div>") +
-      (isNew ? "" : '<div class="aib"><b>Claude</b><div class="aiacts"><button type="button" class="btn" id="pnx">Concept volgend bericht</button></div>' +
-        '<label>Antwoord van het center<textarea id="prp" placeholder="Plak hier wat ze antwoordden (of niet echt antwoordden). Claude vat het samen en stelt de volgende stap voor."></textarea></label>' +
-        '<div class="aiacts"><button type="button" class="btn" id="prb">Analyseer antwoord</button></div><div id="pai"></div></div>') +
-      '<div class="fg"><label>Fase<select class="in" name="stage">' + STAGES.map(function (s) { return '<option value="' + s + '"' + (s === p.stage ? " selected" : "") + ">" + STAGE_NL[s] + "</option>"; }).join("") + "</select></label>" +
-      field("owner", "Wie volgt op") + '<label>Volgende stap<input class="in" name="next" value="' + esc(p.next || "") + '" placeholder="bv. John gaat langs"></label>' + field("nextDate", "Wanneer", "date") +
-      field("contact", "Contactpersoon") + field("whatsapp", "WhatsApp") + field("email", "E-mail", "email") + field("instagram", "Instagram") + field("area", "Gebied") + field("language", "Taal") + "</div>" +
-      '<label>Notitie toevoegen<textarea name="note" placeholder="Wat werd er gezegd? Komt bovenaan de notities, met datum en je naam."></textarea></label>' +
+      (isNew ? "" : '<div class="ptop"><button type="button" class="btn primary" id="pnx">Concept volgend bericht</button><button type="button" class="btn" id="pro">Antwoord plakken</button><span class="sp"></span>' +
+        (wa ? '<a class="btn" target="_blank" rel="noopener" href="https://wa.me/' + wa + '">WhatsApp</a>' : "") + (p.email ? '<a class="btn" href="mailto:' + esc(p.email) + '">Mail</a>' : "") + (ig ? '<a class="btn" target="_blank" rel="noopener" href="https://' + esc(ig) + '">IG</a>' : "") + "</div>" +
+        '<div class="prw" id="prw" hidden><textarea id="prp" placeholder="Plak hier wat het center antwoordde (of niet echt antwoordde). Claude vat het samen en stelt de volgende stap voor."></textarea><div class="aiacts end"><button type="button" class="btn primary" id="prb">Analyseer antwoord</button></div></div>' +
+        '<div id="pai"></div>') +
+      '<div class="fg3"><label>Fase' + sel + "</label>" + field("owner", "Wie volgt op") + field("nextDate", "Wanneer", "date") + "</div>" +
+      '<label class="pfull">Volgende stap<input class="in" name="next" value="' + esc(p.next || "") + '" placeholder="bv. John gaat langs"></label>' +
+      '<label class="pfull">Notitie toevoegen<textarea name="note" rows="2" placeholder="Wat werd er gezegd? Komt bovenaan de notities, met datum en je naam."></textarea></label>' +
+      '<details class="pdet"' + (isNew ? " open" : "") + "><summary>Contactgegevens" + (isNew ? "" : '<span class="muted">' + esc([p.contact, p.area, p.language].filter(Boolean).join(" · ")) + "</span>") + '</summary><div class="fg">' +
+      field("contact", "Contactpersoon") + field("whatsapp", "WhatsApp") + field("email", "E-mail", "email") + field("instagram", "Instagram") + field("area", "Gebied") + field("language", "Taal") + "</div></details>" +
       (p.notes ? '<div class="log">' + esc(p.notes) + "</div>" : "") +
       '<div class="err" id="perr" hidden></div><div class="acts"><button type="submit" class="btn primary" id="ps">Bewaren</button></div></form>';
     dlg.showModal();
@@ -3239,6 +3249,7 @@ function hqClient(cfg) {
       var done = function (saved) { if (saved) { dlg.close(); pPipeline(true); } else $("#pai").innerHTML = ""; };
       if (drafts[p.id]) aiBind($("#pai"), p, drafts[p.id], done);
       $("#pnx").onclick = function () { aiFill($("#pai"), p, "", done); };
+      $("#pro").onclick = function () { var w = $("#prw"); w.hidden = !w.hidden; if (!w.hidden) $("#prp").focus(); };
       $("#prb").onclick = function () { var t = $("#prp").value.trim(); if (t) aiFill($("#pai"), p, t, done); else $("#prp").focus(); };
     }
     $("#pf").onsubmit = function (e) {
