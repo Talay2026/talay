@@ -94,7 +94,7 @@ function summary(a) {
   lines.push("", "PRODUCTS");
   for (const [code, p] of Object.entries(products)) {
     if (!p.offer) { lines.push(`${code}: not offered`); continue; }
-    lines.push(`${code}: ${p.name || "-"} · ${p.price || "?"} THB · ${p.duration || "-"} · check-in ${p.checkin || "-"} · online ${p.online ? "yes" : "no"} · includes ${p.included || "-"}`);
+    lines.push(`${code}: ${p.name || "-"} · ${p.price || "?"} THB · ${p.duration || "-"} · check-in ${p.checkin || "-"} · online ${p.online ? "yes" : "no"} · min age ${p.min_age || "-"} · who ${p.requirements || "-"} · includes ${p.included || "-"} · not included ${p.not_included || "-"}`);
   }
   return lines.join("\n");
 }

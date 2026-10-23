@@ -8,60 +8,105 @@
 <meta name="description" content="Tell us how your dive centre works, so Talay can answer your divers with your own prices, times and policies.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%230A2029'/%3E%3Cpath d='M12 50A38 38 0 0 0 88 50Z' fill='%23E8B04B'/%3E%3Ccircle cx='50' cy='50' r='38' fill='none' stroke='%23F4F0E6' stroke-width='10'/%3E%3Cpath d='M6 50h88' stroke='%23F4F0E6' stroke-width='10' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
-:root{--deep:#09262F;--deep-2:#14404D;--sand:#E0A84A;--sand-2:#F3D9A6;--paper:#F4F0E6;--paper-2:#FBF8F1;--muted:#55646A;--soft:#9FB2B8;--line:#E2DACB;--ok:#1F7A55;--bad:#B3261E}
+:root{--deep:#09262F;--deep-2:#14404D;--sand:#E0A84A;--sand-2:#F3D9A6;--paper:#F4F0E6;--paper-2:#FBF8F1;--muted:#55646A;--soft:#9FB2B8;--line:#E2DACB;--ok:#1F7A55;--ok-bg:#E6F2EC;--bad:#B3261E}
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--paper);color:var(--deep);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased}
-.wrap{max-width:820px;margin:0 auto;padding:0 16px}
+.wrap{max-width:1040px;margin:0 auto;padding:0 16px}
 a{color:inherit}
-header{background:radial-gradient(700px 320px at 90% -10%,#1C5262 0%,transparent 62%),var(--deep);color:var(--paper);padding:28px 0 40px}
-.brand{font-weight:800;font-size:17px;margin-bottom:26px;display:flex;align-items:center;gap:10px}
-h1{font-size:clamp(30px,5vw,44px);line-height:1.08;letter-spacing:-.02em;margin:0 0 14px;font-weight:800}
+[hidden]{display:none!important}
+header{background:radial-gradient(700px 320px at 90% -10%,#1C5262 0%,transparent 62%),var(--deep);color:var(--paper);padding:24px 0 30px}
+.brand{font-weight:800;font-size:17px;margin-bottom:18px}
+h1{font-size:clamp(28px,4.6vw,40px);line-height:1.1;letter-spacing:-.02em;margin:0 0 10px;font-weight:800}
 h1 em{font-style:normal;color:var(--sand)}
-.lead{color:#C9D4D7;margin:0 0 18px;max-width:620px}
+.lead{color:#C9D4D7;margin:0 0 16px;max-width:640px}
 .promise{display:flex;flex-wrap:wrap;gap:8px;padding:0;margin:0;list-style:none}
 .promise li{font-size:13.5px;font-weight:600;background:rgba(244,240,230,.08);border:1px solid rgba(244,240,230,.16);border-radius:999px;padding:5px 12px}
-.bar{position:sticky;top:0;z-index:5;background:var(--paper);border-bottom:1px solid var(--line)}
-.bar .wrap{display:flex;align-items:center;gap:12px;padding-top:10px;padding-bottom:10px}
-.track{flex:1;height:6px;background:var(--line);border-radius:6px;overflow:hidden}
+
+/* Layout: steps on the left, one step at a time on the right */
+.layout{display:grid;grid-template-columns:250px 1fr;gap:24px;align-items:start;padding:24px 0 8px}
+.layout > *{min-width:0}
+nav.steps{position:sticky;top:16px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px 12px}
+.overall{padding:0 6px 12px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.overall small{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}
+.track{height:6px;background:var(--line);border-radius:6px;overflow:hidden}
 .fill{height:100%;width:0;background:var(--sand);transition:width .3s}
-.bar small{color:var(--muted);font-size:13px;white-space:nowrap}
-section{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px 20px;margin:20px 0}
-section h2{font-size:22px;margin:0 0 4px;display:flex;gap:10px;align-items:center}
-.n{width:30px;height:30px;border-radius:50%;background:var(--sand);display:grid;place-items:center;font-size:14px;font-weight:800;flex:none}
-.why{color:var(--muted);font-size:15px;margin:0 0 18px}
+.steps ol{list-style:none;margin:0;padding:0}
+.steps button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;font-size:14.5px;color:var(--deep);background:none;border:0;border-radius:10px;padding:8px 6px;cursor:pointer}
+.steps button:hover{background:var(--paper-2)}
+.steps button[aria-current=step]{background:var(--paper);font-weight:700}
+.dot{width:26px;height:26px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:12.5px;font-weight:800;background:var(--paper);border:1.5px solid var(--line);color:var(--muted)}
+.steps [aria-current=step] .dot{background:var(--sand);border-color:var(--sand);color:var(--deep)}
+.steps .done .dot{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+.steps .miss .dot{border-color:var(--bad);color:var(--bad)}
+.steps .meta{display:block;font-size:12px;font-weight:400;color:var(--muted)}
+
+section.step{background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px 22px}
+.kicker{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+section.step h2{font-size:26px;line-height:1.15;margin:0 0 6px;letter-spacing:-.01em}
+.why{color:var(--muted);font-size:15px;margin:0 0 20px}
+.sub{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--deep-2);margin:26px 0 12px;padding-top:18px;border-top:1px solid var(--line)}
+.sub:first-of-type{border-top:0;padding-top:0;margin-top:4px}
 .f{margin:0 0 18px}
-.f:last-child{margin-bottom:0}
 .f > label,.f > .lbl{display:block;font-weight:650;font-size:15.5px;margin-bottom:6px}
 .req{color:var(--bad);font-weight:700}
 .help{display:block;color:var(--muted);font-size:13.5px;font-weight:400;margin-top:2px}
 input[type=text],input[type=email],input[type=tel],input[type=url],input[type=number],textarea,select{width:100%;font:inherit;font-size:16px;color:var(--deep);background:var(--paper-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+input[type=number]{max-width:200px}
 textarea{min-height:78px;resize:vertical}
 input:focus,textarea:focus,select:focus{outline:3px solid var(--sand-2);border-color:var(--sand)}
 [aria-invalid=true]{border-color:var(--bad)!important;background:#FFF5F4!important}
-.opts{display:flex;flex-wrap:wrap;gap:8px}
-.opts label{display:flex;align-items:center;gap:7px;background:var(--paper-2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:15px;cursor:pointer}
+.opts{display:flex;flex-wrap:wrap;gap:8px;border-radius:12px}
+.opts label{display:flex;align-items:center;gap:7px;background:var(--paper-2);border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:15px;cursor:pointer}
+.opts label:has(input:checked){background:var(--paper);border-color:var(--deep-2)}
 .opts input{accent-color:var(--deep);margin:0}
+.opts[aria-invalid=true]{outline:2px solid var(--bad);outline-offset:4px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
 .prod{border:1px solid var(--line);border-radius:14px;padding:14px;margin:0 0 12px;background:var(--paper-2)}
 .prod > .top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .prod > .top b{font-size:16px}
 .prod .body{margin-top:12px}
+.prod.off{opacity:.75}
 .prod.off .body{display:none}
 .prod .f{margin-bottom:12px}
 .prod .f > label{font-size:14px}
 .prod input,.prod textarea{background:#fff}
-.btn{display:inline-flex;align-items:center;gap:10px;border-radius:999px;padding:14px 26px;font-weight:700;font-size:16px;border:0;cursor:pointer;background:var(--deep);color:var(--paper)}
+.prod .opts label{background:#fff}
+
+.navbtns{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:26px;padding-top:18px;border-top:1px solid var(--line);flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:10px;border-radius:999px;padding:13px 24px;font:inherit;font-weight:700;font-size:16px;border:0;cursor:pointer;background:var(--deep);color:var(--paper)}
+.btn.ghost{background:none;color:var(--deep);border:1.5px solid var(--line)}
 .btn[disabled]{opacity:.6;cursor:default}
 .status{margin:12px 0 0;font-weight:600;color:var(--bad)}
-.saved{color:var(--muted);font-size:13.5px;margin-top:10px}
+.saved{color:var(--muted);font-size:13.5px;margin:10px 0 0}
+
+/* Review step */
+.review{list-style:none;margin:0 0 20px;padding:0;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.review li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid var(--line);font-size:15px}
+.review li:first-child{border-top:0}
+.review .st{font-size:13.5px;font-weight:600;white-space:nowrap;color:var(--muted)}
+.review .st.ok{color:var(--ok)}
+.review .st.bad{color:var(--bad)}
+.review button{font:inherit;font-size:13.5px;background:none;border:0;color:var(--deep-2);text-decoration:underline;cursor:pointer;padding:0}
+
 .done{text-align:center;padding:40px 20px}
-.done h2{justify-content:center;font-size:28px}
+.done h2{font-size:28px}
 .next{margin:0 auto 16px;padding-left:20px;text-align:left;max-width:520px}
 .next li{margin:0 0 8px}
 .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
-footer{color:var(--muted);font-size:14px;padding:10px 0 40px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
-@media (max-width:640px){.grid2{grid-template-columns:1fr}section{padding:18px 14px}}
+footer{color:var(--muted);font-size:14px;padding:16px 0 40px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+
+@media (max-width:820px){
+  .layout{grid-template-columns:1fr;gap:14px;padding-top:0}
+  nav.steps{position:sticky;top:0;z-index:5;border-radius:0;border-width:0 0 1px;margin:0 -16px;padding:10px 16px 8px}
+  .overall{border:0;padding:0 0 8px;margin:0}
+  .steps ol{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .steps ol::-webkit-scrollbar{display:none}
+  .steps button{padding:4px;width:auto}
+  .steps .label{display:none}
+  .steps [aria-current=step] .label{display:inline;white-space:nowrap;font-size:14px}
+}
+@media (max-width:640px){.grid2{grid-template-columns:1fr}section.step{padding:20px 16px}}
 </style>
 </head>
 <body>
@@ -69,27 +114,29 @@ footer{color:var(--muted);font-size:14px;padding:10px 0 40px;display:flex;justif
   <div class="wrap">
     <div class="brand">Talay</div>
     <h1>Set up Talay for <em>your</em> dive centre</h1>
-    <p class="lead">Tell us how your centre works. Your assistant then answers divers with your own prices, times and rules, day and night, under your name. It takes about 20 minutes. Your answers are saved on this device, so you can stop and come back later.</p>
+    <p class="lead">Tell us how your centre works. Your assistant then answers divers with your own prices, times and rules, day and night, under your name. It takes about 20 minutes, in 10 short steps. Everything is saved on this device, so you can stop and come back later.</p>
     <ul class="promise">
       <li>Free to use</li><li>Nothing changes in your system</li><li>Switch it on or off anytime</li><li>Keep taking bookings as before</li>
     </ul>
   </div>
 </header>
-<div class="bar"><div class="wrap"><div class="track"><div class="fill" id="fill"></div></div><small id="progress">0% done</small></div></div>
 
 <main class="wrap">
   <form id="intake" novalidate>
-    <div id="sections"></div>
-    <div class="hp" aria-hidden="true"><label>Website <input type="text" name="website_hp" tabindex="-1" autocomplete="off"></label></div>
-    <section>
-      <div class="f" id="ts"></div>
-      <p class="why">After sending, we set everything up and you test it first. Nothing goes live until you say go.</p>
-      <button class="btn" id="submit" type="submit">Send to Talay</button>
-      <p class="status" id="status" role="status"></p>
-      <p class="saved" id="saved"></p>
-    </section>
+    <div class="layout">
+      <nav class="steps" aria-label="Steps">
+        <div class="overall"><small id="progress">0% done</small><div class="track"><div class="fill" id="fill"></div></div></div>
+        <ol id="stepnav"></ol>
+      </nav>
+      <div>
+        <div id="sections"></div>
+        <div class="hp" aria-hidden="true"><label>Website <input type="text" name="website_hp" tabindex="-1" autocomplete="off"></label></div>
+        <p class="status" id="status" role="status"></p>
+        <p class="saved" id="saved"></p>
+      </div>
+    </div>
   </form>
-  <section class="done" id="done" hidden>
+  <section class="step done" id="done" hidden>
     <h2>Thank you! 🎉</h2>
     <p>We've received everything. This is what happens now:</p>
     <ol class="next">
@@ -109,35 +156,48 @@ footer{color:var(--muted);font-size:14px;padding:10px 0 40px;display:flex;justif
 <script>
 const TURNSTILE_SITEKEY = "0x4AAAAAAFXZnn0VWocS_nWR";  // Cloudflare Turnstile site key (public, same as the homepage)
 const STORE = "talay-intake-v1";
+const FORM_VERSION = 2;
 
 // The questions. Keys are stable: the Airtable conversion depends on them, so never rename a key.
-// type: text, email, tel, url, number, area (textarea), one (radio), many (checkboxes)
+// type: text, email, tel, url, number, area (textarea), one (radio), many (checkboxes); sub = a small heading.
+// show: [key, start of an answer] = only shown when that answer is chosen.
 const SECTIONS = [
   { id: "centre", title: "Your centre", why: "This is how your assistant introduces your centre.", fields: [
-    { k: "centre_name", label: "Name of your dive centre", req: true, ph: "e.g. Blue Turtle Divers" },
+    { sub: "About you" },
     { k: "contact_name", label: "Your name", req: true },
     { k: "contact_role", label: "Your role", type: "one", opts: ["Owner", "Manager", "Other"] },
     { k: "contact_email", label: "Your email", type: "email", req: true },
     { k: "contact_whatsapp", label: "Your WhatsApp number", type: "tel", req: true, ph: "+66 81 234 5678" },
-    { k: "area", label: "Where on Koh Tao are you?", type: "one", opts: ["Mae Haad", "Sairee", "Chalok Baan Kao", "Tanote", "Other"] },
+    { sub: "Your dive centre" },
+    { k: "centre_name", label: "Name of your dive centre", req: true, ph: "e.g. Blue Turtle Divers" },
+    { k: "island", label: "Island or town", req: true, ph: "e.g. Koh Tao, Khao Lak, Koh Lanta" },
+    { k: "area", label: "Area or beach", ph: "e.g. Sairee" },
     { k: "meeting_point", label: "Where should divers come to?", req: true, type: "area", help: "Written the way you'd explain it to a diver.", ph: "e.g. our shop on Sairee Beach, next to the 7-Eleven at the north end" },
+    { k: "arrival", label: "How do divers get to you from the pier or airport?", ph: "e.g. 10 minutes by taxi from Mae Haad pier, about 150 THB" },
     { k: "opening_hours", label: "Shop opening hours", ph: "e.g. every day 7:00 to 19:00" },
     { k: "agency", label: "Which courses do you teach?", type: "many", opts: ["SSI", "PADI", "RAID", "Other"] },
     { k: "agency_level", label: "Your agency rating, if any", ph: "e.g. SSI Diamond Training Centre, PADI 5 Star IDC" },
     { k: "trust", label: "Why do divers trust you?", type: "area", help: "One or two facts we may share, like years on the island or divers trained.", ph: "e.g. on Koh Tao since 2008, more than 20,000 divers trained" },
+    { sub: "Online" },
     { k: "website_url", label: "Website", type: "url", ph: "https://" },
     { k: "instagram", label: "Instagram", ph: "@yourcentre" },
     { k: "maps_url", label: "Google Maps link to your shop", type: "url", help: "Open your shop in Google Maps, tap Share, copy the link." },
     { k: "review_url", label: "Google review link", type: "url", help: "Google Business Profile → Ask for reviews → copy link. Leave empty if you don't know." },
+    { k: "medical_form_url", label: "Link to the medical form divers fill in", type: "url", help: "Optional. Leave empty if divers fill it in at the shop." },
     { k: "logo_note", label: "Logo", type: "one", opts: ["Take it from our website or Instagram", "I'll email it to info@talay.io"] },
   ]},
   { id: "team", title: "Your team", why: "When a diver needs a person, your assistant passes the chat to your team and sends an alert.", fields: [
+    { sub: "Alerts and access" },
     { k: "alert_emails", label: "Who gets the alert when a diver needs a person?", req: true, type: "area", help: "One or more email addresses.", ph: "e.g. desk@yourcentre.com" },
     { k: "staff_emails", label: "Team members who may see and answer the chats", type: "area", help: "Email addresses. They log in at talay.io/zone with a code, no password." },
     { k: "admin_emails", label: "Who may change prices and settings?", type: "area", help: "Usually the owner or manager." },
-    { k: "answer_mode", label: "When should your assistant answer?", type: "one", req: true, help: "You can change this later in your zone.", opts: ["Day and night", "Only outside our office hours (our team answers during the day)"] },
-    { k: "answer_hours", label: "If only outside office hours: when does your team answer the chats?", ph: "e.g. every day 8:30 to 18:00" },
     { k: "emergency_phone", label: "Your emergency phone number (reachable 24/7)", type: "tel", req: true, help: "Only shared in a real emergency, next to the Thai emergency number 1669." },
+    { sub: "When your assistant answers" },
+    { k: "answer_mode", label: "When should your assistant answer?", type: "one", req: true, help: "You can change this later in your zone.", opts: ["Day and night", "Only outside our office hours (our team answers during the day)"] },
+    { k: "answer_hours", label: "When does your team answer the chats itself?", ph: "e.g. every day 8:30 to 18:00", show: ["answer_mode", "Only"] },
+    { k: "assistant_name", label: "Name for your assistant", ph: "Mia", help: "Divers see this name. Leave empty to use Mia." },
+    { sub: "Languages and instructors" },
+    { k: "customer_languages", label: "Languages your divers write in most", type: "many", opts: ["English", "German", "French", "Dutch", "Spanish", "Italian", "Thai", "Chinese", "Other"] },
     { k: "team_languages", label: "Languages your team teaches in", type: "many", opts: ["English", "Thai", "German", "French", "Dutch", "Spanish", "Italian", "Portuguese", "Chinese", "Swedish", "Other"] },
     { k: "instructor_countries", label: "Where are your instructors from?", ph: "e.g. Thailand, England, Germany, Sweden" },
     { k: "choose_instructor", label: "Can a diver ask for a specific instructor?", type: "one", opts: ["Yes, by name", "Only a language or country, not a name", "No"] },
@@ -145,59 +205,91 @@ const SECTIONS = [
   ]},
   { id: "whatsapp", title: "WhatsApp, Instagram and Messenger", why: "Divers keep writing to the number and accounts they already know. We help you connect them; nothing changes for your divers.", fields: [
     { k: "channels_now", label: "Where should your assistant answer?", type: "many", req: true, opts: ["WhatsApp", "Instagram messages", "Facebook Messenger"] },
-    { k: "wa_number", label: "The WhatsApp number divers write to today", type: "tel", help: "Leave the WhatsApp questions empty if you only want Instagram or Messenger." },
-    { k: "wa_setup", label: "How does your team use that number now?", type: "one", opts: ["WhatsApp Business app on a phone", "Through a tool (respond.io, WATI, Zoko, …)", "Normal WhatsApp app", "I don't know"] },
-    { k: "wa_tool", label: "Which tool, if any?", ph: "e.g. respond.io" },
+    { sub: "WhatsApp", show: ["channels_now", "WhatsApp"] },
+    { k: "wa_number", label: "The WhatsApp number divers write to today", type: "tel", show: ["channels_now", "WhatsApp"] },
+    { k: "wa_setup", label: "How does your team use that number now?", type: "one", opts: ["WhatsApp Business app on a phone", "Through a tool (respond.io, WATI, Zoko, …)", "Normal WhatsApp app", "I don't know"], show: ["channels_now", "WhatsApp"] },
+    { k: "wa_tool", label: "Which tool?", ph: "e.g. respond.io", show: ["wa_setup", "Through a tool"] },
+    { k: "wa_choice", label: "Which number should your assistant use?", type: "one", opts: ["On our existing number (team keeps using it too)", "On a new number, just for enquiries", "Let's discuss"], show: ["channels_now", "WhatsApp"] },
+    { sub: "Instagram and Messenger" },
     { k: "meta_access", label: "Do you have a Facebook / Meta Business account for the centre?", type: "one", help: "Instagram and Messenger are connected through your Facebook page, so someone with admin access to it needs to approve the connection.", opts: ["Yes, and I have admin access", "Yes, someone else manages it", "No", "I don't know"] },
-    { k: "wa_choice", label: "On WhatsApp: which number should your assistant use?", type: "one", opts: ["On our existing number (team keeps using it too)", "On a new number, just for enquiries", "Let's discuss"] },
     { k: "facebook_page", label: "Your Facebook page", type: "url", ph: "https://facebook.com/yourcentre" },
     { k: "ig_professional", label: "Is your Instagram a professional (business or creator) account, linked to that Facebook page?", type: "one", opts: ["Yes", "No", "I don't know"] },
+    { sub: "Later" },
     { k: "channels_later", label: "Other channels you'd like later", type: "many", opts: ["Website form", "Email", "LINE", "Telegram"] },
   ]},
   { id: "products", title: "Courses and prices", why: "Your assistant only quotes the prices you give here. Untick what you don't offer; switch online booking off for anything you want to handle yourself.", products: true },
-  { id: "schedule", title: "Times and schedule", why: "The questions divers ask most: when do I start, and when do I need to be there?", fields: [
+  { id: "schedule", title: "Groups and schedule", why: "The questions divers ask most: how big is the group, when do I start, and when do I need to be there?", fields: [
+    { sub: "Group sizes" },
+    { k: "group_students_per_instructor", label: "Courses: maximum students per instructor", type: "number", req: true, ph: "e.g. 4" },
+    { k: "group_divers_per_guide", label: "Fun dives: maximum divers per guide", type: "number", req: true, ph: "e.g. 4" },
+    { k: "group_try_dive", label: "Try dive: maximum per instructor", type: "number", ph: "e.g. 2" },
+    { k: "group_size", label: "Anything else about groups?", ph: "e.g. couples and friends always stay together" },
+    { sub: "Course days" },
     { k: "orientation", label: "Is there an orientation the day before a course starts?", type: "one", opts: ["Yes", "No"] },
-    { k: "orientation_time", label: "If yes: what time, and for which courses?", ph: "e.g. 17:00 at the shop, for Try Dive and Open Water" },
+    { k: "orientation_time", label: "What time, and for which courses?", ph: "e.g. 17:00 at the shop, for Try Dive and Open Water", show: ["orientation", "Yes"] },
     { k: "ow_day1", label: "Open Water: what time on day 1, and what happens each day?", type: "area", ph: "e.g. day 1 8:00 pool, day 2 and 3 boat at 6:30" },
     { k: "dsd_day", label: "Try dive / Basic Diver: what does the day look like?", type: "area", ph: "e.g. pool in the morning, 2 sea dives in the afternoon, max 12 m" },
+    { k: "course_days", label: "Do courses run on consecutive days?", type: "one", opts: ["Yes, always back to back", "Yes, but a rest day in between is possible", "Flexible, divers can spread the days"] },
+    { k: "start_days", label: "Courses start on", type: "one", opts: ["Any day", "Certain days only"] },
+    { k: "start_days_note", label: "Which days?", show: ["start_days", "Certain"] },
+    { sub: "Boats" },
     { k: "boat_times", label: "Fun dive boats: check-in times", req: true, ph: "e.g. morning 6:30, afternoon 11:30" },
     { k: "boat_extra", label: "Other trips", type: "many", opts: ["Night dive", "Sunset dive", "Sail Rock day trip", "None"] },
     { k: "boat_extra_note", label: "Times and who can join", ph: "e.g. night dive Tue and Fri at 17:30, Advanced divers" },
-    { k: "start_days", label: "Courses start on", type: "one", opts: ["Any day", "Certain days only"] },
-    { k: "start_days_note", label: "If certain days: which?" },
+    { k: "refresher_rule", label: "When does a certified diver need a refresher first?", type: "one", opts: ["Last dive more than 6 months ago", "More than 12 months ago", "Our guides decide", "Other"] },
+    { k: "season", label: "Best season, and when is it quieter or rougher?", ph: "e.g. best March to September, rough sea some days in November" },
+    { sub: "Booking deadlines" },
     { k: "cutoff_fun", label: "Latest time to book fun dives for tomorrow", ph: "e.g. 15:00" },
     { k: "cutoff_course", label: "Latest time to book a course starting tomorrow", ph: "e.g. 16:00" },
     { k: "daily_limit", label: "Is there a maximum of online bookings per day?", ph: "e.g. no limit, or max 8 Open Water students per day" },
   ]},
-  { id: "rules", title: "Rules and policies", why: "Divers ask about this all the time. Sensitive questions (medical, pregnancy, under 18, complaints) always go to your team.", fields: [
+  { id: "booking", title: "Bookings and cancellations", why: "Divers want a clear yes or no here. Your assistant explains your own rules; anything about an existing booking still goes to your team.", fields: [
+    { sub: "Moving a booking" },
     { k: "reschedule", label: "Moving or cancelling a booking", type: "one", req: true, opts: ["Moving is free (up to the day before); the online deposit stays valid, no refund", "Something else (describe below)"] },
-    { k: "reschedule_note", label: "Your own rule, if different", type: "area" },
+    { k: "reschedule_note", label: "Your own rule", type: "area", show: ["reschedule", "Something"] },
+    { k: "reschedule_limit", label: "How often can a diver move the date?", type: "one", opts: ["As often as needed", "Once", "Other"] },
+    { k: "reschedule_window", label: "By when must the new date be?", ph: "e.g. within 6 months" },
+    { sub: "Refunds and no-shows" },
+    { k: "refund", label: "A diver changes their mind and no longer wants to come", type: "one", req: true, opts: ["No refund; the deposit stays valid for a new date", "Refund possible (describe below)"] },
+    { k: "refund_note", label: "When is a refund possible?", ph: "e.g. full refund up to 7 days before the start", show: ["refund", "Refund"] },
+    { k: "no_show", label: "A diver doesn't show up and didn't let you know", type: "one", opts: ["The deposit is lost", "Other (describe below)"] },
+    { k: "no_show_note", label: "Your own rule", show: ["no_show", "Other"] },
     { k: "weather", label: "If you cancel because of the weather", type: "one", opts: ["New date for free, deposit back if no date fits during the stay", "Something else (describe below)"] },
-    { k: "weather_note", label: "Your own rule, if different" },
+    { k: "weather_note", label: "Your own rule", show: ["weather", "Something"] },
+    { sub: "Switching course" },
+    { k: "upgrade", label: "A diver wants to switch course after paying (e.g. try dive → Open Water)", type: "one", opts: ["Possible: the deposit counts, they pay the difference at the shop", "Our team decides case by case"] },
+    { sub: "Paying at the shop" },
     { k: "pay_shop", label: "How can divers pay the rest at the shop?", type: "many", opts: ["Cash (THB)", "Card", "Bank transfer", "Other"] },
-    { k: "card_fee", label: "Card surcharge at the shop (%)", type: "number", ph: "e.g. 3" },
+    { k: "card_fee", label: "Card surcharge at the shop (%)", type: "number", ph: "e.g. 3", show: ["pay_shop", "Card"] },
+    { k: "discounts", label: "Discounts you always give", type: "area", help: "Only standard ones your assistant may mention. Everything else goes to your team.", ph: "e.g. Advanced straight after Open Water: 9,900 instead of 11,000" },
+  ]},
+  { id: "rules", title: "Rules for divers", why: "Sensitive questions (medical, pregnancy, under 18, complaints) always go to your team. These are the simple ones your assistant can answer.", fields: [
     { k: "min_age", label: "Minimum age for diving", type: "number", ph: "10" },
     { k: "minor_rule", label: "Anything special for children or under 18s?", ph: "e.g. 10-14 Junior, parent's permission under 18" },
     { k: "swim_test", label: "Swimming requirement for the Open Water", ph: "e.g. float 10 minutes and swim 200 m, any style" },
     { k: "glasses", label: "Prescription masks available?", type: "one", opts: ["Yes, free", "Yes, for a fee", "No"] },
     { k: "insurance", label: "Dive insurance included?", ph: "e.g. yes, 30 days for all our dives" },
-    { k: "discounts", label: "Discounts you always give", type: "area", help: "Only standard ones your assistant may mention. Everything else goes to your team.", ph: "e.g. Advanced straight after Open Water: 9,900 instead of 11,000" },
+    { k: "cert_card", label: "How and when do divers get their certification?", ph: "e.g. digital card in the SSI app, the same day" },
+    { k: "seasick", label: "Seasickness: anything divers should know?", ph: "e.g. tablets for sale at the desk, take one an hour before the boat" },
+    { k: "bring", label: "What should divers bring?", type: "area", ph: "e.g. swimwear, towel, sunscreen (reef safe), a copy of your passport, your certification card" },
   ]},
   { id: "shop", title: "Your shop and extras", why: "Small details that win the booking at 2 am. Leave empty what you don't have.", fields: [
+    { sub: "Staying and facilities" },
     { k: "accommodation", label: "Accommodation", type: "area", help: "Included with a course? How many nights, what kind of room, can a partner stay? Price for other divers?", ph: "e.g. 3 free nights in a fan room with the Open Water; other divers 500 THB/night" },
     { k: "facilities", label: "At the shop", type: "many", opts: ["Free wifi", "Showers", "Lockers", "Luggage storage", "Restaurant", "Bar", "Pool on site", "Changing rooms"] },
     { k: "food", label: "Food and drinks", ph: "e.g. water, fruit and snacks on the boat; lunch not included" },
+    { k: "pickup", label: "Pick-up", ph: "e.g. free pick-up from the pier and Sairee; or no pick-up" },
+    { k: "travel", label: "Help with ferries or travel?", ph: "e.g. we book Lomprayah ferries at the desk" },
+    { sub: "On the boat" },
     { k: "boats", label: "Your boats", ph: "e.g. 2 large boats with toilet and shade, max 20 divers" },
-    { k: "group_size", label: "Group sizes", ph: "e.g. max 4 divers per guide, 4 students per instructor, 2 on a try dive" },
     { k: "gear", label: "Gear", type: "area", ph: "e.g. all gear and a dive computer included, 3 mm shorty, no discount for own gear" },
     { k: "nitrox", label: "Nitrox", type: "one", opts: ["Yes, extra charge", "Yes, free for certified divers", "No"] },
     { k: "photos", label: "Photographer or video", ph: "e.g. yes, from 1,500 THB per dive; own camera after Advanced or 40 dives" },
     { k: "non_divers", label: "Can non-divers come on the boat?", ph: "e.g. yes, 500 THB" },
     { k: "snorkel", label: "Snorkelling on your boats?", ph: "e.g. yes, 600 THB with gear; or no" },
-    { k: "pickup", label: "Pick-up", ph: "e.g. free pick-up from the pier and Sairee; or no pick-up" },
-    { k: "travel", label: "Help with ferries or travel?", ph: "e.g. we book Lomprayah ferries at the desk" },
-    { k: "elearning", label: "Online theory before arrival", ph: "e.g. yes, SSI app, we send the link after booking" },
     { k: "sites", label: "Dive sites you visit most", ph: "e.g. Chumphon Pinnacle, Twins, Japanese Gardens, Sail Rock" },
+    { sub: "Learning" },
+    { k: "elearning", label: "Online theory before arrival", ph: "e.g. yes, SSI app, we send the link after booking" },
     { k: "other_courses", label: "Other courses you offer", type: "area", help: "Rescue, Divemaster, specialties, freediving… Your team handles these; your assistant just knows you offer them." },
   ]},
   { id: "awkward", title: "The awkward questions", why: "Every centre gets questions no template covers. Tell us yours, so your assistant never answers them wrongly.", fields: [
@@ -205,29 +297,33 @@ const SECTIONS = [
     { k: "never_say", label: "Anything your assistant should never say or promise?", type: "area" },
     { k: "tone", label: "How do you talk to divers?", type: "one", opts: ["Friendly with emojis", "Friendly, few emojis", "Short and professional"] },
   ]},
-  { id: "billing", title: "Statement details", why: "For the monthly overview of bookings made through Talay. You don't pay anything for using Talay.", fields: [
+  { id: "billing", title: "Check and send", why: "Last step: your company details for the monthly overview, a quick check, and send. You don't pay anything for using Talay.", review: true, fields: [
+    { sub: "Statement details" },
     { k: "legal_name", label: "Company name", ph: "e.g. Blue Turtle Co., Ltd." },
     { k: "address", label: "Company address", type: "area" },
     { k: "tax_id", label: "Tax ID (optional)" },
+    { sub: "Confirm" },
     { k: "consent", label: "Confirm", type: "many", req: true, opts: ["This information is correct, and Talay may use it to answer divers on our behalf. We can switch it off at any time."] },
   ]},
 ];
 
 const PRODUCTS = [
-  { code: "DSD", name: "Try dive (Basic Diver / Discover Scuba)", dur: "1 day" },
-  { code: "OW", name: "Open Water", dur: "3 days" },
-  { code: "AOW", name: "Advanced Open Water", dur: "2 days" },
-  { code: "AD", name: "Adventure Diver", dur: "1 day" },
-  { code: "FUN", name: "Fun dive trip (2 dives)", dur: "half a day" },
-  { code: "FUN10", name: "10 fun dives package", dur: "flexible" },
-  { code: "REF", name: "Refresher / Scuba Review", dur: "1 day" },
-  { code: "DDS", name: "Deep Diving Specialty", dur: "2 days" },
+  { code: "DSD", name: "Try dive (Basic Diver / Discover Scuba)", dur: "1 day", age: "10" },
+  { code: "OW", name: "Open Water", dur: "3 days", age: "10" },
+  { code: "AOW", name: "Advanced Open Water", dur: "2 days", age: "12", pre: "Open Water" },
+  { code: "AD", name: "Adventure Diver", dur: "1 day", age: "10", pre: "Open Water" },
+  { code: "FUN", name: "Fun dive trip (2 dives)", dur: "half a day", age: "10", pre: "Open Water or higher" },
+  { code: "FUN10", name: "10 fun dives package", dur: "flexible", age: "10", pre: "Open Water or higher" },
+  { code: "REF", name: "Refresher / Scuba Review", dur: "1 day", age: "10", pre: "Open Water or higher" },
+  { code: "DDS", name: "Deep Diving Specialty", dur: "2 days", age: "15", pre: "Advanced Open Water" },
 ];
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const showAttr = f => f.show ? ` data-show="${esc(f.show[0])}" data-show-v="${esc(f.show[1])}"` : "";
 
 function fieldHtml(f, prefix = "") {
+  if (f.sub) return `<h3 class="sub"${showAttr(f)}>${esc(f.sub)}</h3>`;
   const name = prefix + f.k, id = "q-" + name, t = f.type || "text";
   const req = f.req ? ' <span class="req">*</span>' : "";
   const help = f.help ? `<span class="help">${esc(f.help)}</span>` : "";
@@ -235,10 +331,10 @@ function fieldHtml(f, prefix = "") {
   if (t === "one" || t === "many") {
     const it = t === "one" ? "radio" : "checkbox";
     const opts = f.opts.map(o => `<label><input type="${it}" name="${name}" value="${esc(o)}"${f.req ? " data-req" : ""}> ${esc(o)}</label>`).join("");
-    return `<div class="f" data-group="${name}"><span class="lbl">${esc(f.label)}${req}${help}</span><div class="opts">${opts}</div></div>`;
+    return `<div class="f" data-group="${name}"${showAttr(f)}><span class="lbl">${esc(f.label)}${req}${help}</span><div class="opts">${opts}</div></div>`;
   }
-  if (t === "area") return `<div class="f"><label for="${id}">${esc(f.label)}${req}${help}</label><textarea id="${id}" name="${name}"${ph}${f.req ? " required" : ""}></textarea></div>`;
-  return `<div class="f"><label for="${id}">${esc(f.label)}${req}${help}</label><input id="${id}" name="${name}" type="${t}"${ph}${f.req ? " required" : ""}${t === "number" ? ' inputmode="decimal" min="0"' : ""}></div>`;
+  if (t === "area") return `<div class="f"${showAttr(f)}><label for="${id}">${esc(f.label)}${req}${help}</label><textarea id="${id}" name="${name}"${ph}${f.req ? " required" : ""}></textarea></div>`;
+  return `<div class="f"${showAttr(f)}><label for="${id}">${esc(f.label)}${req}${help}</label><input id="${id}" name="${name}" type="${t}"${ph}${f.req ? " required" : ""}${t === "number" ? ' inputmode="decimal" min="0"' : ""}></div>`;
 }
 
 function productHtml(p) {
@@ -251,14 +347,28 @@ function productHtml(p) {
       ${fieldHtml({ k: "name", label: "Name you use", ph: p.name }, pre)}
       ${fieldHtml({ k: "duration", label: "Duration", ph: p.dur }, pre)}
       ${fieldHtml({ k: "checkin", label: "Check-in time", ph: "e.g. 8:00" }, pre)}
+      ${fieldHtml({ k: "min_age", label: "Minimum age", type: "number", ph: p.age }, pre)}
+      ${fieldHtml({ k: "requirements", label: "Who can join?", ph: p.pre || "no experience needed" }, pre)}
     </div>
-    ${fieldHtml({ k: "included", label: "What's included", ph: "e.g. all gear, dive computer, certification, learning materials" }, pre)}</div>
+    ${fieldHtml({ k: "included", label: "What's included", ph: "e.g. all gear, dive computer, certification, learning materials" }, pre)}
+    ${fieldHtml({ k: "not_included", label: "Not included", ph: "e.g. meals, marine park fee 200 THB" }, pre)}</div>
   </div>`;
 }
 
-$("#sections").innerHTML = SECTIONS.map((s, i) => `<section id="s-${s.id}"><h2><span class="n">${i + 1}</span>${esc(s.title)}</h2><p class="why">${esc(s.why)}</p>${
-  s.products ? PRODUCTS.map(productHtml).join("") + fieldHtml({ k: "price_notes", label: "Anything else about prices?", type: "area", ph: "e.g. prices go up 10% from 1 December" }) : s.fields.map(f => fieldHtml(f)).join("")
-}</section>`).join("");
+const STEPS = SECTIONS.length;
+$("#sections").innerHTML = SECTIONS.map((s, i) => `<section class="step" id="s-${s.id}" data-step="${i}" hidden>
+  <p class="kicker">Step ${i + 1} of ${STEPS}</p><h2>${esc(s.title)}</h2><p class="why">${esc(s.why)}</p>
+  ${s.products ? PRODUCTS.map(productHtml).join("") + fieldHtml({ k: "price_notes", label: "Anything else about prices?", type: "area", ph: "e.g. prices go up 10% from 1 December" }) : ""}
+  ${s.review ? `<h3 class="sub">Your answers</h3><ul class="review" id="review"></ul>` : ""}
+  ${(s.fields || []).map(f => fieldHtml(f)).join("")}
+  ${s.review ? `<div class="f" id="ts"></div><p class="why">After sending, we set everything up and you test it first. Nothing goes live until you say go.</p>` : ""}
+  <div class="navbtns">
+    ${i > 0 ? `<button type="button" class="btn ghost" data-go="${i - 1}">← Back</button>` : "<span></span>"}
+    ${s.review ? `<button class="btn" id="submit" type="submit">Send to Talay</button>` : `<button type="button" class="btn" data-go="${i + 1}">Next: ${esc(SECTIONS[i + 1].title)} →</button>`}
+  </div>
+</section>`).join("");
+
+$("#stepnav").innerHTML = SECTIONS.map((s, i) => `<li><button type="button" data-go="${i}"><span class="dot">${i + 1}</span><span class="label">${esc(s.title)}<span class="meta" id="meta-${i}"></span></span></button></li>`).join("");
 
 const form = $("#intake");
 
@@ -291,23 +401,100 @@ function restore(data) {
   form.querySelectorAll(".prod").forEach(c => c._sync());
 }
 
-// Progress and autosave on this device
-const countable = SECTIONS.filter(s => s.fields).flatMap(s => s.fields.map(f => f.k));
-function progress(d) {
-  const filled = countable.filter(k => Array.isArray(d[k]) ? d[k].length : d[k]).length;
-  const pct = Math.round(filled / countable.length * 100);
+// Follow-up questions: only shown when the answer they depend on is chosen
+function applyShow(d) {
+  form.querySelectorAll("[data-show]").forEach(el => {
+    const v = d[el.dataset.show], want = el.dataset.showV;
+    const on = Array.isArray(v) ? v.some(x => x.startsWith(want)) : String(v || "").startsWith(want);
+    el.hidden = !on;
+  });
+}
+const visible = el => !el.closest("[hidden]:not(section.step)");
+
+// Per step: which required answers are missing, how many questions are answered
+const filled = (d, k) => Array.isArray(d[k]) ? d[k].length > 0 : !!d[k];
+function stepState(i, d) {
+  const sec = form.querySelector(`[data-step="${i}"]`);
+  const missing = [];
+  sec.querySelectorAll("[required]").forEach(el => { if (visible(el) && !el.value.trim()) missing.push(el); });
+  sec.querySelectorAll("[data-group]").forEach(g => { if (g.querySelector("[data-req]") && visible(g) && !g.querySelector("input:checked")) missing.push(g.querySelector("input")); });
+  const keys = (SECTIONS[i].fields || []).filter(f => f.k && !f.show).map(f => f.k);
+  const answered = keys.filter(k => filled(d, k)).length;
+  return { missing, answered, total: keys.length };
+}
+
+let current = 0, touched = new Set();
+function refresh(d = collect()) {
+  applyShow(d);
+  let all = 0, done = 0;
+  SECTIONS.forEach((s, i) => {
+    const st = stepState(i, d);
+    all += st.total; done += st.answered;
+    const btn = $("#stepnav").children[i].firstElementChild;
+    const complete = !st.missing.length && (s.products ? PRODUCTS.some(p => d["p_" + p.code + "_price"]) : st.answered > 0);
+    btn.classList.toggle("done", complete && i !== current);
+    btn.classList.toggle("miss", !!st.missing.length && touched.has(i) && i !== current);
+    const dot = btn.querySelector(".dot");
+    dot.textContent = complete && i !== current ? "✓" : String(i + 1);
+    $("#meta-" + i).textContent = s.products ? "" : st.missing.length && touched.has(i) ? st.missing.length + " required left" : st.total ? st.answered + " of " + st.total + " answered" : "";
+  });
+  const pct = Math.round(done / all * 100);
   $("#fill").style.width = pct + "%";
   $("#progress").textContent = pct + "% done";
+  if (SECTIONS[current].review) renderReview(d);
 }
+
+function renderReview(d) {
+  $("#review").innerHTML = SECTIONS.map((s, i) => {
+    if (s.review) return "";
+    const st = stepState(i, d);
+    const priced = PRODUCTS.filter(p => (d["p_" + p.code + "_offer"] || []).length && d["p_" + p.code + "_price"]).length;
+    const txt = st.missing.length ? `<span class="st bad">${st.missing.length} required missing</span>`
+      : s.products ? `<span class="st${priced ? " ok" : ""}">${priced ? priced + " with a price" : "no prices yet"}</span>`
+      : `<span class="st${st.answered ? " ok" : ""}">${st.answered} of ${st.total} answered</span>`;
+    return `<li><span>${i + 1}. ${esc(s.title)}</span><span>${txt} · <button type="button" data-go="${i}">Edit</button></span></li>`;
+  }).join("");
+}
+
+function go(i, focusTop = true) {
+  if (i < 0 || i >= STEPS) return;
+  touched.add(current);
+  if (i !== current) $("#status").textContent = "";
+  current = i;
+  form.querySelectorAll("section.step").forEach(s => s.hidden = Number(s.dataset.step) !== i);
+  $("#stepnav").querySelectorAll("button").forEach((b, n) => { if (n === i) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current"); });
+  refresh();
+  try { localStorage.setItem(STORE + "-step", String(i)); } catch {}
+  if (focusTop) { const top = $("main").getBoundingClientRect().top + window.scrollY - 8; if (window.scrollY > top) window.scrollTo({ top, behavior: "smooth" }); }
+  const navBtn = $("#stepnav").children[i].firstElementChild;
+  if (navBtn.scrollIntoView && window.innerWidth <= 820) navBtn.scrollIntoView({ block: "nearest", inline: "center" });
+}
+form.addEventListener("click", e => {
+  const b = e.target.closest("[data-go]");
+  if (b) { e.preventDefault(); go(Number(b.dataset.go)); }
+});
+
+// Autosave on this device
 let saveTimer;
 form.addEventListener("input", () => {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    const d = collect(); progress(d);
+    const d = collect(); refresh(d);
+    form.querySelectorAll("[aria-invalid=true]").forEach(el => {
+      const ok = el.classList.contains("opts") ? !!el.querySelector("input:checked") : !!el.value.trim();
+      if (ok) el.setAttribute("aria-invalid", "false");
+    });
     try { localStorage.setItem(STORE, JSON.stringify(d)); $("#saved").textContent = "Saved on this device at " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + "."; } catch {}
-  }, 400);
+  }, 300);
 });
-try { const old = JSON.parse(localStorage.getItem(STORE) || "null"); if (old) { restore(old); progress(old); $("#saved").textContent = "We restored the answers you saved on this device."; } } catch {}
+form.addEventListener("change", () => applyShow(collect()));
+let startStep = 0;
+try {
+  const old = JSON.parse(localStorage.getItem(STORE) || "null");
+  if (old) { restore(old); $("#saved").textContent = "We restored the answers you saved on this device."; }
+  startStep = Math.min(STEPS - 1, Math.max(0, parseInt(localStorage.getItem(STORE + "-step") || "0", 10) || 0));
+} catch {}
+go(startStep, false);
 
 // Turnstile (same set-up as the homepage form)
 let tsWidget = null;
@@ -328,9 +515,11 @@ async function getToken() {
 
 const emailOk = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 const phoneOk = v => /^[+0-9 ()\-.]{6,40}$/.test(v);
+// Marks every missing or invalid answer; returns the first one with its step
 function check() {
   let first = null;
   form.querySelectorAll("[required]").forEach(el => {
+    if (!visible(el)) return;
     const v = el.value.trim();
     let ok = v.length > 0;
     if (ok && el.type === "email") ok = emailOk(v);
@@ -339,7 +528,7 @@ function check() {
     if (!ok && !first) first = el;
   });
   form.querySelectorAll("[data-group]").forEach(g => {
-    if (!g.querySelector("[data-req]")) return;
+    if (!g.querySelector("[data-req]") || !visible(g)) return;
     const ok = !!g.querySelector("input:checked");
     g.querySelector(".opts").setAttribute("aria-invalid", ok ? "false" : "true");
     if (!ok && !first) first = g.querySelector("input");
@@ -347,19 +536,23 @@ function check() {
   return first;
 }
 
-const button = $("#submit"), status = $("#status");
 form.addEventListener("submit", async e => {
   e.preventDefault();
+  const button = $("#submit"), status = $("#status");
   status.textContent = "";
+  SECTIONS.forEach((s, i) => touched.add(i));
   const bad = check();
   if (bad) {
+    const step = Number(bad.closest("section.step").dataset.step);
+    if (step !== current) go(step);
     status.textContent = "A few required answers are missing or not valid (marked in red).";
-    bad.scrollIntoView({ behavior: "smooth", block: "center" }); bad.focus({ preventScroll: true });
+    refresh();
+    setTimeout(() => { bad.scrollIntoView({ behavior: "smooth", block: "center" }); bad.focus({ preventScroll: true }); }, 50);
     return;
   }
   button.disabled = true; button.textContent = "Sending…";
   const answers = collect();
-  const body = { answers, website: form.website_hp.value, form_version: 1 };
+  const body = { answers, website: form.website_hp.value, form_version: FORM_VERSION };
   if (TURNSTILE_SITEKEY) {
     body.turnstile = await getToken();
     if (!body.turnstile) { status.textContent = "Complete the security check above the button, then send again."; button.disabled = false; button.textContent = "Send to Talay"; return; }
@@ -368,7 +561,7 @@ form.addEventListener("submit", async e => {
     const res = await fetch("/api/intake", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const out = await res.json().catch(() => ({}));
     if (!res.ok || !out.ok) throw new Error(out.error || "send");
-    try { localStorage.removeItem(STORE); } catch {}
+    try { localStorage.removeItem(STORE); localStorage.removeItem(STORE + "-step"); } catch {}
     form.hidden = true; $("#done").hidden = false; window.scrollTo({ top: 0, behavior: "smooth" });
   } catch (err) {
     status.textContent = String(err.message) === "rate" ? "Too many attempts from this connection. Try again in an hour, or WhatsApp us."
