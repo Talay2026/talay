@@ -20,6 +20,8 @@
 //            Handover at, Human took over, Human took over at, Opted out
 //   Centers: Slug, Name, Assistant name, Staff emails, Logo
 
+import { teamFor, whatsappTeam, template } from "./notify.js";
+
 const WINDOW_H = 24; // WhatsApp customer service window
 const splitEmails = (v) => String(v || "").toLowerCase().split(/[\s,;]+/).filter(Boolean);
 const okId = (v) => /^[A-Za-z0-9:_-]{1,64}$/.test(String(v || ""));
@@ -2351,11 +2353,14 @@ async function hqAlerts(env, at0, { since, withTest = false } = {}) {
     const c = of(l), f = l.fields, id = str(f, "External ID");
     if (!c || !id) continue;
     leadOf[c.slug + "/" + id] = l;
+    if (f["Seed at"]) continue; // demo data (script "Demodata Ridgefin"), not a real diver
     const t = msOf(f["Handover at"]);
     if (!crossed(t, ALERT_HANDOVER_MIN) || f["Human took over"] || f["Opted out"] || msOf(f["Human took over at"]) >= t) continue;
     if (/booked|lost|closed|spam/i.test(str(f, "Status"))) continue;
     if ((msgs[c.slug + "/" + id] || []).some((m) => m.fields["Direction"] === "Team" && msOf(m.fields["Sent at"]) >= t)) continue;
-    alerts.push({ kind: "handover", center: c.name, slug: c.slug, id, name: str(f, "Name") || str(f, "Contact") || "Een duiker", at: isoT(t),
+    const asked = (msgs[c.slug + "/" + id] || []).filter((m) => m.fields["Direction"] === "Customer" && msOf(m.fields["Sent at"]) <= t + 60000).pop();
+    alerts.push({ kind: "handover", center: c.name, slug: c.slug, id, test: c.test, at: isoT(t),
+      name: str(f, "Name") || str(f, "Contact") || "Een duiker", question: String(asked?.fields["Text"] || ""),
       text: `${str(f, "Name") || "Een duiker"} wacht al ${ALERT_HANDOVER_MIN} min op het team van ${c.name}.` });
   }
   for (const [k, list] of Object.entries(msgs)) {
@@ -2363,14 +2368,14 @@ async function hqAlerts(env, at0, { since, withTest = false } = {}) {
     list.forEach((m) => {
       const t = msOf(m.fields["Sent at"]);
       if (m.fields["Direction"] === "Mia" && t >= from && t < at0 && SORRY.test(String(m.fields["Text"] || "").trim()))
-        alerts.push({ kind: "sorry", center: c.name, slug, id, at: isoT(t), text: `${c.assistant} stuurde het sorry-bericht bij ${c.name}. Kijk eerst naar het API-tegoed van Anthropic en Make (inbound v2).` });
+        alerts.push({ kind: "sorry", center: c.name, slug, id, test: c.test, at: isoT(t), text: `${c.assistant} stuurde het sorry-bericht bij ${c.name}. Kijk eerst naar het API-tegoed van Anthropic en Make (inbound v2).` });
     });
     if (c.paused || c.outsideOnly) continue;
     const last = list[list.length - 1], t = msOf(last.fields["Sent at"]), l = leadOf[k];
     if (last.fields["Direction"] !== "Customer" || !crossed(t, ALERT_WAIT_MIN)) continue;
     if (SMALL_TALK.test(String(last.fields["Text"] || "").trim())) continue;
     if (l && (l.fields["Human took over"] || l.fields["Opted out"])) continue;
-    alerts.push({ kind: "waiting", center: c.name, slug, id, at: isoT(t),
+    alerts.push({ kind: "waiting", center: c.name, slug, id, test: c.test, at: isoT(t),
       text: `Een duiker bij ${c.name} kreeg ${ALERT_WAIT_MIN} min geen antwoord: “${String(last.fields["Text"] || "").slice(0, 120)}”` });
   }
   // Claude budget, once a day in the run that starts at 08:00 Koh Tao time.
@@ -2398,12 +2403,77 @@ async function sendAlerts(env, msg) {
   const res = await fetch(env.ALERT_WEBHOOK, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(msg) });
   if (!res.ok) throw new Error(`Alert webhook: ${res.status}`);
 }
-// Cloudflare cron (src/index.js → scheduled).
+// Cloudflare cron (src/index.js → scheduled). Also the WhatsApp escalation and morning summary
+// for the dive center teams (table Notify, see src/notify.js); those include demo and test centers.
 export async function runHqAlerts(env, scheduledTime) {
-  if (!env.ALERT_WEBHOOK || !env.AIRTABLE_TOKEN) return;
+  if (!env.AIRTABLE_TOKEN) return;
   const at0 = Math.floor((scheduledTime || Date.now()) / 60000) * 60000;
-  const alerts = await hqAlerts(env, at0, { withTest: env.ALERT_INCLUDE_TEST === "1" });
-  if (alerts.length) await sendAlerts(env, alertMessage(alerts, false));
+  const alerts = await hqAlerts(env, at0, { withTest: true });
+  const hq = alerts.filter((a) => env.ALERT_INCLUDE_TEST === "1" || !a.test);
+  if (env.ALERT_WEBHOOK && hq.length) await sendAlerts(env, alertMessage(hq, false));
+  await teamEscalations(env, alerts, at0).catch((e) => console.error("escalation", e));
+  await morningSummaries(env, at0).catch((e) => console.error("morning", e));
+}
+
+// ---------- Notifications for the dive center team (WhatsApp, table Notify) ----------
+// Office hours from Centers → Escalation hours ("… 9:00 … 18:00"), in minutes since midnight.
+function officeHours(f) {
+  const hm = String(first(f["Escalation hours"]) || "").match(/(\d{1,2}):(\d{2}).*?(\d{1,2}):(\d{2})/);
+  let open = hm ? (+hm[1]) * 60 + (+hm[2]) : 9 * 60, close = hm ? (+hm[3]) * 60 + (+hm[4]) : 18 * 60;
+  if (close <= open) { open = 9 * 60; close = 18 * 60; }
+  return { open, close };
+}
+const thaiMinutes = (ms) => { const t = new Date(ms + TZ_MS); return t.getUTCHours() * 60 + t.getUTCMinutes(); };
+
+// A handover with no team reply after 30 minutes (the same check as the HQ alert), only within
+// the center's office hours: template talay_still_waiting to everyone with the topic Escalation.
+async function teamEscalations(env, alerts, at0) {
+  const list = alerts.filter((a) => a.kind === "handover");
+  if (!list.length) return;
+  const centers = await at(env, "Centers", { formula: `OR(${[...new Set(list.map((a) => a.slug))].map((s) => `{Slug} = '${q(s)}'`).join(",")})` });
+  for (const a of list) {
+    const r = centers.find((c) => String(first(c.fields["Slug"]) || "").toLowerCase() === a.slug);
+    if (!r) continue;
+    const { open, close } = officeHours(r.fields), m = thaiMinutes(at0);
+    if (m < open || m >= close) continue;
+    const name = String(first(r.fields["Name"]) || a.center);
+    const people = await teamFor(env, name, "Escalation");
+    const link = `?center=${encodeURIComponent(a.slug)}&c=${encodeURIComponent(a.id)}`;
+    await whatsappTeam(env, people, template("talay_still_waiting", [name, a.name, ALERT_HANDOVER_MIN, a.question || "(see the chat)"], link));
+  }
+}
+
+// Every morning, in the run that starts 30 to 15 minutes before opening time: what happened
+// while the team was off (template talay_morning, topic Morning summary). Skipped when nothing happened.
+async function morningSummaries(env, at0) {
+  const now = thaiMinutes(at0);
+  if (now < 4 * 60 || now >= 12 * 60) return; // opening times are in the morning: no Centers call the rest of the day
+  const recs = await at(env, "Centers", { formula: "{Slug} != ''" });
+  for (const r of recs) {
+    const { open } = officeHours(r.fields);
+    if (now < open - 30 || now >= open - 15) continue;
+    const center = centerOut(r, true);
+    const people = await teamFor(env, center.name, "Morning summary");
+    if (!people.length) continue;
+    const today = thaiDate(at0);
+    const [night, open2, boat] = await Promise.all([
+      overnight(env, center),
+      conversations(env, center, "open"),
+      at(env, "Bookings", { formula: `AND(${ofCenter(center)}, DATETIME_FORMAT({Activity date}, 'YYYY-MM-DD') = '${today}')`, fields: ["Group size", "Status"], max: 500 }),
+    ]);
+    const onBoat = boat.filter((b) => !/cancel|refund/i.test(String(first(b.fields["Status"]) || "")))
+      .reduce((a, b) => a + (Number(first(b.fields["Group size"])) || 1), 0);
+    const waiting = open2.needsCount || 0;
+    if (!night.conversations && !night.bookings && !waiting && !onBoat) continue;
+    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+    await whatsappTeam(env, people, template("talay_morning", [
+      center.name,
+      night.conversations,
+      night.bookings ? `${night.bookings} (${Math.round(night.revenue).toLocaleString("en-US")} THB)` : "none",
+      waiting ? plural(waiting, "diver", "divers") : "nobody",
+      onBoat ? plural(onBoat, "diver", "divers") : "no bookings via Talay",
+    ]));
+  }
 }
 // "Stuur een testmelding" on the Systeem page: the last 24 hours, demo and test included.
 async function adminAlertTest(env) {

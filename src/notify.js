@@ -11,6 +11,8 @@
 //   type=needs_you  c (respond.io Contact ID), name, text   → template talay_needs_you
 //   type=urgent     same as needs_you, but also outside office hours for everyone
 //   type=booking    name, product, date, amount             → template talay_new_booking
+// The 15-minute cron (src/zone.js → runHqAlerts) also uses this file for the escalation
+// (talay_still_waiting, topic Escalation) and the morning summary (talay_morning).
 // Outside the center's office hours (Centers → Office from / Office to, HHMM) only people with
 // Evenings get "needs you"; the morning summary picks up the rest. Add dry=1 to see what would
 // be sent without sending anything.
@@ -35,6 +37,13 @@ const TEMPLATES = {
   talay_new_booking: {
     body: "New booking for {{1}} via Talay.\n\n{{2}} booked {{3}} for {{4}}.\nPaid online: {{5}}\n\nAll details are in your zone and in the booking email.",
   },
+  talay_still_waiting: {
+    body: "Reminder for {{1}}: {{2}} has been waiting {{3}} minutes for a reply from your team.\n\nQuestion: {{4}}\n\nTap below to answer in your zone.",
+    button: { text: "Open chat", url: "https://talay.io/zone{{1}}" },
+  },
+  talay_morning: {
+    body: "Good morning, {{1}} team. Here is what happened since your team went offline:\n\nConversations handled by Mia: {{2}}\nNew bookings: {{3}}\nWaiting for your team: {{4}}\nOn the boat today: {{5}}\n\nHave a great day of diving.",
+  },
 };
 
 export async function handleNotify(request, env, ctx) {
@@ -58,10 +67,7 @@ export async function handleNotify(request, env, ctx) {
   if (!name) return out({ error: "center has no name" }, 404);
   const night = isNight(Date.now(), Number(first(cf["Office from"])) || 800, Number(first(cf["Office to"])) || 1800);
 
-  // Exact match on the linked Center's name (a link field reads as the primary field, Name).
-  const people = (await airtable(env, TABLE, `AND({Active}, ARRAYJOIN({Center}) & '' = '${q(name)}')`, 50))
-    .map((r) => r.fields)
-    .filter((f) => (f["Topics"] || []).includes(TOPIC[type]))
+  const people = (await teamFor(env, name, TOPIC[type]))
     .filter((f) => type !== "needs_you" || !night || f["Evenings"]);
 
   const sent = [];
@@ -73,11 +79,7 @@ export async function handleNotify(request, env, ctx) {
     const link = `?center=${encodeURIComponent(slug)}` + (id ? `&c=${encodeURIComponent(id)}` : "");
     msg = template("talay_needs_you", [name, p.name || "A diver", p.text || "(see the chat)"], link);
   }
-  for (const f of people) {
-    const to = phoneOf(f["WhatsApp"]);
-    if (!(f["Channels"] || []).includes("WhatsApp") || !to) continue;
-    sent.push({ to: f["Name"] || to, channel: "WhatsApp", ...(dry ? { dry: true } : await whatsapp(env, to, f["Name"], msg)) });
-  }
+  sent.push(...await whatsappTeam(env, people, msg, dry));
   // Push only knows "needs you" (the phone asks /zone/api/push-latest what to show).
   if (type !== "booking") {
     for (const f of people) {
@@ -89,13 +91,32 @@ export async function handleNotify(request, env, ctx) {
   return out({ ok: true, night, people: people.length, sent, ...(dry ? { message: msg } : {}) });
 }
 
+// The people of one center who want this topic (Needs you, Bookings, Morning summary, Escalation).
+// Exact match on the linked Center's name (a link field reads as the primary field, Name).
+export async function teamFor(env, centerName, topic) {
+  return (await airtable(env, TABLE, `AND({Active}, ARRAYJOIN({Center}) & '' = '${q(centerName)}')`, 50))
+    .map((r) => r.fields)
+    .filter((f) => (f["Topics"] || []).includes(topic));
+}
+
+// One template to everyone in the list who has WhatsApp as a channel.
+export async function whatsappTeam(env, people, msg, dry = false) {
+  const sent = [];
+  for (const f of people) {
+    const to = phoneOf(f["WhatsApp"]);
+    if (!(f["Channels"] || []).includes("WhatsApp") || !to) continue;
+    sent.push({ to: f["Name"] || to, channel: "WhatsApp", ...(dry ? { dry: true } : await whatsapp(env, to, f["Name"], msg)) });
+  }
+  return sent;
+}
+
 function isNight(now, from, to) {
   const t = new Date(now + TZ_MS);
   const hhmm = t.getUTCHours() * 100 + t.getUTCMinutes();
   return hhmm < from || hhmm >= to;
 }
 
-function template(name, values, buttonSuffix) {
+export function template(name, values, buttonSuffix) {
   const t = TEMPLATES[name];
   const components = [{ type: "body", text: t.body, parameters: values.map((v) => ({ type: "text", text: param(v) })) }];
   if (t.button && buttonSuffix) {
