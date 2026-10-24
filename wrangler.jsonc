@@ -10,7 +10,9 @@
     "run_worker_first": ["/b/*", "/zone", "/zone/*", "/api/*"]
   },
   "vars": {
-    "AIRTABLE_BASE": "appEXBMOJa73WiQHb"
+    "AIRTABLE_BASE": "appEXBMOJa73WiQHb",
+    // respond.io channel of Talay's own WhatsApp number (+32 456 95 39 07): notifications to center staff.
+    "NOTIFY_CHANNEL": "570715"
   },
   "observability": { "enabled": true },
   // Talay HQ: elke 15 minuten nakijken of er een melding nodig is (src/zone.js → runHqAlerts).

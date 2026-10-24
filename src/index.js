@@ -9,9 +9,10 @@
 //   Products: "Name FR", "Duration FR", "Included FR", "Check-in FR" (also DE, ES, NL)
 //   Centers:  "Meeting point FR" (also DE, ES, NL)
 
-import { handleZone, runHqAlerts } from "./zone.js"; // customer zone for dive centers: talay.io/zone (+ alerts for Talay HQ)
+import { handleZone, runHqAlerts, handlePush, handleWeekly } from "./zone.js"; // customer zone for dive centers: talay.io/zone (+ alerts for Talay HQ)
 import { handleDemo } from "./demo.js"; // demo requests from the homepage form: talay.io/api/demo
 import { handleIntake } from "./intake.js"; // onboarding form for a new centre: talay.io/start -> talay.io/api/intake
+import { handleNotify } from "./notify.js"; // WhatsApp and push to dive center staff, called by Make: talay.io/api/notify
 
 const CACHE_SECONDS = 120; // limits Airtable API calls; logo links stay valid
 const MAX_DIVERS = 10; // more than 10 goes to a person (rule from the conversation flow)
@@ -385,6 +386,16 @@ export default {
     }
     if (url.pathname === "/api/intake") {
       return handleIntake(request, env, ctx);
+    }
+    // Called by Make: notifications to the dive center team, push to the zone, the weekly e-mail.
+    if (url.pathname === "/api/notify" || url.pathname === "/api/push" || url.pathname === "/api/weekly") {
+      const handler = { "/api/notify": handleNotify, "/api/push": handlePush, "/api/weekly": handleWeekly }[url.pathname];
+      try {
+        return await handler(request, env, ctx);
+      } catch (err) {
+        console.error(url.pathname, err);
+        return new Response(JSON.stringify({ error: String(err.message || err).slice(0, 300) }), { status: 502, headers: { "Content-Type": "application/json" } });
+      }
     }
     if (!url.pathname.startsWith("/b/")) return env.ASSETS.fetch(request);
     const lang = pickLang(request, url);
