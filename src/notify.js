@@ -1,6 +1,6 @@
 // Notifications for dive center staff: talay.io/api/notify (called by Make, one call per event).
 // Who gets what is in the Airtable table "Notify", one row per person per center:
-//   Name, Center (link to Centers), Slug (from Center) (lookup), Role (Owner | Office | Instructor),
+//   Name, Center (link to Centers), Role (Owner | Office | Instructor),
 //   WhatsApp, Email, Topics (Needs you | Bookings | Morning summary | Escalation),
 //   Channels (WhatsApp | Push | Email), Evenings (checkbox), Active (checkbox).
 // WhatsApp goes out as an approved template from Talay's own number (respond.io channel
@@ -54,10 +54,12 @@ export async function handleNotify(request, env, ctx) {
   const [center] = await airtable(env, "Centers", `{Slug} = '${q(slug)}'`, 1);
   if (!center) return out({ error: "center not found" }, 404);
   const cf = center.fields;
-  const name = first(cf["Name"]) || "your dive center";
+  const name = String(first(cf["Name"]) || "");
+  if (!name) return out({ error: "center has no name" }, 404);
   const night = isNight(Date.now(), Number(first(cf["Office from"])) || 800, Number(first(cf["Office to"])) || 1800);
 
-  const people = (await airtable(env, TABLE, `AND({Active}, ARRAYJOIN({Slug (from Center)}) & '' = '${q(slug)}')`, 50))
+  // Exact match on the linked Center's name (a link field reads as the primary field, Name).
+  const people = (await airtable(env, TABLE, `AND({Active}, ARRAYJOIN({Center}) & '' = '${q(name)}')`, 50))
     .map((r) => r.fields)
     .filter((f) => (f["Topics"] || []).includes(TOPIC[type]))
     .filter((f) => type !== "needs_you" || !night || f["Evenings"]);
