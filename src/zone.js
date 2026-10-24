@@ -999,7 +999,7 @@ async function pushUnsubscribe(request, env) {
     { method: "DELETE", headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` } });
   return json({ ok: true });
 }
-async function pushToCenter(env, slug, onlyEmail) {
+export async function pushToCenter(env, slug, onlyEmail) {
   if (!env.VAPID_PRIVATE) return 0;
   let formula = `{Center} = '${q(slug)}'`;
   if (onlyEmail) formula = `AND(${formula}, LOWER({Email}) = '${q(onlyEmail.toLowerCase())}')`;
