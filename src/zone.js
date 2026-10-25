@@ -817,7 +817,8 @@ async function bookings(env, center) {
       `IS_AFTER({Activity date}, DATETIME_PARSE('${from}', 'YYYY-MM-DD')), ` +
       `IS_BEFORE({Activity date}, DATETIME_PARSE('${to}', 'YYYY-MM-DD')))`,
     fields: ["Ref", "Activity date", "P name", "Group size", "Payer name", "Payer phone", "Total value THB",
-      "Deposit paid THB", "Balance at shop", "Status", "Refunded THB", "Manage token", "Late change"],
+      "Deposit paid THB", "Balance at shop", "Status", "Refunded THB", "Manage token", "Late change",
+      "Time slot", "Note", "Stripe session ID"],
     sort: [{ field: "Activity date", direction: "asc" }],
     max: 1000,
   });
@@ -850,6 +851,8 @@ async function bookings(env, center) {
         name: first(f["Payer name"]) || "", phone,
         total: n(f["Total value THB"]), deposit: n(f["Deposit paid THB"]), balance: n(f["Balance at shop"]),
         refunded: n(f["Refunded THB"]), status: first(f["Status"]) || "", late: !!f["Late change"],
+        slot: String(first(f["Time slot"]) || ""), note: String(first(f["Note"]) || "").slice(0, 300),
+        order: String(first(f["Stripe session ID"]) || ""),
         manage: /^[0-9a-fA-F-]{20,64}$/.test(token) ? `/b/manage?t=${token}` : "",
         chat: byPhone[phone] || "",
       };
@@ -5905,7 +5908,9 @@ function zoneClient(cfg) {
         brange === "tomorrow" ? t("No bookings via {a} for tomorrow yet.", { a: esc(cfg.assistant) }) : t("No bookings in this period.")) + "</div>";
       return;
     }
-    var html = "", days = {};
+    var html = "", days = {}, orders = {};
+    // Bookings paid together (one Stripe payment) belong to one order.
+    bdata.bookings.forEach(function (b) { if (b.order && !isCx(b)) orders[b.order] = (orders[b.order] || 0) + 1; });
     list.forEach(function (b) { (days[b.date] = days[b.date] || []).push(b); });
     Object.keys(days).forEach(function (day) {
       var rows = days[day], dl = rows.filter(function (b) { return !isCx(b); });
@@ -5925,7 +5930,9 @@ function zoneClient(cfg) {
             if (b.chat) links.push('<a href="#" data-chat="' + esc(b.chat) + '">' + tr("Chat") + "</a>");
             if (b.manage && !isCx(b) && b.date >= td) links.push('<a href="' + esc(b.manage) + '" target="_blank" rel="noopener">' + tr("Move / cancel") + "</a>");
             var wa = b.phone ? '<a class="tel" href="https://wa.me/' + esc(b.phone.replace(/[^0-9]/g, "")) + '" target="_blank" rel="noopener">' + esc(b.phone) + "</a>" : "";
-            return '<tr class="' + (isCx(b) ? "cx" : "") + '"><td data-l="' + tr("Name") + '" class="tname">' + esc(b.name) + '<small class="ref">' + esc(b.ref) + '</small></td><td data-l="' + tr("Phone") + '">' + wa + '</td><td class="num" data-l="' + tr("Divers") + '">' + b.divers +
+            return '<tr class="' + (isCx(b) ? "cx" : "") + '"><td data-l="' + tr("Name") + '" class="tname">' + esc(b.name) + '<small class="ref">' + esc(b.ref) + (b.slot ? " · " + esc(t(b.slot)) : "") + "</small>" +
+              (orders[b.order] > 1 ? '<small class="ref">' + tn(orders[b.order], "1 activity in this order", "{n} activities in this order") + "</small>" : "") +
+              (b.note ? '<small class="ref">“' + esc(b.note) + "”</small>" : "") + '</td><td data-l="' + tr("Phone") + '">' + wa + '</td><td class="num" data-l="' + tr("Divers") + '">' + b.divers +
               '</td><td class="num" data-l="' + tr("Paid online") + '">' + thb(b.deposit) + '</td><td class="num" data-l="' + tr("At the shop") + '">' + (isCx(b) ? "–" : thb(b.balance)) + '</td><td class="keep" data-l="' + tr("Status") + '">' + stTag(b) +
               (b.refunded ? "<br><small>" + tr("Refunded {x}", { x: thb(b.refunded) }) + "</small>" : "") + '</td><td class="keep noprint tlinks">' + links.join(" ") + "</td></tr>";
           }).join("");
