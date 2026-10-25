@@ -4739,6 +4739,21 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .pane .head > .tag{align-self:flex-start;margin-top:3px}
 /* Center logo (25 Oct): bigger, with a light ring so a dark logo stands out */
 header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-shadow:0 0 0 1px rgba(247,243,234,.25),0 2px 6px rgba(0,0,0,.25)}
+/* Colours swapped (25 Oct): chat light and airy like WhatsApp, the list warm */
+@media (prefers-color-scheme:light){
+ .pane{background:#FCFBF8}
+ .m.Customer{background:#fff;border-color:#ECE6DA}
+ .m.Mia{background:#EAF4F1}
+ .m.Mia .who{color:#2E6F80}
+ .m.Team{background:#E4EEF8;color:var(--deep)}
+ .m.Team small,.m.Team a{color:var(--muted)}
+ .m.Team .who{color:#2F5F8F}
+ .m.Team .mfile{background:rgba(10,32,41,.06)}
+ #convos .list{background:var(--paper)}
+ #convos .list .item.on{background:var(--card);box-shadow:var(--shadow)}
+ #convos .list .item:hover:not(.on){background:rgba(255,255,255,.55)}
+ #convos .list .tools input{background-color:var(--card)}
+}
 @media (max-width:760px){#books .btable.bday tr.grp{background:none;border:0;padding:12px 2px 4px;margin:0}#books .btable.bday tr.grp td{background:none;padding:0;justify-content:flex-start;text-align:left}#books .btable.bday .tname{flex-direction:column;align-items:flex-start;gap:0}}
 .minis.strip{gap:0;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
 .minis.strip .mini{background:none;border:0;border-radius:0;box-shadow:none;padding:14px 20px}
