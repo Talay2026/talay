@@ -3280,7 +3280,14 @@ function hqClient(cfg) {
   function api(path, opt) {
     return fetch("/zone/admin/api/" + path, Object.assign({ credentials: "same-origin" }, opt || {})).then(function (r) {
       if (r.status === 401) { location.reload(); throw new Error("auth"); }
-      return r.json().then(function (j) { if (!r.ok || j.error) throw new Error(j.error || "Er ging iets mis."); return j; });
+      // Not JSON (a Cloudflare error page, an Access login): name the status and error number instead of a JSON parse error.
+      return r.text().then(function (body) {
+        var j; try { j = JSON.parse(body); } catch (e) {
+          var code = body.match(/[Ee]rror[ ]+([0-9]{4})/);
+          throw new Error("De server gaf geen gegevens terug (HTTP " + r.status + (code ? ", Cloudflare-fout " + code[1] : "") + "). Klik op Vernieuwen; blijft het, kijk dan in Cloudflare bij de logs van de Worker.");
+        }
+        if (!r.ok || j.error) throw new Error(j.error || "Er ging iets mis."); return j;
+      });
     });
   }
   function post(path, body) { return api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); }
