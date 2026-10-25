@@ -821,8 +821,9 @@ async function orderInfo(env, ctx, url) {
     const slot = { Morning: T[l].am, Afternoon: T[l].pm, "Full day": T[l].day }[x.time_slot] || "";
     return [fmtDate(x.activity_date, l), lower ? slot.toLowerCase() : slot].filter(Boolean).join(", ");
   };
-  // One WhatsApp for the whole order (Make sends it after the last booking when count > 1).
-  const confirm = [
+  // One WhatsApp for the whole order (Make sends it after the last booking). Empty for a single booking:
+  // Make then uses Bookings → Confirm text, as before (ifempty in Respond.io 15).
+  const confirm = items.length < 2 ? "" : [
     firstName ? t.confirmHi(firstName) : t.confirmHiNo, "",
     ...[...items].sort((x, y) => x.activity_date.localeCompare(y.activity_date))
       .map((x) => `• ${x.shown}, ${when(x, lang, lang !== "de")}, ${diversLabel(x.divers, lang)}`), "",
