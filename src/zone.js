@@ -520,13 +520,34 @@ async function chat(env, center, id) {
       };
     });
   })();
+  // Diver card: earlier chats of the same diver (same contact or same phone) at this center.
+  // Earlier leads change rarely: keep them 10 minutes in the cache.
+  const history = await (async () => {
+    const cur = leads[id], c = String(lead.contact || "").trim(), flat = c.replace(/\s+/g, "");
+    const or = [`{External ID} & '' = '${q(id)}'`];
+    if (/^\+?[0-9 ]{6,20}$/.test(c)) or.push(`SUBSTITUTE({Contact} & '', ' ', '') = '${q(flat)}'`);
+    const rows = await cached(env, `hist/${center.slug}/${id}`, 600, async () => (await at(env, "Leads", {
+      formula: `AND(${ofCenter(center)}, OR(${or.join(",")}))`,
+      fields: ["Cert level", "Team note"], max: 20,
+    }).catch(() => [])).map((r) => ({ id: r.id, createdTime: r.createdTime, fields: r.fields })));
+    const old = rows.filter((r) => !cur || r.id !== cur.id).sort((a, b) => Date.parse(b.createdTime) - Date.parse(a.createdTime));
+    const all = cur ? rows.concat(rows.some((r) => r.id === cur.id) ? [] : [cur]) : rows;
+    const since = all.reduce((m, r) => Math.min(m, Date.parse(r.createdTime) || m), Date.parse(cur?.createdTime || 0) || Date.now());
+    const note = String(lead.note || "").trim();
+    return {
+      since: new Date(since).toISOString(), chats: old.length,
+      cert: String(first(old.map((r) => first(r.fields["Cert level"])).filter(Boolean)) || ""),
+      notes: old.map((r) => ({ at: r.createdTime, text: String(r.fields["Team note"] || "").trim() }))
+        .filter((n) => n.text && n.text !== note).slice(0, 2),
+    };
+  })();
   const teamAt = Math.max(Date.parse(lastTeam?.at || 0) || 0, Date.parse(lead.humanAt || 0) || 0);
   const handover = Date.parse(lead.handoverAt || 0) || 0;
   return {
     id, lead, hasLead: !!leads[id], messages, closesAt, canReply,
     needsYou: canReply && handover > teamAt && !lead.optedOut,
     cc: (countryOf(lead.contact) || [""])[0],
-    bookings: diverBookings,
+    bookings: diverBookings, history,
     _leadRec: leads[id] || null,
   };
 }
@@ -4774,6 +4795,10 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .bkw{flex:none;font-size:11.5px;font-weight:700;color:#1E7A52;background:var(--card);border-radius:999px;padding:3px 9px}
 .bkm{flex:none;text-decoration:none;font-size:12px}
 .bkp{font-size:12px;color:var(--muted)}
+.hist{display:grid;gap:2px;font-size:12.5px;color:var(--muted);padding-left:10px;border-left:2px solid var(--line)}
+.hist b{font-weight:600;color:var(--deep)}
+.hist .hn{color:#7A5B12;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+@media (prefers-color-scheme:dark){.hist .hn{color:var(--sand)}}
 .tag.ret{background:rgba(220,164,74,.18);color:#8A5E14}
 @media (prefers-color-scheme:dark){.bki,.bkw{color:#6FCF9B}.tag.ret{color:var(--sand)}}
 @media (max-width:760px){.pane .head > .tag.ret{display:none}.bkwrap{padding:0 12px 10px}.bkc{flex-wrap:wrap}.bkb{flex-basis:calc(100% - 46px)}.bkw{margin-left:46px}.bkm{margin-left:auto}}
@@ -4876,7 +4901,7 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 @media (max-width:760px){
  .cimore{display:inline-flex;align-items:center;gap:4px;justify-self:start;font:inherit;font-size:13px;font-weight:600;color:var(--muted);background:none;border:0;padding:2px 0;cursor:pointer}
  .cinfo.open .cimore svg{transform:rotate(180deg)}
- .cinfo:not(.open) .facts,.cinfo:not(.open) .teamrow{display:none}
+ .cinfo:not(.open) .facts,.cinfo:not(.open) .teamrow,.cinfo:not(.open) .hist{display:none}
  .night.big .nstats b{font-size:26px}
  .night.big .nstats span{font-size:12px;line-height:1.35;display:block}
 }
@@ -5336,7 +5361,7 @@ function zoneClient(cfg) {
     api("chat?c=" + encodeURIComponent(id) + fr).then(function (d) {
       if (id !== current) return;
       if (d.messages && d.messages.length) { chatSeenAt = d.messages[d.messages.length - 1].at; markSeen(id, chatSeenAt); }
-      var key = JSON.stringify([d.messages.length, d.canReply, d.needsYou, d.lead, d.bookings]);
+      var key = JSON.stringify([d.messages.length, d.canReply, d.needsYou, d.lead, d.bookings, d.history]);
       if (key === lastChat) return;
       var draft = $("#txt") ? $("#txt").value : "";
       var oldBox = $("#msgs"), keepTop = null;
@@ -5346,7 +5371,7 @@ function zoneClient(cfg) {
       var actions = "";
       if (d.hasLead && L.human) actions += '<button class="ghost hb" id="handback">▶ ' + t("Let {a} take over", { a: esc(cfg.assistant) }) + "</button>";
       if (d.hasLead && d.needsYou && !L.human) actions += '<button class="ghost" id="handled">' + t("Mark as handled") + "</button>";
-      var facts = fact(t("Channel"), L.channel && L.channel !== "WhatsApp" ? L.channel : "") + fact(t("Language"), L.language && langName(L.language)) + fact(t("Level"), human(L.cert)) + fact(t("On the island"), prettyDates(L.dates)) +
+      var facts = fact(t("Channel"), L.channel && L.channel !== "WhatsApp" ? L.channel : "") + fact(t("Language"), L.language && langName(L.language)) + fact(t("Level"), human(L.cert || (d.history && d.history.cert))) + fact(t("On the island"), prettyDates(L.dates)) +
         fact(t("Group"), L.group) + fact(t("Interested in"), /^rec[A-Za-z0-9]{14}$/.test(L.interested) ? "" : L.interested) + fact("WhatsApp", L.contact && L.name && L.contact !== L.name ? prettyPhone(L.contact) : "") +
         "";
       // While the team has the chat, Mia stays silent for this diver. "Talay - release handovers" (hourly)
@@ -5375,7 +5400,7 @@ function zoneClient(cfg) {
         (d.hasLead ? '<div class="teamrow"><button type="button" class="asg" id="assign" aria-haspopup="menu" aria-expanded="false" title="' + t("Assigned to") + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span id="asgName">' + esc(L.assigned ? (L.assigned === String(cfg.email || "").toLowerCase() ? t("You") : person(L.assigned)) : t("Not assigned")) + '</span><svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>' +
           '<button type="button" class="nbtn' + (L.note ? " has" : "") + '" id="nOpen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>' + (L.note ? esc(L.note.length > 70 ? L.note.slice(0, 70) + "…" : L.note) : t("Add a team note")) + "</button>" +
           '<div class="nbox" id="nBox" hidden><textarea id="nTxt" rows="3" maxlength="2000" placeholder="' + t("Only your team sees this, never the diver. E.g. wants to be in the same group as her friend.") + '">' + esc(L.note) + '</textarea><div class="nact"><span class="nmsg" id="nMsg"></span><button type="button" class="ghost" id="nCancel">' + t("Cancel") + '</button><button type="button" class="btn primary" id="nSave">' + t("Save") + "</button></div></div></div>" : "") +
-        bookingCard(d.bookings) + "</div>" +
+        bookingCard(d.bookings, d.history) + "</div>" +
         '<div class="msgs" id="msgs">' + (function () {
           var prevDay = "";
           return d.messages.map(function (m, idx) {
@@ -6028,9 +6053,10 @@ function zoneClient(cfg) {
   })();
 
   // ---- The diver's bookings, shown in the conversation
-  function bookingCard(list) {
-    list = list || [];
-    if (!list.length) return "";
+  function bookingCard(list, h) {
+    list = list || []; h = h || {};
+    var notes = h.notes || [];
+    if (!list.length && !h.chats && !notes.length) return "";
     var today = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
     var cx = function (b) { return /cancel|refund/i.test(b.status); };
     var up = list.filter(function (b) { return b.date >= today && !cx(b); }).sort(function (a, b) { return a.date.localeCompare(b.date); });
@@ -6048,7 +6074,23 @@ function zoneClient(cfg) {
     var pastLine = past.length ? '<div class="bkp">' + (up.length ? t("Earlier") + ": " : t("Booked before") + ": ") + past.slice(0, 3).map(function (b) {
       return esc(b.product) + " (" + esc(fmt(b.date)) + (cx(b) ? ", " + t("cancelled") : "") + ")";
     }).join(" · ") + (past.length > 3 ? " · " + t("+{n} more", { n: past.length - 3 }) : "") + "</div>" : "";
-    return '<div class="bkwrap">' + up.map(card).join("") + pastLine + "</div>";
+    // Diver card: only for a diver who booked or chatted before, so a first chat stays as it was.
+    var hist = "";
+    if (past.length || h.chats) {
+      var live = list.filter(function (b) { return !cx(b); });
+      var since = Date.parse(h.since || "") || 0;
+      if (live.length) since = Math.min(since || Infinity, Date.parse(live[live.length - 1].date + "T12:00:00Z"));
+      var top = [
+        since ? t("Diver since {d}", { d: new Date(since).toLocaleDateString(LOC, { month: "long", year: "numeric" }) }) : "",
+        live.length ? tn(live.length, "1 booking", "{n} bookings") + " · " + money(live.reduce(function (a, b) { return a + (b.total || 0); }, 0)) : t("No booking yet"),
+      ].filter(Boolean).join(" · ");
+      hist = '<div class="hist"><b>' + esc(top) + "</b>" + pastLine.replace('class="bkp"', 'class="bkp hp"') +
+        notes.map(function (n) {
+          return '<div class="hn" title="' + esc(n.text) + '">' + t("Earlier note") + " (" + esc(new Date(n.at).toLocaleDateString(LOC, { day: "numeric", month: "short" })) + "): " + esc(n.text.length > 90 ? n.text.slice(0, 90) + "…" : n.text) + "</div>";
+        }).join("") + "</div>";
+      pastLine = "";
+    }
+    return '<div class="bkwrap">' + up.map(card).join("") + pastLine + hist + "</div>";
   }
 
   // ---- Pretty names and facts
