@@ -4737,6 +4737,8 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .item.on{background:var(--paper);box-shadow:inset 0 0 0 1px var(--line)}
 .item.on::before{content:none}
 .pane .head > .tag{align-self:flex-start;margin-top:3px}
+/* Center logo (25 Oct): bigger, with a light ring so a dark logo stands out */
+header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-shadow:0 0 0 1px rgba(247,243,234,.25),0 2px 6px rgba(0,0,0,.25)}
 @media (max-width:760px){#books .btable.bday tr.grp{background:none;border:0;padding:12px 2px 4px;margin:0}#books .btable.bday tr.grp td{background:none;padding:0;justify-content:flex-start;text-align:left}#books .btable.bday .tname{flex-direction:column;align-items:flex-start;gap:0}}
 .minis.strip{gap:0;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
 .minis.strip .mini{background:none;border:0;border-radius:0;box-shadow:none;padding:14px 20px}
