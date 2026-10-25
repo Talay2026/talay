@@ -4700,8 +4700,8 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .btable.bday .tname small.ref{display:block;font-size:12px;color:var(--muted);font-weight:500}
 .btable.bday a.tel{font-weight:500;text-decoration:none}
 .btable.bday a.tel:hover{text-decoration:underline}
-.btable.bday .tlinks a{color:var(--bar);font-weight:600;text-decoration:none;white-space:nowrap}
-.btable.bday .tlinks a:hover{text-decoration:underline}
+.btable td.tlinks a{color:#2E6F80;font-weight:600;text-decoration:none;white-space:nowrap}
+.btable td.tlinks a:hover{text-decoration:underline}
 @media (max-width:760px){#books .btable.bday tr.grp{background:none;border:0;padding:12px 2px 4px;margin:0}#books .btable.bday tr.grp td{background:none;padding:0;justify-content:flex-start;text-align:left}#books .btable.bday .tname{flex-direction:column;align-items:flex-start;gap:0}}
 .minis.strip{gap:0;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
 .minis.strip .mini{background:none;border:0;border-radius:0;box-shadow:none;padding:14px 20px}
@@ -5509,7 +5509,6 @@ function zoneClient(cfg) {
         var act = [];
         if (i.booked) act.push('<span class="st ok">' + t("Booked since") + "</span>");
         else if (i.chat && i.canMessage) act.push('<a href="#" data-remind="' + k + '">' + t("Send reminder") + "</a>");
-        else if (i.chat) act.push('<span class="st">' + t("Outside 24 h") + "</span>");
         else act.push('<span class="st">' + t("No chat linked") + "</span>");
         if (i.chat) act.push('<a href="#" data-uchat="' + k + '">' + t("Chat") + "</a>");
         return '<tr><td class="tname" data-l="' + t("Diver") + '">' + who + '</td><td data-l="' + t("Product") + '">' + esc(i.product) + '</td><td data-l="' + t("For") + '">' + esc(dayLabel(i.date)) + '</td><td class="num" data-l="' + t("Divers") + '">' + i.divers +
@@ -5554,15 +5553,14 @@ function zoneClient(cfg) {
     $("#blist").innerHTML = '<p class="d" style="color:var(--muted);font-size:14px;margin:0 0 10px">' + t("These divers told {a} when they're on the island, but haven't booked yet. A personal message now often makes the difference.", { a: esc(cfg.assistant) }) + "</p>" +
       '<div class="bscroll"><table class="btable"><thead><tr><th>' + t("Diver") + "</th><th>" + t("When") + "</th><th>" + t("Interested in") + "</th><th>" + t("Level") + '</th><th class="num">' + t("Group") + '</th><th class="noprint"></th></tr></thead><tbody>' +
       list.map(function (i, k) {
-        var who = esc(i.name || i.phone || t("Unknown diver")) + (i.language ? ' <span class="tag lang">' + esc(String(i.language).slice(0, 2)) + "</span>" : "");
-        var when = '<b>' + esc(whenText(i)) + '</b><br><small style="color:var(--muted)">' + esc(shortDay(i.from)) + " – " + esc(shortDay(i.to)) + (i.dates ? " · “" + esc(i.dates) + "”" : "") + "</small>";
+        var who = esc(i.name || i.phone || t("Unknown diver"));
+        var when = esc(whenText(i)) + '<br><small style="color:var(--muted)">' + esc(shortDay(i.from)) + " – " + esc(shortDay(i.to)) + "</small>";
         var act = [];
         if (i.chat && i.canMessage) act.push('<a href="#" data-amsg="' + k + '">' + t("Send a message") + "</a>");
-        else if (i.chat) act.push('<span class="st">' + t("Outside 24 h") + "</span>");
         if (i.chat) act.push('<a href="#" data-achat="' + k + '">' + t("Chat") + "</a>");
         else if (i.phone) act.push(esc(i.phone));
         return '<tr><td class="tname" data-l="' + t("Diver") + '">' + who + '</td><td data-l="' + t("When") + '">' + when + '</td><td data-l="' + t("Interested in") + '">' + esc(i.interested || "–") +
-          '</td><td data-l="' + t("Level") + '">' + esc(i.cert || "–") + '</td><td class="num" data-l="' + t("Group") + '">' + esc(i.group || "1") + '</td><td class="keep noprint tlinks">' + act.join(" · ") + "</td></tr>";
+          '</td><td data-l="' + t("Level") + '">' + esc(human(i.cert) || "–") + '</td><td class="num" data-l="' + t("Group") + '">' + esc(i.group || "1") + '</td><td class="keep noprint tlinks">' + act.join(" · ") + "</td></tr>";
       }).join("") + "</tbody></table></div>" +
       '<p style="color:var(--muted);font-size:13px">' + t("WhatsApp, Instagram and Messenger only allow a free message within 24 hours of the diver's last message. For the others, message them from your own app.") + "</p>";
     function go(k, draft) {
