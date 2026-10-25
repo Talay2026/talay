@@ -8,7 +8,7 @@
 // (Gmail 33 and the booking mail), so the Email channel is not used here yet.
 //
 // GET or POST talay.io/api/notify?key=PUSH_KEY&type=…&center=<slug>&…
-//   type=needs_you  c (respond.io Contact ID), name, text   → template talay_needs_you
+//   type=needs_you  c (respond.io Contact ID), name, text   → template talay_needs_you_v2
 //   type=urgent     same as needs_you, but also outside office hours for everyone
 //   type=booking    name, product, date, amount             → template talay_new_booking
 // The 15-minute cron (src/zone.js → runHqAlerts) also uses this file for the escalation
@@ -43,7 +43,8 @@ const langOf = (f) => { const l = String(f["Language"] || "").slice(0, 2).toLowe
 // Template texts as approved by Meta, per language (Notify → Language); respond.io wants the body
 // text next to the values. Only the buttons with a link to one chat have a variable part.
 const TEMPLATES = {
-  talay_needs_you: {
+  // v2: the first talay_needs_you on channel 570715 was filed as Marketing, and Meta keeps one category per name.
+  talay_needs_you_v2: {
     url: "https://talay.io/zone{{1}}",
     en: { body: "Talay alert for {{1}}: a diver needs your team.\n\nName: {{2}}\nQuestion: {{3}}\n\nMia told the diver that the team will reply. Tap below to open the chat.", button: "Open chat" },
     fr: { body: "Alerte Talay pour {{1}} : un plongeur a besoin de votre équipe.\n\nNom : {{2}}\nQuestion : {{3}}\n\nMia a dit au plongeur que l'équipe va répondre. Touchez ci-dessous pour ouvrir la conversation.", button: "Ouvrir le chat" },
@@ -112,7 +113,7 @@ export async function handleNotify(request, env, ctx) {
   } else {
     const id = String(p.c || "").replace(/[^A-Za-z0-9:_-]/g, "").slice(0, 64);
     const link = `?center=${encodeURIComponent(slug)}` + (id ? `&c=${encodeURIComponent(id)}` : "");
-    build = (l) => template("talay_needs_you", [name, p.name || WORDS[l].diver, p.text || WORDS[l].seeChat], link, l);
+    build = (l) => template("talay_needs_you_v2", [name, p.name || WORDS[l].diver, p.text || WORDS[l].seeChat], link, l);
   }
   sent.push(...await whatsappTeam(env, people, build, dry));
   // Push only knows "needs you" (the phone asks /zone/api/push-latest what to show).
