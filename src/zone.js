@@ -80,6 +80,7 @@ export async function handleZone(request, env, ctx) {
       if (!okId(id)) return json({ error: "Bad request" });
       return json(await cached(env, `prod/${center.slug}/${id}`, 300, () => products(env, center, id), fresh));
     }
+    if (p === "/zone/api/quick") return json({ quick: quickReplies(await centerRecord(env, center)) });
     if (p === "/zone/api/bookings") return json(await cached(env, `book/${center.slug}`, 60, () => bookings(env, center), fresh));
     if (p === "/zone/api/dashboard") {
       const per = /^\d{4}-\d{2}$/.test(url.searchParams.get("period") || "") ? url.searchParams.get("period") : "";
@@ -521,13 +522,34 @@ async function chat(env, center, id) {
       };
     });
   })();
+  // Diver card: earlier chats of the same diver (same contact or same phone) at this center.
+  // Earlier leads change rarely: keep them 10 minutes in the cache.
+  const history = await (async () => {
+    const cur = leads[id], c = String(lead.contact || "").trim(), flat = c.replace(/\s+/g, "");
+    const or = [`{External ID} & '' = '${q(id)}'`];
+    if (/^\+?[0-9 ]{6,20}$/.test(c)) or.push(`SUBSTITUTE({Contact} & '', ' ', '') = '${q(flat)}'`);
+    const rows = await cached(env, `hist/${center.slug}/${id}`, 600, async () => (await at(env, "Leads", {
+      formula: `AND(${ofCenter(center)}, OR(${or.join(",")}))`,
+      fields: ["Cert level", "Team note"], max: 20,
+    }).catch(() => [])).map((r) => ({ id: r.id, createdTime: r.createdTime, fields: r.fields })));
+    const old = rows.filter((r) => !cur || r.id !== cur.id).sort((a, b) => Date.parse(b.createdTime) - Date.parse(a.createdTime));
+    const all = cur ? rows.concat(rows.some((r) => r.id === cur.id) ? [] : [cur]) : rows;
+    const since = all.reduce((m, r) => Math.min(m, Date.parse(r.createdTime) || m), Date.parse(cur?.createdTime || 0) || Date.now());
+    const note = String(lead.note || "").trim();
+    return {
+      since: new Date(since).toISOString(), chats: old.length,
+      cert: String(first(old.map((r) => first(r.fields["Cert level"])).filter(Boolean)) || ""),
+      notes: old.map((r) => ({ at: r.createdTime, text: String(r.fields["Team note"] || "").trim() }))
+        .filter((n) => n.text && n.text !== note).slice(0, 2),
+    };
+  })();
   const teamAt = Math.max(Date.parse(lastTeam?.at || 0) || 0, Date.parse(lead.humanAt || 0) || 0);
   const handover = Date.parse(lead.handoverAt || 0) || 0;
   return {
     id, lead, hasLead: !!leads[id], messages, closesAt, canReply,
     needsYou: canReply && handover > teamAt && !lead.optedOut,
     cc: (countryOf(lead.contact) || [""])[0],
-    bookings: diverBookings,
+    bookings: diverBookings, history,
     _leadRec: leads[id] || null,
   };
 }
@@ -1628,7 +1650,7 @@ async function settings(env, center) {
   return {
     admin: center.admin, admins: splitEmails(f["Admin emails"]), products,
     staff, team: await teamDetails(env, center, staff),
-    alert: s("Alert Email"),
+    alert: s("Alert Email"), quick: quickReplies(f),
     hoursText: s("Escalation hours"),
     from: hours ? hours[1].padStart(5, "0") : "09:00",
     to: hours ? hours[2].padStart(5, "0") : "18:00",
@@ -1639,6 +1661,17 @@ async function settings(env, center) {
       sites: s("Dive sites"), boats: s("Boat departure times"), emergency: s("Center emergency phone"),
     },
   };
+}
+
+// Quick replies: the team's saved texts, typed into a chat with "/". Stored as JSON in the
+// Centers long text field "Quick replies": [{ "title": "Address", "text": "…" }].
+const QUICK_MAX = 30;
+function quickReplies(f) {
+  try {
+    const v = JSON.parse(String(first(f["Quick replies"]) || "[]"));
+    return (Array.isArray(v) ? v : []).map((x) => ({ title: String(x?.title || "").slice(0, 40), text: String(x?.text || "").slice(0, 1500) }))
+      .filter((x) => x.title && x.text).slice(0, QUICK_MAX);
+  } catch (e) { return []; }
 }
 
 // Team details live in the Airtable table "Notify" (one row per person per center, also used by
@@ -1697,7 +1730,7 @@ async function saveMember(env, center, email, body) {
 async function saveSettings(request, env, center, email) {
   const body = await readBody(request);
   if (!body) return json({ error: "Bad request" }, 400);
-  if (body.action !== "mia" && !center.admin) {
+  if (body.action !== "mia" && body.action !== "quick" && !center.admin) {
     return json({ error: "Only an admin of your dive center can change this." }, 403);
   }
   if (body.action === "product") return await saveProduct(env, center, email, body);
@@ -1728,6 +1761,11 @@ async function saveSettings(request, env, center, email) {
     fields["Outside hours only"] = !!body.outsideOnly;
   } else if (body.action === "mia") {
     fields["Mia paused"] = !!body.paused;
+  } else if (body.action === "quick") {
+    const items = (Array.isArray(body.items) ? body.items : []).map((x) => ({ title: String(x?.title || "").trim().slice(0, 40), text: String(x?.text || "").trim().slice(0, 1500) }));
+    if (items.some((x) => !x.title || !x.text)) return json({ error: "Give every quick reply a name and a text." }, 400);
+    if (items.length > QUICK_MAX) return json({ error: `Maximum ${QUICK_MAX} quick replies.` }, 400);
+    fields["Quick replies"] = JSON.stringify(items);
   } else {
     return json({ error: "Unknown setting." }, 400);
   }
@@ -1753,6 +1791,7 @@ function describe(b) {
   if (b.action === "hours") return `office hours: ${b.from}–${b.to}`;
   if (b.action === "mode") return b.outsideOnly ? "assistant answers only outside office hours" : "assistant answers day and night";
   if (b.action === "mia") return b.paused ? "paused the assistant" : "turned the assistant back on";
+  if (b.action === "quick") return `quick replies: ${(b.items || []).map((x) => x.title).join(", ")}`;
   return b.action;
 }
 
@@ -4787,6 +4826,10 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .bkw{flex:none;font-size:11.5px;font-weight:700;color:#1E7A52;background:var(--card);border-radius:999px;padding:3px 9px}
 .bkm{flex:none;text-decoration:none;font-size:12px}
 .bkp{font-size:12px;color:var(--muted)}
+.hist{display:grid;gap:2px;font-size:12.5px;color:var(--muted);padding-left:10px;border-left:2px solid var(--line)}
+.hist b{font-weight:600;color:var(--deep)}
+.hist .hn{color:#7A5B12;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+@media (prefers-color-scheme:dark){.hist .hn{color:var(--sand)}}
 .tag.ret{background:rgba(220,164,74,.18);color:#8A5E14}
 @media (prefers-color-scheme:dark){.bki,.bkw{color:#6FCF9B}.tag.ret{color:var(--sand)}}
 @media (max-width:760px){.pane .head > .tag.ret{display:none}.bkwrap{padding:0 12px 10px}.bkc{flex-wrap:wrap}.bkb{flex-basis:calc(100% - 46px)}.bkw{margin-left:46px}.bkm{margin-left:auto}}
@@ -4889,12 +4932,30 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 @media (max-width:760px){
  .cimore{display:inline-flex;align-items:center;gap:4px;justify-self:start;font:inherit;font-size:13px;font-weight:600;color:var(--muted);background:none;border:0;padding:2px 0;cursor:pointer}
  .cinfo.open .cimore svg{transform:rotate(180deg)}
- .cinfo:not(.open) .facts,.cinfo:not(.open) .teamrow{display:none}
+ .cinfo:not(.open) .facts,.cinfo:not(.open) .teamrow,.cinfo:not(.open) .hist{display:none}
  .night.big .nstats b{font-size:26px}
  .night.big .nstats span{font-size:12px;line-height:1.35;display:block}
 }
 /* Dark mode (25 Oct): readable trend pills in the mini strip */
 @media (prefers-color-scheme:dark){.mini em.trend.up{background:rgba(95,192,138,.16);color:#6FCF9B}.mini em.trend.down{background:rgba(240,168,119,.16);color:#F0A877}}
+/* Quick replies (25 Oct) */
+.composer{position:relative}
+.qpop{position:absolute;left:12px;right:12px;bottom:calc(100% - 4px);z-index:30;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 28px -10px rgba(9,38,47,.3);padding:4px;max-width:520px}
+.qpop button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;text-align:left;font:inherit;background:none;border:0;border-radius:8px;padding:7px 10px;cursor:pointer;color:var(--deep)}
+.qpop button b{font-size:13.5px;font-weight:600}
+.qpop button span{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.qpop button.on,.qpop button:hover{background:var(--paper)}
+.qpop .qnone{font-size:13px;color:var(--muted);padding:8px 10px}
+.qedit{padding:10px 2px 14px;display:grid;gap:10px}
+.qedit label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+.qedit textarea{font:inherit;font-size:14px;color:var(--deep);border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--paper-2);resize:vertical}
+.qlist:empty{display:none}
+.qedit[hidden]{display:none}
+.qlist{grid-template-columns:minmax(0,1fr)}
+.qlist .pmi{overflow:hidden}
+.qlist .pms{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#qNew{margin-top:8px}
+@media (prefers-color-scheme:dark){.qpop{box-shadow:0 8px 28px -10px rgba(0,0,0,.6)}}
 /* Unread dot (25 Oct) */
 .item .udot{width:9px;height:9px;border-radius:50%;background:var(--sand);flex:none}
 .item.unread .nm{font-weight:800}
@@ -5109,6 +5170,14 @@ header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-sh
       <div class="smsg" id="tMsg"></div>
     </div>
     <div class="scard">
+      <h3>${T("Quick replies")}</h3>
+      <p class="d">${T("Texts your team often sends, like your address or what to bring. In a chat, type / and the first letters of the name to put one in.")}</p>
+      <ul class="people qlist" id="qlist"></ul>
+      <div class="pedit qedit" id="qedit" hidden><label>${T("Name")}<input type="text" id="qTitle" maxlength="40" placeholder="${T("e.g. address")}"></label><label>${T("Text")}<textarea id="qText" rows="4" maxlength="1500"></textarea></label><div class="nact"><span class="sp"></span><button type="button" class="ghost" id="qCancel">${T("Cancel")}</button><button type="button" class="btn" id="qSave">${T("Save")}</button></div></div>
+      <button type="button" class="ghost" id="qNew">${T("+ New quick reply")}</button>
+      <div class="smsg" id="qMsg"></div>
+    </div>
+    <div class="scard">
       <h3>${T("What {a} knows about you", { a: A })}</h3>
       <p class="d">${T("To change any of this, message Jonas at {mail}.", { mail: '<a href="mailto:jonas@talay.io">jonas@talay.io</a>' })}</p>
       <dl class="info" id="info"></dl>
@@ -5201,11 +5270,30 @@ function zoneClient(cfg) {
       });
     } catch (e) {}
   }
+  var iconOn = null, iconImg = null;
+  function tabIcon(on) {
+    if (on === iconOn) return; iconOn = on;
+    var link = document.querySelector('link[rel="icon"]'); if (!link) return;
+    if (!on) { link.href = "/zone/icon-192.png"; return; }
+    var draw = function () {
+      try {
+        var c = document.createElement("canvas"); c.width = c.height = 64; var x = c.getContext("2d");
+        x.drawImage(iconImg, 0, 0, 64, 64);
+        x.beginPath(); x.arc(50, 14, 13, 0, 2 * Math.PI); x.fillStyle = "#E8B04B"; x.fill(); x.lineWidth = 4; x.strokeStyle = "#0A2029"; x.stroke();
+        if (iconOn) link.href = c.toDataURL("image/png");
+      } catch (e) {}
+    };
+    if (iconImg && iconImg.complete) return draw();
+    iconImg = new Image(); iconImg.onload = draw; iconImg.src = "/zone/icon-192.png";
+  }
   function badge(list) {
     var need = list.filter(function (c) { return c.needsYou || c.waitingMin > 0; });
     var n = need.length, el = $("#count");
     el.hidden = !n; el.textContent = n;
-    document.title = (n ? "(" + n + ") " : "") + cfg.center + " · Talay";
+    // Browser tab: chats that need the team plus chats with a new diver message, and a dot on the icon.
+    var tabN = list.filter(function (c) { return c.needsYou || c.waitingMin > 0 || unread(c); }).length;
+    document.title = (tabN ? "(" + tabN + ") " : "") + cfg.center + " · Talay";
+    tabIcon(tabN > 0);
     var ids = need.map(function (c) { return c.id; });
     if (needSeen && ids.some(function (id) { return needSeen.indexOf(id) < 0; })) beep();
     needSeen = ids;
@@ -5335,6 +5423,7 @@ function zoneClient(cfg) {
     current = id; lastChat = ""; chatSeenAt = null;
     var it = items.filter(function (c) { return c.id === id; })[0]; if (it) markSeen(id, it.lastAt);
     var row = document.querySelector('.item[data-id="' + id + '"]'); if (row) { row.classList.remove("unread"); var u = row.querySelector(".udot"); if (u) u.remove(); }
+    if (filter === "open" || filter === "need") badge(items);
     document.querySelectorAll(".item").forEach(function (b) { b.classList.toggle("on", b.dataset.id === id); });
     $("#convos").classList.add("open"); document.body.classList.add("inchat");
     $("#pane").innerHTML = '<div class="skel pad"><i></i><i></i><i></i></div>';
@@ -5349,7 +5438,7 @@ function zoneClient(cfg) {
     api("chat?c=" + encodeURIComponent(id) + fr).then(function (d) {
       if (id !== current) return;
       if (d.messages && d.messages.length) { chatSeenAt = d.messages[d.messages.length - 1].at; markSeen(id, chatSeenAt); }
-      var key = JSON.stringify([d.messages.length, d.canReply, d.needsYou, d.lead, d.bookings]);
+      var key = JSON.stringify([d.messages.length, d.canReply, d.needsYou, d.lead, d.bookings, d.history]);
       if (key === lastChat) return;
       var draft = $("#txt") ? $("#txt").value : "";
       var oldBox = $("#msgs"), keepTop = null;
@@ -5359,7 +5448,7 @@ function zoneClient(cfg) {
       var actions = "";
       if (d.hasLead && L.human) actions += '<button class="ghost hb" id="handback">▶ ' + t("Let {a} take over", { a: esc(cfg.assistant) }) + "</button>";
       if (d.hasLead && d.needsYou && !L.human) actions += '<button class="ghost" id="handled">' + t("Mark as handled") + "</button>";
-      var facts = fact(t("Channel"), L.channel && L.channel !== "WhatsApp" ? L.channel : "") + fact(t("Language"), L.language && langName(L.language)) + fact(t("Level"), human(L.cert)) + fact(t("On the island"), prettyDates(L.dates)) +
+      var facts = fact(t("Channel"), L.channel && L.channel !== "WhatsApp" ? L.channel : "") + fact(t("Language"), L.language && langName(L.language)) + fact(t("Level"), human(L.cert || (d.history && d.history.cert))) + fact(t("On the island"), prettyDates(L.dates)) +
         fact(t("Group"), L.group) + fact(t("Interested in"), /^rec[A-Za-z0-9]{14}$/.test(L.interested) ? "" : L.interested) + fact("WhatsApp", L.contact && L.name && L.contact !== L.name ? prettyPhone(L.contact) : "") +
         "";
       // While the team has the chat, Mia stays silent for this diver. "Talay - release handovers" (hourly)
@@ -5388,7 +5477,7 @@ function zoneClient(cfg) {
         (d.hasLead ? '<div class="teamrow"><button type="button" class="asg" id="assign" aria-haspopup="menu" aria-expanded="false" title="' + t("Assigned to") + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span id="asgName">' + esc(L.assigned ? (L.assigned === String(cfg.email || "").toLowerCase() ? t("You") : person(L.assigned)) : t("Not assigned")) + '</span><svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>' +
           '<button type="button" class="nbtn' + (L.note ? " has" : "") + '" id="nOpen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>' + (L.note ? esc(L.note.length > 70 ? L.note.slice(0, 70) + "…" : L.note) : t("Add a team note")) + "</button>" +
           '<div class="nbox" id="nBox" hidden><textarea id="nTxt" rows="3" maxlength="2000" placeholder="' + t("Only your team sees this, never the diver. E.g. wants to be in the same group as her friend.") + '">' + esc(L.note) + '</textarea><div class="nact"><span class="nmsg" id="nMsg"></span><button type="button" class="ghost" id="nCancel">' + t("Cancel") + '</button><button type="button" class="btn primary" id="nSave">' + t("Save") + "</button></div></div></div>" : "") +
-        bookingCard(d.bookings) + "</div>" +
+        bookingCard(d.bookings, d.history) + "</div>" +
         '<div class="msgs" id="msgs">' + (function () {
           var prevDay = "";
           return d.messages.map(function (m, idx) {
@@ -5412,6 +5501,7 @@ function zoneClient(cfg) {
         paused + (d.canReply
           ? '<div class="composer">' +
             '<div class="pchips" id="pchips" hidden></div>' +
+            '<div class="qpop" id="qpop" role="listbox" hidden></div>' +
             '<div class="cbox"><textarea id="txt" placeholder="' + t("Reply on {ch}…", { ch: esc((L && L.channel) || "WhatsApp") }) + '" title="' + t("Enter sends · Shift + Enter for a new line · replying pauses {a} for this diver for 2 hours.", { a: esc(cfg.assistant) }) + '" rows="1"></textarea>' +
             '<button class="emo" id="att" type="button" title="' + t("Photo or file") + '" aria-label="' + t("Photo or file") + '"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9"/></svg></button><input type="file" id="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden>' +
             '<button class="emo" id="emo" type="button" title="' + t("Emoji") + '" aria-label="' + t("Emoji") + '" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/></svg></button>' +
@@ -5467,7 +5557,7 @@ function zoneClient(cfg) {
         var so = $("#sigon"); so.checked = !d.messages.some(function (m) { return m.dir === "Team"; });
         // Enter sends, Shift + Enter is a new line. On a phone the keyboard's return key stays a new line.
         var touch = matchMedia("(pointer:coarse)").matches;
-        tx.onkeydown = function (e) { if (e.key === "Enter" && !e.isComposing && (e.metaKey || e.ctrlKey || (!touch && !e.shiftKey))) { e.preventDefault(); send(); } };
+        tx.onkeydown = function (e) { if (quickKey(e, tx)) return; if (e.key === "Enter" && !e.isComposing && (e.metaKey || e.ctrlKey || (!touch && !e.shiftKey))) { e.preventDefault(); send(); } };
         var fi = $("#file"), fc = $("#fchip");
         $("#att").onclick = function () { fi.click(); };
         fi.onchange = function () { pickFile(fi.files && fi.files[0]); fi.value = ""; };
@@ -5488,6 +5578,8 @@ function zoneClient(cfg) {
         });
         var grow = function () { tx.style.height = "auto"; tx.style.height = Math.min(tx.scrollHeight, 180) + "px"; };
         tx.addEventListener("input", grow); setTimeout(grow, 0);
+        tx.addEventListener("input", function () { quickShow(tx); });
+        tx.addEventListener("blur", function () { setTimeout(quickHide, 150); });
         $("#send").onclick = send;
         var sg = $("#sugg");
         if (sg) {
@@ -5785,6 +5877,82 @@ function zoneClient(cfg) {
   }
   setInterval(function () { if (!document.hidden && $("#books").classList.contains("on")) loadBookings(); }, 60000);
 
+  // ---- quick replies: type "/" plus the first letters of a name; at most 5 matches show.
+  var QUICK = [], qSel = 0, qHits = [];
+  function loadQuick() { api("quick").then(function (d) { QUICK = d.quick || []; }).catch(function () {}); }
+  loadQuick();
+  function quickQuery(tx) {
+    var before = tx.value.slice(0, tx.selectionStart == null ? tx.value.length : tx.selectionStart);
+    var m = before.match(/(^|\s)\/([^\s\/]{0,30})$/);
+    return m ? { q: m[2].toLowerCase(), start: before.length - m[2].length - 1 } : null;
+  }
+  function quickHide() { var p = $("#qpop"); if (p) p.hidden = true; qHits = []; }
+  function quickShow(tx) {
+    var p = $("#qpop"), m = quickQuery(tx); if (!p) return;
+    if (!m) return quickHide();
+    var norm = function (s) { return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }, q = norm(m.q);
+    qHits = QUICK.filter(function (x) { return norm(x.title).indexOf(q) === 0; })
+      .concat(q ? QUICK.filter(function (x) { var n = norm(x.title); return n.indexOf(q) > 0; }) : []).slice(0, 5);
+    if (!qHits.length) {
+      // Nothing saved yet: one hint where to add them. Otherwise say nothing matches.
+      if (QUICK.length ? !m.q : m.q) return quickHide();
+      p.innerHTML = '<div class="qnone">' + (QUICK.length ? t("No quick reply starts with “{q}”.", { q: esc(m.q) }) : t("No quick replies yet. Add them in Settings.")) + "</div>";
+      p.hidden = false; return;
+    }
+    qSel = Math.min(qSel, qHits.length - 1);
+    p.innerHTML = qHits.map(function (x, i) { return '<button type="button" role="option" data-q="' + i + '" class="' + (i === qSel ? "on" : "") + '"><b>/' + esc(x.title) + "</b><span>" + esc(x.text.replace(/\s+/g, " ").slice(0, 90)) + "</span></button>"; }).join("");
+    p.hidden = false;
+    p.querySelectorAll("button").forEach(function (b) { b.onmousedown = function (e) { e.preventDefault(); quickPick(tx, Number(b.dataset.q)); }; });
+  }
+  function quickPick(tx, i) {
+    var x = qHits[i], m = quickQuery(tx); if (!x || !m) return quickHide();
+    var end = tx.selectionStart == null ? tx.value.length : tx.selectionStart;
+    tx.value = tx.value.slice(0, m.start) + x.text + tx.value.slice(end);
+    tx.selectionStart = tx.selectionEnd = m.start + x.text.length;
+    quickHide(); qSel = 0; tx.dispatchEvent(new Event("input")); tx.focus();
+  }
+  function quickKey(e, tx) {
+    var p = $("#qpop"); if (!p || p.hidden || !qHits.length) { if (e.key === "Escape") quickHide(); return false; }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); qSel = (qSel + (e.key === "ArrowDown" ? 1 : qHits.length - 1)) % qHits.length; quickShow(tx); return true; }
+    if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); quickPick(tx, qSel); return true; }
+    if (e.key === "Escape") { e.preventDefault(); quickHide(); return true; }
+    return false;
+  }
+  var qEditing = -1;
+  function renderQuick(list) {
+    QUICK = list || [];
+    $("#qlist").innerHTML = QUICK.map(function (x, i) {
+      return '<li data-i="' + i + '"><span class="av">/</span><div class="pmi"><div class="pmn"><b>/' + esc(x.title) + '</b></div><div class="pms">' + esc(x.text.replace(/\s+/g, " ").slice(0, 110)) + (x.text.length > 110 ? "…" : "") + "</div></div>" +
+        '<button type="button" class="ped">' + t("Edit") + '</button><button type="button" class="prm">' + t("Delete") + "</button></li>";
+    }).join("");
+    $("#qlist").querySelectorAll("li").forEach(function (li) {
+      var i = Number(li.dataset.i);
+      li.querySelector(".ped").onclick = function () { quickEdit(i); };
+      li.querySelector(".prm").onclick = function () {
+        if (!confirm(t("Delete the quick reply “{x}”?", { x: QUICK[i].title }))) return;
+        quickSave(QUICK.filter(function (_, j) { return j !== i; }), t("Deleted."));
+      };
+    });
+  }
+  function quickEdit(i) {
+    qEditing = i; var x = QUICK[i] || { title: "", text: "" };
+    $("#qTitle").value = x.title; $("#qText").value = x.text; $("#qedit").hidden = false; $("#qNew").hidden = true; $("#qTitle").focus();
+  }
+  function quickClose() { $("#qedit").hidden = true; $("#qNew").hidden = false; qEditing = -1; }
+  function quickSave(items, ok, btn) {
+    if (btn) btn.disabled = true;
+    return post("settings", { action: "quick", items: items }).then(function () { renderQuick(items); quickClose(); say("#qMsg", ok); })
+      .catch(function (e) { say("#qMsg", e.message, true); }).finally(function () { if (btn) btn.disabled = false; });
+  }
+  $("#qNew").onclick = function () { quickEdit(-1); };
+  $("#qCancel").onclick = quickClose;
+  $("#qSave").onclick = function () {
+    var x = { title: $("#qTitle").value.trim().replace(/^\/+/, "").replace(/\s+/g, "-"), text: $("#qText").value.trim() };
+    if (!x.title || !x.text) return say("#qMsg", t("Give every quick reply a name and a text."), true);
+    var items = QUICK.slice(); if (qEditing >= 0) items[qEditing] = x; else items.push(x);
+    quickSave(items, t("Saved."), this);
+  };
+
   // ---- settings
   var sdata = null, ME = cfg.email;
   function say(id, text, err) { var el = $(id); el.textContent = text; el.className = "smsg" + (err ? " err" : ""); if (!err && text) setTimeout(function () { if (el.textContent === text) el.textContent = ""; }, 4000); }
@@ -5886,6 +6054,7 @@ function zoneClient(cfg) {
       $("#modeToggle").textContent = d.outsideOnly ? t("Answer day and night") : t("Answer only outside office hours");
       if (document.activeElement !== $("#aEmail")) $("#aEmail").value = d.alert;
       renderTeam(d);
+      if ($("#qedit").hidden) renderQuick(d.quick);
       var I = d.info, rows = [[t("Assistant"), I.assistant], [t("Languages"), I.languages], [t("Meeting point"), I.meeting], [t("Dive sites"), I.sites], [t("Boat times"), I.boats], [t("Emergency phone"), I.emergency]];
       $("#info").innerHTML = rows.filter(function (r) { return r[1]; }).map(function (r) { return "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>"; }).join("");
     }).catch(function (e) { if (e.message !== "auth") say("#miaMsg", e.message, true); });
@@ -6060,9 +6229,10 @@ function zoneClient(cfg) {
   })();
 
   // ---- The diver's bookings, shown in the conversation
-  function bookingCard(list) {
-    list = list || [];
-    if (!list.length) return "";
+  function bookingCard(list, h) {
+    list = list || []; h = h || {};
+    var notes = h.notes || [];
+    if (!list.length && !h.chats && !notes.length) return "";
     var today = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
     var cx = function (b) { return /cancel|refund/i.test(b.status); };
     var up = list.filter(function (b) { return b.date >= today && !cx(b); }).sort(function (a, b) { return a.date.localeCompare(b.date); });
@@ -6080,7 +6250,23 @@ function zoneClient(cfg) {
     var pastLine = past.length ? '<div class="bkp">' + (up.length ? t("Earlier") + ": " : t("Booked before") + ": ") + past.slice(0, 3).map(function (b) {
       return esc(b.product) + " (" + esc(fmt(b.date)) + (cx(b) ? ", " + t("cancelled") : "") + ")";
     }).join(" · ") + (past.length > 3 ? " · " + t("+{n} more", { n: past.length - 3 }) : "") + "</div>" : "";
-    return '<div class="bkwrap">' + up.map(card).join("") + pastLine + "</div>";
+    // Diver card: only for a diver who booked or chatted before, so a first chat stays as it was.
+    var hist = "";
+    if (past.length || h.chats) {
+      var live = list.filter(function (b) { return !cx(b); });
+      var since = Date.parse(h.since || "") || 0;
+      if (live.length) since = Math.min(since || Infinity, Date.parse(live[live.length - 1].date + "T12:00:00Z"));
+      var top = [
+        since ? t("Diver since {d}", { d: new Date(since).toLocaleDateString(LOC, { month: "long", year: "numeric" }) }) : "",
+        live.length ? tn(live.length, "1 booking", "{n} bookings") + " · " + money(live.reduce(function (a, b) { return a + (b.total || 0); }, 0)) : t("No booking yet"),
+      ].filter(Boolean).join(" · ");
+      hist = '<div class="hist"><b>' + esc(top) + "</b>" + pastLine.replace('class="bkp"', 'class="bkp hp"') +
+        notes.map(function (n) {
+          return '<div class="hn" title="' + esc(n.text) + '">' + t("Earlier note") + " (" + esc(new Date(n.at).toLocaleDateString(LOC, { day: "numeric", month: "short" })) + "): " + esc(n.text.length > 90 ? n.text.slice(0, 90) + "…" : n.text) + "</div>";
+        }).join("") + "</div>";
+      pastLine = "";
+    }
+    return '<div class="bkwrap">' + up.map(card).join("") + pastLine + hist + "</div>";
   }
 
   // ---- Pretty names and facts
@@ -6591,7 +6777,9 @@ function zoneClient(cfg) {
   (function () { var m = location.search.match(/[?&]c=([A-Za-z0-9:_-]{1,64})/); if (m) openChat(m[1]); })();
   // Polling is kept light on purpose (Airtable limits): the list every 30 s while the page
   // is visible; the open conversation only when the list shows something new in it.
-  setInterval(function () { if (!document.hidden) loadList(); }, 30000);
-  setInterval(function () { if (!document.hidden && filter !== "open" && filter !== "need") api("conversations?view=open").then(function (d) { badge(d.conversations); }).catch(function () {}); }, 60000);
+  // In a background tab the list still refreshes, every minute, so the tab title and icon stay right.
+  var listTick = 0;
+  setInterval(function () { listTick++; if (!document.hidden || listTick % 2 === 0) loadList(); }, 30000);
+  setInterval(function () { if (filter !== "open" && filter !== "need") api("conversations?view=open").then(function (d) { badge(d.conversations); }).catch(function () {}); }, 60000);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) { lastList = ""; loadList(); } });
 }
