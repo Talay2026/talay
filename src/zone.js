@@ -626,28 +626,36 @@ async function leadAction(request, env, center, action) {
 // Team-only fields on the lead: Leads → Team note (long text) and Assigned to (an e-mail of this
 // center's team, or empty). Divers never see them.
 // Translate one chat message for the team: a diver's message into the zone language, or the
-// team's draft into the diver's language. Nothing is sent; the team reads or edits the result.
+// team's draft into the diver's language (read from the diver's last message, because Leads →
+// Language can be out of date). Nothing is sent; the team reads or edits the result.
 // Same message and language again within 30 days comes from the cache. Needs ANTHROPIC_API_KEY.
-const TRANSLATE_PROMPT = `You translate WhatsApp, Instagram and Messenger messages between a dive centre and a diver. Translate the user's message into the language named in <to>. Keep the meaning, the tone and the length; keep emojis, names, prices, dates, times, phone numbers and links exactly as they are. Keep common diving terms as divers use them in that language (Open Water, Advanced, fun dive, Discover Scuba Diving). When the message is already in that language, return it unchanged. Return only the translation, with no quotes, notes or explanation.`;
+const TRANSLATE_PROMPT = `You translate WhatsApp, Instagram and Messenger messages between a dive centre and a diver. Translate the message in <message> into the language named in <to>; when <to> is missing, translate it into the language the diver writes in, shown in <diver>. Keep the meaning, the tone and the length; keep emojis, names, prices, dates, times, phone numbers and links exactly as they are. Keep common diving terms as divers use them in that language (Open Water, Advanced, fun dive, Discover Scuba Diving). When the message is already in that language, return it unchanged. Answer in exactly this form, with the language names in English:
+From: <language of the message>
+To: <language of the translation>
+
+<the translation, with no quotes, notes or explanation>`;
 async function translate(request, env) {
   const body = await readBody(request);
   const text = String(body?.text || "").trim().slice(0, 3000);
   const to = String(body?.to || "").trim();
-  if (!text || !/^[\p{L} ()-]{2,30}$/u.test(to)) return json({ error: "Bad request" }, 400);
+  const like = String(body?.like || "").trim().slice(0, 600);
+  if (!text || (to ? !/^[\p{L} ()-]{2,30}$/u.test(to) : !like)) return json({ error: "Bad request" }, 400);
   if (!env.ANTHROPIC_API_KEY) return json({ error: "Translation isn't switched on yet." }, 503);
-  const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(to + "\n" + text)))].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
+  const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(to + "\n" + like + "\n" + text)))].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
   try {
     return json(await cached(env, `tr/${hash}`, 30 * 86400, async () => {
       const r = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "content-type": "application/json", "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2026-10-21" },
-        body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 2000, system: TRANSLATE_PROMPT, messages: [{ role: "user", content: `<to>${to}</to>\n\n${text}` }] }),
+        body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 2000, system: TRANSLATE_PROMPT, messages: [{ role: "user", content: (to ? `<to>${to}</to>` : `<diver>${like}</diver>`) + `\n<message>\n${text}\n</message>` }] }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok || d.stop_reason === "refusal") { console.error("translate", r.status, JSON.stringify(d).slice(0, 300)); throw new Error("translate"); }
-      const out = (d.content || []).filter((c) => c.type === "text").map((c) => c.text).join("").trim();
+      const raw = (d.content || []).filter((c) => c.type === "text").map((c) => c.text).join("").trim();
+      const m = raw.match(/^From:\s*(.{1,40})\nTo:\s*(.{1,40})\n+([\s\S]+)$/);
+      const out = (m ? m[3] : raw).trim();
       if (!out) throw new Error("translate");
-      return { text: out };
+      return { text: out, from: m ? m[1].trim() : "", to: m ? m[2].trim() : to };
     }));
   } catch (e) {
     return json({ error: "Translating didn't work. Try again." }, 502);
@@ -5289,7 +5297,9 @@ function zoneClient(cfg) {
       }
 
       // Translate shows on the diver's messages when the diver writes in another language than the zone (or the language isn't known yet).
-      var dl = langCode(L.language), foreign = !dl || dl !== cfg.lang;
+      // Leads → Language can be out of date, so Translate shows on every diver message and the
+      // reply is translated into the language of the diver's last message.
+      var lastDiver = ""; d.messages.forEach(function (m) { if (m.dir === "Customer" && m.text && !/^📎 /.test(m.text)) lastDiver = m.text; });
       $("#pane").innerHTML =
         '<div class="head"><button class="back" aria-label="Back">‹</button>' + avatar(L.name || L.contact, d.cc) + '<div><b>' + esc(dname(L.name, L.contact)) + "</b>" +
         (l.t ? '<div class="sub">' + esc(l.t) + "</div>" : "") + "</div>" +
@@ -5308,8 +5318,8 @@ function zoneClient(cfg) {
             var dt = new Date(m.at), day = dt.toLocaleDateString(LOC, { weekday: "long", day: "numeric", month: "long" });
             var sep = day !== prevDay ? '<div class="day">' + esc(day) + "</div>" : ""; prevDay = day;
             var rep = m.dir === "Mia" ? '<button class="rep" type="button" data-rep="' + idx + '" title="' + t("Report this answer to Talay") + '">' + t("Report") + "</button>" : "";
-            var tr = m.dir === "Customer" && m.text && !/^📎 /.test(m.text) && foreign ? TR[cfg.lang + "|" + m.text] : null;
-            if (m.dir === "Customer" && m.text && !/^📎 /.test(m.text) && foreign) rep = '<button class="rep trb" type="button" data-tr="' + idx + '">' + (tr ? t("Show original") : t("Translate")) + "</button>";
+            var tr = m.dir === "Customer" && m.text && !/^📎 /.test(m.text) ? TR[cfg.lang + "|" + m.text] : null;
+            if (m.dir === "Customer" && m.text && !/^📎 /.test(m.text)) rep = '<button class="rep trb" type="button" data-tr="' + idx + '">' + (tr ? t("Show original") : t("Translate")) + "</button>";
             var files = (m.files || []).map(function (f) {
               return /^image\//.test(f.type)
                 ? '<a class="mimg" href="' + esc(f.url) + '" target="_blank" rel="noopener"><img src="' + esc(f.thumb || f.url) + '" alt="' + esc(f.name) + '" loading="lazy"></a>'
@@ -5331,7 +5341,7 @@ function zoneClient(cfg) {
             '<div class="fchip" id="fchip" hidden></div>' +
             '<div class="epick" id="epick" hidden>' + EMOJI.map(function (x) { return '<button type="button">' + x + "</button>"; }).join("") + "</div>" +
             '<div class="cmeta"><label class="sig"><input type="checkbox" id="sigon"> ' + t("Signed as") + ' <input id="sig" maxlength="30" placeholder="' + t("your name") + '"></label>' +
-            (dl && dl !== cfg.lang ? '<button type="button" class="trout" id="trOut" disabled>' + TR_ICON + "<span>" + t("Translate to {l}", { l: esc(langName(dl)) }) + "</span></button>" : "") +
+            (lastDiver ? '<button type="button" class="trout" id="trOut" disabled>' + TR_ICON + "<span>" + t("Translate to the diver's language") + "</span></button>" : "") +
             '<select id="prod" aria-label="' + t("Booking link") + '" hidden><option value="">' + t("+ Booking link…") + "</option></select>" +
             '<span class="sp"></span><span class="bt' + (l.soon ? " soon" : "") + '">' + esc(l.t) + "</span></div>" +
             '<div class="note" id="note"></div></div>'
@@ -5411,8 +5421,8 @@ function zoneClient(cfg) {
             if (orig !== null) { tx.value = orig; orig = null; toLab.textContent = toText; grow(); tx.focus(); return; }
             var v = tx.value.trim(); if (!v) return;
             to.disabled = true; toLab.textContent = t("Translating…");
-            post("translate", { text: v, to: LANGN[dl] || L.language }).then(function (r) {
-              orig = tx.value; tx.value = r.text; toLab.textContent = t("Undo translation"); to.disabled = false; grow(); tx.focus();
+            post("translate", { text: v, like: lastDiver }).then(function (r) {
+              orig = tx.value; tx.value = r.text; toLab.textContent = t("Undo translation") + (r.to ? " (" + langName(langCode(r.to)) + ")" : ""); to.disabled = false; grow(); tx.focus();
             }).catch(function (e) { toLab.textContent = toText; toSync(); $("#note").textContent = e.message; });
           };
         }
