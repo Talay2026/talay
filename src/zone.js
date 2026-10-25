@@ -4685,6 +4685,10 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .tarr .trow .tr-b small{white-space:normal;overflow:visible}
 @media (max-width:1100px){.trow2{grid-template-columns:1fr 1fr}.trow2 #tWeek{grid-column:1 / -1}.tarr{grid-template-columns:1fr 1fr}}
 @media (max-width:760px){.trow1,.trow2{grid-template-columns:1fr}.trow2 #tWeek{grid-column:auto}.tarr{grid-template-columns:1fr}}
+.item .meta{display:flex;flex-wrap:wrap;gap:2px 0;margin-top:4px;font-size:12.5px;color:var(--muted)}
+.item .meta span+span::before{content:"·";margin:0 6px}
+.item .meta .left{margin:0;font-size:inherit}
+.item .meta .bk{color:var(--ok);font-weight:600}
 /* Calm chat (25 Oct): one quiet info block above the messages, everything on the same left edge */
 .pane .head{border-bottom:0;padding:16px 22px 6px}
 .cinfo{background:var(--card);border-bottom:1px solid var(--line);padding:0 22px 14px 70px;display:grid;gap:10px}
@@ -4733,10 +4737,9 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
         <button class="chip on" data-f="open">${T("Open")}</button>
         <button class="chip" data-f="need">${T("Needs you")}</button>
         <button class="chip" data-f="booked">${T("Booked")}</button>
-        <button class="chip" data-f="all">${T("All (30 days)")}</button>
+        <button class="chip" data-f="all" title="${T("All (30 days)")}">${T("All")}</button>
       </div>
     </div>
-    <div class="ms small" id="msChat" hidden></div>
     <div class="items" id="list"><div class="skel list"><i></i><i></i><i></i><i></i></div></div>
   </div>
   <div class="pane" id="pane"><div class="placeholder">${T("Pick a conversation.")}<br><br>${T("<b>Open</b> shows every diver who wrote in the last 24 hours: WhatsApp, Instagram and Messenger only let you reply freely within that window. <b>Needs you</b> means {a} handed it over to your team.", { a: A })}</div></div>
@@ -4986,15 +4989,16 @@ function zoneClient(cfg) {
         avatar(c.name, c.cc) + '<div class="ib">' +
         '<div class="top"><span class="nm">' + esc(dname(c.name)) + "</span>" +
         '<span class="tm">' + ago(c.lastAt) + "</span></div>" +
-        ((c.needsYou || c.teamActive || c.assigned || /booked/i.test(c.status) || c.language) ? '<div class="tags">' +
-        (c.needsYou ? '<span class="tag need">' + t("Needs you") + "</span>" : "") +
-        (c.waitingMin ? '<span class="tag wait">' + t("Waiting {t}", { t: waitFor(c.waitingMin) }) + "</span>" : "") +
-        (c.assigned ? '<span class="tag asg">→ ' + esc(c.assigned === String(cfg.email || "").toLowerCase() ? t("You") : person(c.assigned)) + "</span>" : "") +
-        (c.teamActive ? '<span class="tag team"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg> ' + t("{a} paused", { a: esc(cfg.assistant) }) + "</span>" : "") +
-        (/booked/i.test(c.status) ? '<span class="tag st">' + t("Booked") + "</span>" : "") +
-        (c.language ? '<span class="tag lang">' + esc(langName(c.language)) + "</span>" : "") + "</div>" : "") +
+        (c.waitingMin ? '<div class="tags"><span class="tag wait">' + t("Waiting {t}", { t: waitFor(c.waitingMin) }) + "</span></div>"
+          : c.needsYou ? '<div class="tags"><span class="tag need">' + t("Needs you") + "</span></div>"
+          : c.teamActive ? '<div class="tags"><span class="tag team"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg> ' + t("{a} paused", { a: esc(cfg.assistant) }) + "</span></div>" : "") +
         '<div class="pv">' + esc(who + c.preview) + "</div>" +
-        (l.t ? '<div class="left' + (l.soon ? " soon" : "") + '">' + l.t + "</div>" : "") + "</div></button>";
+        (function () {
+          var meta = [];
+          if (/booked/i.test(c.status)) meta.push('<span class="bk">' + t("Booked") + "</span>");
+          if (c.assigned) meta.push("→ " + esc(c.assigned === String(cfg.email || "").toLowerCase() ? t("You") : person(c.assigned)));
+          return l.t || meta.length ? '<div class="meta">' + (l.t ? '<span class="left' + (l.soon ? " soon" : "") + '">' + l.t + "</span>" : "") + meta.map(function (m) { return "<span>" + m + "</span>"; }).join("") + "</div>" : "";
+        })() + "</div></button>";
     }).join("");
     el.querySelectorAll(".item").forEach(function (b) { b.onclick = function () { openChat(b.dataset.id); }; });
   }
@@ -5758,10 +5762,6 @@ function zoneClient(cfg) {
         "<b>" + t("Your first milestone: 10 divers through Talay") + "</b><small>" + t("Every booking through {a} counts.", { a: esc(cfg.assistant) }) + "</small>";
       var html = '<div class="msicon">' + trophy + '</div><div class="msbody">' + head + prog + "</div>";
       var dash = $("#ms"); dash.innerHTML = html; dash.hidden = false;
-      var recent = latest && (Date.now() - Date.parse(latest.at)) < 7 * 86400000;
-      var chat = $("#msChat");
-      if (recent) { chat.innerHTML = '<div class="msicon">' + trophy + '</div><div class="msbody"><b>' + esc(MS_LABEL[latest.k](latest.value)) + "</b><small>" + t("Reached on {d}", { d: esc(ordinalDay(latest.at)) }) + "</small></div>"; chat.hidden = false; }
-      else chat.hidden = true;
     }).catch(function () {});
   }
   loadMilestones(); setInterval(function () { if (!document.hidden) loadMilestones(); }, 1800000);
