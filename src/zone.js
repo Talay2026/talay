@@ -1529,9 +1529,10 @@ async function settings(env, center) {
       cutoff: Number(first(p["Cutoff hour"])) || 15, active: !!p["Active"],
     };
   }).sort((a, b) => a.price - b.price);
+  const staff = splitEmails(f["Staff emails"]);
   return {
     admin: center.admin, admins: splitEmails(f["Admin emails"]), products,
-    staff: splitEmails(f["Staff emails"]),
+    staff, team: await teamDetails(env, center, staff),
     alert: s("Alert Email"),
     hoursText: s("Escalation hours"),
     from: hours ? hours[1].padStart(5, "0") : "09:00",
@@ -1545,6 +1546,59 @@ async function settings(env, center) {
   };
 }
 
+// Team details live in the Airtable table "Notify" (one row per person per center, also used by
+// /api/notify for WhatsApp and push). Staff emails on Centers stays the list of who may sign in.
+const ROLES = ["Owner", "Office", "Instructor"];
+const TOPICS = ["Needs you", "Bookings", "Morning summary", "Escalation"];
+const CHANNELS = ["WhatsApp", "Push", "Email"];
+const NLANGS = ["EN", "FR", "ES", "DE", "NL", "TH"];
+async function notifyRows(env, center) {
+  return at(env, "Notify", { formula: `ARRAYJOIN({Center}) & '' = '${q(center.name)}'`, max: 100 });
+}
+async function teamDetails(env, center, staff) {
+  let rows = [];
+  try { rows = await notifyRows(env, center); } catch (e) { return null; } // table not there yet
+  const byMail = {};
+  rows.forEach((r) => { const m = String(r.fields["Email"] || "").trim().toLowerCase(); if (m && !byMail[m]) byMail[m] = r; });
+  return staff.map((e) => {
+    const r = byMail[e], g = (r && r.fields) || {};
+    return {
+      email: e, id: r ? r.id : "", name: String(g["Name"] || ""), role: String(g["Role"] || ""),
+      whatsapp: String(g["WhatsApp"] || ""), language: String(g["Language"] || ""),
+      topics: g["Topics"] || [], channels: g["Channels"] || [], evenings: !!g["Evenings"], active: r ? !!g["Active"] : false,
+    };
+  });
+}
+async function saveMember(env, center, email, body) {
+  const m = String(body.email || "").trim().toLowerCase();
+  if (!EMAIL.test(m)) return json({ error: "Enter a valid email address." }, 400);
+  const phone = String(body.whatsapp || "").replace(/[^\d+]/g, "");
+  if (phone && !/^\+\d{8,15}$/.test(phone)) return json({ error: "Write the WhatsApp number with the country code, for example +66 81 234 5678." }, 400);
+  const pick = (v, list) => (Array.isArray(v) ? v : []).filter((x) => list.includes(x));
+  const fields = {
+    Name: String(body.name || "").trim().slice(0, 80), Email: m, WhatsApp: phone,
+    Role: ROLES.includes(body.role) ? body.role : null, Language: NLANGS.includes(body.language) ? body.language : null,
+    Topics: pick(body.topics, TOPICS), Channels: pick(body.channels, CHANNELS),
+    Evenings: !!body.evenings, Active: body.active !== false,
+  };
+  try {
+    const f = await centerRecord(env, center), staff = splitEmails(f["Staff emails"]);
+    if (!staff.includes(m)) {
+      if (staff.length >= 50) return json({ error: "Maximum 50 team members." }, 400);
+      await atPatch(env, "Centers", center.id, { "Staff emails": staff.concat([m]).join("\n") });
+    }
+    const row = (await notifyRows(env, center)).find((r) => String(r.fields["Email"] || "").trim().toLowerCase() === m);
+    if (row) await atPatch(env, "Notify", row.id, fields);
+    else await atWrite(env, "Notify", "POST", [{ fields: { ...fields, Center: [center.id] } }]);
+  } catch (e) {
+    console.error("member", e.message);
+    if (/: (404|403|422) /.test(e.message)) return json({ error: "Team details aren't available yet. Ask Jonas to finish the setup." }, 500);
+    return json({ error: "Could not save. Try again." }, 502);
+  }
+  await logChange(env, center, email, `team member: ${m}`);
+  return json({ ok: true });
+}
+
 async function saveSettings(request, env, center, email) {
   const body = await readBody(request);
   if (!body) return json({ error: "Bad request" }, 400);
@@ -1552,6 +1606,7 @@ async function saveSettings(request, env, center, email) {
     return json({ error: "Only an admin of your dive center can change this." }, 403);
   }
   if (body.action === "product") return await saveProduct(env, center, email, body);
+  if (body.action === "member") return await saveMember(env, center, email, body);
   const fields = {};
   if (body.action === "team") {
     const list = [...new Set(splitEmails((body.emails || []).join("\n")))];
@@ -1560,6 +1615,12 @@ async function saveSettings(request, env, center, email) {
     if (!list.includes(email)) return json({ error: "You can't remove yourself. Ask a colleague to do that." }, 400);
     if (list.length > 50) return json({ error: "Maximum 50 team members." }, 400);
     fields["Staff emails"] = list.join("\n");
+    try {
+      const gone = (await notifyRows(env, center)).filter((r) => { const m = String(r.fields["Email"] || "").trim().toLowerCase(); return m && !list.includes(m); });
+      for (const r of gone) {
+        await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Notify/${r.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` } });
+      }
+    } catch (e) { /* no Notify table yet */ }
   } else if (body.action === "alert") {
     const a = String(body.email || "").trim().toLowerCase();
     if (!EMAIL.test(a)) return json({ error: "Enter one valid email address." }, 400);
@@ -4103,7 +4164,7 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 .people li{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--paper-2)}
 .people li span{flex:1;overflow-wrap:anywhere}
 .people li small{color:var(--muted)}
-.people button{font:inherit;font-size:13px;background:none;border:0;color:var(--warn);font-weight:700;cursor:pointer}
+.people li > button{font:inherit;font-size:13px;background:none;border:0;color:var(--warn);font-weight:700;cursor:pointer}
 .smsg{font-size:13px;margin-top:10px;color:var(--ok);font-weight:700;min-height:1em}
 .smsg.err{color:var(--warn)}
 .switch{display:flex;align-items:center;gap:14px}
@@ -4726,8 +4787,52 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .ptable .ps[hidden]{display:none}
 .people{gap:0;margin-bottom:14px;border-top:1px solid var(--line)}
 .people li{border:0;border-bottom:1px solid var(--line);border-radius:0;background:none;padding:10px 2px}
-.people button{color:var(--muted);font-weight:600}
-.people button:hover{color:var(--warn)}
+.people li > button{color:var(--muted);font-weight:600}
+.people li > button:hover{color:var(--warn)}
+.people li{gap:12px}
+.people .av{flex:none;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--paper);color:var(--deep);font-weight:700;font-size:14px}
+.people .pmi{flex:1;min-width:0}
+.people .pmn{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.people .pmn b{font-weight:600}
+.people .prole{flex:none;font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:0 8px}
+.people .pms{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.people li > button.ped{color:var(--deep)}
+.people .pedit{padding:14px 2px 18px 48px;border-bottom:1px solid var(--line)}
+.pedit .pgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pedit label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+.pedit input[type=text],.pedit input[type=tel]{font:inherit;font-size:14px;color:var(--deep);border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--paper-2)}
+.pedit .plab{font-size:13px;color:var(--muted);margin:14px 0 6px}
+.pedit label.pev{display:flex;align-items:center;gap:8px;margin-top:14px;color:var(--deep);font-size:14px}
+.pedit input[type=checkbox]{width:18px;height:18px;accent-color:#0A2029}
+.pedit .pact{display:flex;gap:8px;margin-top:16px}
+.pedit .pchips{padding:0;margin:0;gap:6px;flex-wrap:wrap;overflow:visible}
+@media (max-width:760px){.people .pedit{padding-left:2px}.pedit .pgrid{grid-template-columns:1fr}}
+/* Support (25 Oct): empty state across the page, centred */
+#supp .empty-card{max-width:none;align-items:center;text-align:center;padding:40px 24px}
+#supp .empty-card p{max-width:520px}
+.empty-card p b{font-size:inherit;color:var(--deep);font-weight:600}
+/* Conversations (25 Oct): one clean edge between list and chat */
+#convos .list .tools{border-bottom:0;padding-bottom:6px}
+.item.on{background:var(--paper);box-shadow:inset 0 0 0 1px var(--line)}
+.item.on::before{content:none}
+.pane .head > .tag{align-self:flex-start;margin-top:3px}
+/* Center logo (25 Oct): bigger, with a light ring so a dark logo stands out */
+header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-shadow:0 0 0 1px rgba(247,243,234,.25),0 2px 6px rgba(0,0,0,.25)}
+/* Colours swapped (25 Oct): chat light and airy like WhatsApp, the list warm */
+@media (prefers-color-scheme:light){
+ .pane{background:#FCFBF8}
+ .m.Customer{background:#fff;border-color:#ECE6DA}
+ .m.Mia{background:#EAF4F1}
+ .m.Mia .who{color:#2E6F80}
+ .m.Team{background:#E4EEF8;color:var(--deep)}
+ .m.Team small,.m.Team a{color:var(--muted)}
+ .m.Team .who{color:#2F5F8F}
+ .m.Team .mfile{background:rgba(10,32,41,.06)}
+ #convos .list{background:var(--paper)}
+ #convos .list .item.on{background:var(--card);box-shadow:var(--shadow)}
+ #convos .list .item:hover:not(.on){background:rgba(255,255,255,.55)}
+ #convos .list .tools input{background-color:var(--card)}
+}
 @media (max-width:760px){#books .btable.bday tr.grp{background:none;border:0;padding:12px 2px 4px;margin:0}#books .btable.bday tr.grp td{background:none;padding:0;justify-content:flex-start;text-align:left}#books .btable.bday .tname{flex-direction:column;align-items:flex-start;gap:0}}
 .minis.strip{gap:0;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
 .minis.strip .mini{background:none;border:0;border-radius:0;box-shadow:none;padding:14px 20px}
@@ -4849,7 +4954,7 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
     </div>
     <div class="scard adm">
       <h3>${T("Team")}</h3>
-      <p class="d">${T("Everyone here can sign in at talay.io/zone with a code sent to their email.")}</p>
+      <p class="d">${T("Everyone here can sign in at talay.io/zone with a code sent to their email.")} ${T("Add a name and WhatsApp number so {a}'s notifications reach the right person.", { a: A })}</p>
       <ul class="people" id="team"></ul>
       <div class="srow"><input type="email" id="tEmail" placeholder="${T("colleague@email.com")}"><button class="btn" id="tAdd" type="button">${T("Add")}</button></div>
       <div class="smsg" id="tMsg"></div>
@@ -4873,7 +4978,7 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
       <button class="chip on" data-t="open">${T("Open")}</button>
       <button class="chip" data-t="done">${T("Done")}</button>
       <span class="sp"></span>
-      <button class="btn" id="tNew" type="button">${T("New ticket")}</button>
+      <button class="ghost" id="tNew" type="button">+ ${T("New ticket")}</button>
     </div>
     <div id="tbody"><div class="skel"><i></i><i></i><i></i></div></div>
   </div>
@@ -5445,6 +5550,65 @@ function zoneClient(cfg) {
       .catch(function (e) { say(msgId, e.message, true); })
       .finally(function () { if (btn) btn.disabled = false; });
   }
+  var ROLE_T = { Owner: t("Owner"), Office: t("Office"), Instructor: t("Instructor") };
+  var TOPIC_T = [["Needs you", t("A conversation needs the team")], ["Bookings", t("New bookings")], ["Morning summary", t("Morning summary")], ["Escalation", t("Still waiting after 30 minutes")]];
+  var CHAN_T = [["WhatsApp", "WhatsApp"], ["Push", t("Push on the phone")], ["Email", t("Email")]];
+  var NLANG = ["EN", "FR", "ES", "DE", "NL", "TH"];
+  function removeMember(e) {
+    if (!confirm(t("Remove {e}? They can no longer sign in.", { e: e }))) return;
+    save({ action: "team", emails: sdata.staff.filter(function (x) { return x !== e; }) }, "#tMsg", t("Removed."));
+  }
+  function renderTeam(d) {
+    var list = d.team || d.staff.map(function (e) { return { email: e, simple: true }; });
+    $("#team").innerHTML = list.map(function (p, i) {
+      var nm = p.name || p.email, gets = p.active && p.channels.length && p.topics.length ? t("Notifications via {x}", { x: p.channels.map(function (c) { return c === "Push" ? "Push" : c === "Email" ? t("Email") : c; }).join(", ") }) : (p.simple ? "" : t("No notifications"));
+      return '<li data-i="' + i + '"><span class="av">' + esc(nm.charAt(0).toUpperCase()) + '</span><div class="pmi"><div class="pmn"><b>' + esc(nm) + "</b>" +
+        (p.role ? '<span class="prole">' + esc(ROLE_T[p.role] || p.role) + "</span>" : "") + (p.email === ME ? " <small>(" + t("you") + ")</small>" : "") + "</div>" +
+        '<div class="pms">' + [p.name ? esc(p.email) : "", p.whatsapp ? esc(p.whatsapp) : "", gets].filter(Boolean).join(" · ") + "</div></div>" +
+        (p.simple ? "" : '<button type="button" class="ped">' + t("Edit") + "</button>") +
+        (p.email === ME ? "" : '<button type="button" class="prm">' + t("Remove") + "</button>") + "</li>";
+    }).join("");
+    $("#team").querySelectorAll("li").forEach(function (li) {
+      var p = list[Number(li.dataset.i)];
+      var rm = li.querySelector(".prm"); if (rm) rm.onclick = function () { removeMember(p.email); };
+      var ed = li.querySelector(".ped"); if (ed) ed.onclick = function () { editMember(li, p); };
+    });
+  }
+  function chipRow(name, opts, on, multi) {
+    return '<div class="chips pchips" data-n="' + name + '"' + (multi ? ' data-multi="1"' : "") + ">" + opts.map(function (o) {
+      return '<button type="button" class="chip' + ((multi ? on.indexOf(o[0]) > -1 : on === o[0]) ? " on" : "") + '" data-v="' + esc(o[0]) + '">' + esc(o[1]) + "</button>";
+    }).join("") + "</div>";
+  }
+  function editMember(li, p) {
+    var open = document.querySelector("#team .pedit"); if (open) open.remove();
+    var f = document.createElement("div"); f.className = "pedit";
+    var on = p.id ? p : { topics: ["Needs you", "Bookings", "Morning summary"], channels: ["WhatsApp", "Push"], evenings: false, role: "", language: "" };
+    f.innerHTML = '<div class="pgrid"><label>' + t("Name") + '<input type="text" class="pn" maxlength="80" value="' + esc(p.name || "") + '"></label>' +
+      '<label>' + t("WhatsApp number") + '<input type="tel" class="pw" placeholder="+66 81 234 5678" value="' + esc(p.whatsapp || "") + '"></label></div>' +
+      '<div class="plab">' + t("Role") + "</div>" + chipRow("role", [["Owner", t("Owner")], ["Office", t("Office")], ["Instructor", t("Instructor")]], on.role, false) +
+      '<div class="plab">' + t("Language of the notifications") + "</div>" + chipRow("language", NLANG.map(function (l) { return [l, l]; }), on.language || "EN", false) +
+      '<div class="plab">' + t("Notifications") + "</div>" + chipRow("topics", TOPIC_T, on.topics, true) +
+      '<div class="plab">' + t("Via") + "</div>" + chipRow("channels", CHAN_T, on.channels, true) +
+      '<label class="pev"><input type="checkbox" class="pe"' + (on.evenings ? " checked" : "") + "> " + t("Also in the evening and at night") + "</label>" +
+      '<div class="pact"><button type="button" class="btn psv">' + t("Save") + '</button><button type="button" class="ghost pcx">' + t("Cancel") + "</button></div>";
+    li.after(f);
+    f.querySelectorAll(".pchips").forEach(function (row) {
+      row.querySelectorAll(".chip").forEach(function (c) {
+        c.onclick = function () {
+          if (row.dataset.multi) c.classList.toggle("on");
+          else row.querySelectorAll(".chip").forEach(function (x) { x.classList.toggle("on", x === c && !(x.classList.contains("on") && row.dataset.n === "role")); });
+        };
+      });
+    });
+    var val = function (n) { var r = f.querySelector('[data-n="' + n + '"]'); return [].map.call(r.querySelectorAll(".chip.on"), function (c) { return c.dataset.v; }); };
+    f.querySelector(".pcx").onclick = function () { f.remove(); };
+    f.querySelector(".psv").onclick = function () {
+      save({ action: "member", email: p.email, name: f.querySelector(".pn").value, whatsapp: f.querySelector(".pw").value,
+        role: val("role")[0] || "", language: val("language")[0] || "EN", topics: val("topics"), channels: val("channels"),
+        evenings: f.querySelector(".pe").checked, active: true }, "#tMsg", t("Saved."), this);
+    };
+    f.querySelector(".pn").focus();
+  }
   function loadSettings() {
     return api("settings").then(function (d) {
       sdata = d;
@@ -5477,16 +5641,7 @@ function zoneClient(cfg) {
       $("#modeState").className = "pill " + (d.outsideOnly ? "off" : "on");
       $("#modeToggle").textContent = d.outsideOnly ? t("Answer day and night") : t("Answer only outside office hours");
       if (document.activeElement !== $("#aEmail")) $("#aEmail").value = d.alert;
-      $("#team").innerHTML = d.staff.map(function (e) {
-        return "<li><span>" + esc(e) + (e === ME ? " <small>(" + t("you") + ")</small>" : "") + "</span>" +
-          (e === ME ? "" : '<button type="button" data-rm="' + esc(e) + '">' + t("Remove") + "</button>") + "</li>";
-      }).join("");
-      $("#team").querySelectorAll("[data-rm]").forEach(function (b) {
-        b.onclick = function () {
-          if (!confirm(t("Remove {e}? They can no longer sign in.", { e: b.dataset.rm }))) return;
-          save({ action: "team", emails: sdata.staff.filter(function (x) { return x !== b.dataset.rm; }) }, "#tMsg", t("Removed."));
-        };
-      });
+      renderTeam(d);
       var I = d.info, rows = [[t("Assistant"), I.assistant], [t("Languages"), I.languages], [t("Meeting point"), I.meeting], [t("Dive sites"), I.sites], [t("Boat times"), I.boats], [t("Emergency phone"), I.emergency]];
       $("#info").innerHTML = rows.filter(function (r) { return r[1]; }).map(function (r) { return "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>"; }).join("");
     }).catch(function (e) { if (e.message !== "auth") say("#miaMsg", e.message, true); });
@@ -5508,7 +5663,11 @@ function zoneClient(cfg) {
     var e = ($("#tEmail").value || "").trim().toLowerCase(); if (!e || !sdata) return;
     if (sdata.staff.indexOf(e) > -1) { say("#tMsg", t("Already in the team."), true); return; }
     var btn = this;
-    save({ action: "team", emails: sdata.staff.concat([e]) }, "#tMsg", t("{e} can now sign in.", { e: e }), btn).then(function () { $("#tEmail").value = ""; });
+    save({ action: "team", emails: sdata.staff.concat([e]) }, "#tMsg", t("{e} can now sign in.", { e: e }), btn).then(function () {
+      $("#tEmail").value = "";
+      var li = [].find.call(document.querySelectorAll("#team li"), function (x) { return x.querySelector(".pms, .pmn") && x.textContent.indexOf(e) > -1; });
+      var ed = li && li.querySelector(".ped"); if (ed) ed.click();
+    });
   };
 
   // ---- unfinished bookings
