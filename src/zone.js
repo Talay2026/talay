@@ -2267,7 +2267,7 @@ const outreachTime = (iso) => (iso ? thaiStamp(Date.parse(iso)) : "");
 
 export async function runOutreachSync(env) {
   if (!env.INSTANTLY_API_KEY || !env.AIRTABLE_TOKEN) return { skipped: true };
-  const camps = ((await instantly(env, "campaigns?limit=100")).items || []).filter((c) => !/\btest\b/i.test(c.name || "")); // "Talay TEST" = own addresses
+  const camps = ((await instantly(env, "campaigns?limit=100")).items || []).filter((c) => !/\bTEST\b/.test(c.name || "")); // "Talay TEST" = own addresses ("W1b ID-Test" is a real campaign)
   const leads = new Map();
   for (const c of camps) {
     let after = "";
