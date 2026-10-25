@@ -4732,6 +4732,11 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 #supp .empty-card{max-width:none;align-items:center;text-align:center;padding:40px 24px}
 #supp .empty-card p{max-width:520px}
 .empty-card p b{font-size:inherit;color:var(--deep);font-weight:600}
+/* Conversations (25 Oct): one clean edge between list and chat */
+#convos .list .tools{border-bottom:0;padding-bottom:6px}
+.item.on{background:var(--paper);box-shadow:inset 0 0 0 1px var(--line)}
+.item.on::before{content:none}
+.pane .head > .tag{align-self:flex-start;margin-top:3px}
 @media (max-width:760px){#books .btable.bday tr.grp{background:none;border:0;padding:12px 2px 4px;margin:0}#books .btable.bday tr.grp td{background:none;padding:0;justify-content:flex-start;text-align:left}#books .btable.bday .tname{flex-direction:column;align-items:flex-start;gap:0}}
 .minis.strip{gap:0;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
 .minis.strip .mini{background:none;border:0;border-radius:0;box-shadow:none;padding:14px 20px}
