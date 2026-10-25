@@ -3885,7 +3885,7 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 .item .pv{font-size:14px;color:var(--muted);margin-top:3px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .tag{font-size:11px;font-weight:800;border-radius:999px;padding:2px 8px;white-space:nowrap}
 .tag.need{background:var(--sand);color:#0A2029}
-.tag.team{background:var(--team);color:var(--deep)}
+.tag.team{background:#FBEADF;color:#8A3F12;display:inline-flex;align-items:center;gap:4px}
 .tag.lang{background:var(--line);color:var(--deep);text-transform:uppercase}
 .tag.st{border:1px solid var(--line);color:var(--muted)}
 .left{font-size:12px;color:var(--muted);margin-top:4px}
@@ -3919,6 +3919,15 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 .note{padding:8px 16px 10px;font-size:13px;color:var(--muted);background:var(--paper-2)}
 .note.err{color:var(--warn);font-weight:700}
 .closed{padding:12px 16px;font-size:14px;color:var(--muted);border-top:1px solid var(--line);background:var(--paper-2)}
+.paused{display:flex;align-items:center;gap:12px;padding:12px 18px;background:#FBEADF;border-top:1px solid #F0CDB4;color:#5A2A0C}
+.paused .pi{flex:none;width:32px;height:32px;border-radius:50%;background:#F3C9A9;display:grid;place-items:center;font-size:14px}
+.paused .pt{flex:1;display:grid;gap:2px;font-size:13px;line-height:1.4}
+.paused .pt b{font-size:14px;color:#3E1C07}
+.paused .btn{flex:none;font:inherit;font-size:14px;font-weight:700;border:0;border-radius:999px;padding:10px 16px;background:var(--sand);color:#0A2029;cursor:pointer;white-space:nowrap}
+.paused .btn:hover{filter:brightness(1.05)}
+.paused .btn[disabled]{opacity:.6;cursor:progress}
+.ghost.hb{background:var(--sand);border-color:var(--sand);color:#0A2029}
+@media (max-width:760px){.paused{flex-wrap:wrap;padding:10px 12px}.paused .btn{width:100%}}
 .placeholder{margin:auto;color:var(--muted);text-align:center;padding:24px;max-width:380px}
 #dash{flex-direction:column}
 #dash iframe{flex:1;border:0;width:100%;background:#fff}
@@ -4824,7 +4833,7 @@ function zoneClient(cfg) {
         '<span class="tm">' + ago(c.lastAt) + "</span></div>" +
         ((c.needsYou || c.teamActive || /booked/i.test(c.status) || c.language) ? '<div class="tags">' +
         (c.needsYou ? '<span class="tag need">' + t("Needs you") + "</span>" : "") +
-        (c.teamActive ? '<span class="tag team">' + t("Team") + "</span>" : "") +
+        (c.teamActive ? '<span class="tag team"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg> ' + t("{a} paused", { a: esc(cfg.assistant) }) + "</span>" : "") +
         (/booked/i.test(c.status) ? '<span class="tag st">' + t("Booked") + "</span>" : "") +
         (c.language ? '<span class="tag lang">' + esc(langName(c.language)) + "</span>" : "") + "</div>" : "") +
         '<div class="pv">' + esc(who + c.preview) + "</div>" +
@@ -4864,11 +4873,22 @@ function zoneClient(cfg) {
       lastChat = key;
       var L = d.lead, l = left(d.closesAt);
       var actions = "";
-      if (d.hasLead && L.human) actions += '<button class="ghost" id="handback">' + t("Let {a} take over", { a: esc(cfg.assistant) }) + "</button>";
+      if (d.hasLead && L.human) actions += '<button class="ghost hb" id="handback">▶ ' + t("Let {a} take over", { a: esc(cfg.assistant) }) + "</button>";
       if (d.hasLead && d.needsYou && !L.human) actions += '<button class="ghost" id="handled">' + t("Mark as handled") + "</button>";
       var facts = fact(t("Channel"), L.channel && L.channel !== "WhatsApp" ? L.channel : "") + fact(t("Language"), L.language && langName(L.language)) + fact(t("Level"), human(L.cert)) + fact(t("On the island"), prettyDates(L.dates)) +
         fact(t("Group"), L.group) + fact(t("Interested in"), /^rec[A-Za-z0-9]{14}$/.test(L.interested) ? "" : L.interested) + fact(t("Status"), human(L.status)) + fact("WhatsApp", L.contact && L.name && L.contact !== L.name ? prettyPhone(L.contact) : "") +
-        (L.human ? "<span>" + t("<b>Team is handling this.</b> {a} is paused for this diver.", { a: esc(cfg.assistant) }) + "</span>" : "");
+        "";
+      // While the team has the chat, Mia stays silent for this diver. "Talay - release handovers" (hourly)
+      // gives it back 4 hours after the last team message; this banner keeps the early hand back in view.
+      var paused = "";
+      if (d.hasLead && L.human) {
+        var lastTeamAt = 0;
+        d.messages.forEach(function (m) { if (m.dir === "Team") lastTeamAt = Math.max(lastTeamAt, Date.parse(m.at) || 0); });
+        var back = new Date(Math.ceil((Math.max(lastTeamAt, Date.parse(L.humanAt || 0) || 0, Date.now() - 4 * 3600e3) + 4 * 3600e3) / 3600e3) * 3600e3);
+        paused = '<div class="paused"><span class="pi"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></span><div class="pt"><b>' + t("{a} is paused for this diver", { a: esc(cfg.assistant) }) + "</b><span>" +
+          t("Done helping? Give the chat back, so {a} answers the next question. Otherwise {a} only takes over again around {t}.", { a: esc(cfg.assistant), t: esc(back.toLocaleTimeString(LOC, { hour: "2-digit", minute: "2-digit" })) }) +
+          '</span></div><button class="btn primary" id="handback2" type="button">▶ ' + t("Let {a} take over", { a: esc(cfg.assistant) }) + "</button></div>";
+      }
 
       $("#pane").innerHTML =
         '<div class="head"><button class="back" aria-label="Back">‹</button>' + avatar(L.name || L.contact, d.cc) + '<div><b>' + esc(dname(L.name, L.contact)) + "</b>" +
@@ -4888,7 +4908,7 @@ function zoneClient(cfg) {
               "<small>" + esc(dt.toLocaleTimeString(LOC, { hour: "2-digit", minute: "2-digit" })) + rep + "</small></div>";
           }).join("");
         })() + "</div>" +
-        (d.canReply
+        paused + (d.canReply
           ? '<div class="composer">' +
             '<div class="pchips" id="pchips" hidden></div>' +
             '<div class="cbox"><textarea id="txt" placeholder="' + t("Reply on {ch}…", { ch: esc((L && L.channel) || "WhatsApp") }) + '" rows="1"></textarea>' +
@@ -4918,6 +4938,7 @@ function zoneClient(cfg) {
       var place = function () { box.scrollTop = keepTop === null ? box.scrollHeight : keepTop; };
       place(); requestAnimationFrame(place); setTimeout(place, 250);
       if ($("#handback")) $("#handback").onclick = function () { act("handback", this); };
+      if ($("#handback2")) $("#handback2").onclick = function () { act("handback", this); };
       if ($("#handled")) $("#handled").onclick = function () { act("handled", this); };
       if (d.canReply) {
         var tx = $("#txt"), s = $("#sig");
@@ -5369,11 +5390,15 @@ function zoneClient(cfg) {
     loadDay();
     api("conversations?view=open").then(function (d) {
       var need = d.conversations.filter(function (c) { return c.needsYou; });
+      var held = d.conversations.filter(function (c) { return c.teamActive && !c.needsYou; });
       var open = d.conversations.length;
       $("#tNeed").innerHTML = '<div class="th"><b>' + t("Needs your team") + "</b>" + (need.length ? '<span class="tag need">' + need.length + "</span>" : "") + '<a href="#" class="tlink" id="tAllChats">' + t("All chats ({n})", { n: open }) + "</a></div>" +
         (need.length ? need.slice(0, 5).map(function (c) {
           return '<button class="trow" data-chat="' + esc(c.id) + '">' + avatar(c.name, c.cc) + '<span class="tr-b"><b>' + esc(dname(c.name)) + "</b><small>" + esc(String(c.preview || "").slice(0, 90)) + '</small></span><span class="tr-t">' + ago(c.lastAt) + "</span></button>";
-        }).join("") : '<p class="tok"><span class="okdot"></span>' + t("Nothing waiting. {a} is handling every conversation.", { a: esc(cfg.assistant) }) + "</p>");
+        }).join("") : held.length ? "" : '<p class="tok"><span class="okdot"></span>' + t("Nothing waiting. {a} is handling every conversation.", { a: esc(cfg.assistant) }) + "</p>") +
+        held.slice(0, 5).map(function (c) {
+          return '<button class="trow" data-chat="' + esc(c.id) + '">' + avatar(c.name, c.cc) + '<span class="tr-b"><b>' + esc(dname(c.name)) + ' <span class="tag team"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg> ' + t("{a} paused", { a: esc(cfg.assistant) }) + "</span></b><small>" + t("Give it back to {a} when you're done.", { a: esc(cfg.assistant) }) + '</small></span><span class="tr-t">' + ago(c.lastAt) + "</span></button>";
+        }).join("");
       $("#tNeed").querySelectorAll("[data-chat]").forEach(function (b) { b.onclick = function () { goChat(b.dataset.chat); }; });
       $("#tAllChats").onclick = function (e) { e.preventDefault(); document.querySelector('nav button[data-v="convos"]').click(); };
     }).catch(function () { $("#tNeed").innerHTML = '<div class="th"><b>' + t("Needs your team") + '</b></div><p class="tok">' + t("Couldn't load conversations.") + "</p>"; });
