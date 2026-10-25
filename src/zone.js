@@ -2043,23 +2043,37 @@ const centerMeta = (r) => {
   };
 };
 
+const LEAD_FIELDS = ["Status", "Outside hours", "Follow-ups sent", "Human took over", "Human took over at", "Handover at", "Handed over",
+  "First message at", "First reply at", "Response seconds", "External ID", "Opted out", "Center", "C slug"];
+const BOOKING_FIELDS = ["Status", "Group size", "Total value THB", "Commission THB", "Deposit paid THB", "Center", "C slug"];
+// at() with only these fields; when one of them doesn't exist in this base (422), all fields as before.
+const atFields = (env, table, opts, fields) =>
+  at(env, table, { ...opts, fields }).catch((e) => (/: 422 /.test(e.message) ? at(env, table, opts) : Promise.reject(e)));
+
 async function adminOverview(env) {
   const now = Date.now();
   const P = adminPeriods(now);
   const from = Math.min(P.month.prev[0], P.week.prev[0], now - 30 * DAY);
-  const [centerRecs, leads, books, msgs, talk] = await Promise.all([
+  // Only the fields this page reads, so the Worker stays under its CPU and memory limits
+  // (error 1102 once Chat grew past a few thousand rows a month).
+  const since = `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${isoT(from - 1000)}'))`;
+  const [centerRecs, leads, books, talk, sorry] = await Promise.all([
     at(env, "Centers", { sort: [{ field: "Name" }] }),
-    at(env, "Leads", { formula: `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${isoT(from - 1000)}'))`, max: 20000 }),
-    at(env, "Bookings", { formula: `IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${isoT(from - 1000)}'))`, max: 20000 }),
+    atFields(env, "Leads", { formula: since, max: 20000 }, LEAD_FIELDS),
+    atFields(env, "Bookings", { formula: since, max: 20000 }, BOOKING_FIELDS),
+    // One pass over Chat for the month: reply times, and the last 24 hours for the health check.
     at(env, "Chat", {
-      formula: `IS_AFTER({Sent at}, DATETIME_PARSE('${isoT(now - DAY)}'))`,
-      fields: ["Direction", "Contact ID", "Center", "Sent at", "Text"], sort: [{ field: "Sent at" }], max: 5000,
-    }).catch(() => null),
+      formula: `IS_AFTER({Sent at}, DATETIME_PARSE('${isoT(Math.min(P.month.start, P.week.start, now - DAY) - DAY)}'))`,
+      // Newest first, so the cap never drops the last 24 hours; turned back to oldest first below.
+      fields: ["Direction", "Contact ID", "Center", "Sent at"], sort: [{ field: "Sent at", direction: "desc" }], max: 20000,
+    }).then((rows) => rows.reverse()).catch(() => null),
+    // The sorry message of the v2 error handler (SORRY), counted in Airtable so Text never comes along.
     at(env, "Chat", {
-      formula: `IS_AFTER({Sent at}, DATETIME_PARSE('${isoT(Math.min(P.month.start, P.week.start) - DAY)}'))`,
-      fields: ["Direction", "Contact ID", "Center", "Sent at"], sort: [{ field: "Sent at" }], max: 20000,
+      formula: `AND(IS_AFTER({Sent at}, DATETIME_PARSE('${isoT(now - DAY)}')), {Direction} = 'Mia', LEFT(LOWER(TRIM({Text} & '')), 39) = 'sorry, something went wrong on our side')`,
+      fields: ["Center"], max: 2000,
     }).catch(() => null),
   ]);
+  const msgs = talk ? talk.filter((m) => msOf(m.fields["Sent at"]) > now - DAY) : null;
   const delays = talk ? replyDelays(talk) : null;
   const replyOf = (list, a, b) => median(list.filter((d) => d.at >= a && d.at < b).map((d) => d.sec));
 
@@ -2122,7 +2136,7 @@ async function adminOverview(env) {
       });
       const latest = (list) => { const t = list.reduce((a, m) => Math.max(a, msOf(m.fields["Sent at"])), 0); return t ? isoT(t) : null; };
       health = {
-        errors: mia.filter((m) => SORRY.test(String(m.fields["Text"] || "").trim())).length,
+        errors: (sorry || []).filter((m) => String(m.fields["Center"] || "").toLowerCase() === c.slug).length,
         replies: mia.length,
         divers: new Set(mine.filter((m) => m.fields["Direction"] === "Customer").map((m) => String(m.fields["Contact ID"] || ""))).size,
         waiting: waiting.length,
@@ -3280,7 +3294,14 @@ function hqClient(cfg) {
   function api(path, opt) {
     return fetch("/zone/admin/api/" + path, Object.assign({ credentials: "same-origin" }, opt || {})).then(function (r) {
       if (r.status === 401) { location.reload(); throw new Error("auth"); }
-      return r.json().then(function (j) { if (!r.ok || j.error) throw new Error(j.error || "Er ging iets mis."); return j; });
+      // Not JSON (a Cloudflare error page, an Access login): name the status and error number instead of a JSON parse error.
+      return r.text().then(function (body) {
+        var j; try { j = JSON.parse(body); } catch (e) {
+          var code = body.match(/[Ee]rror[ ]+([0-9]{4})/);
+          throw new Error("De server gaf geen gegevens terug (HTTP " + r.status + (code ? ", Cloudflare-fout " + code[1] : "") + "). Klik op Vernieuwen; blijft het, kijk dan in Cloudflare bij de logs van de Worker.");
+        }
+        if (!r.ok || j.error) throw new Error(j.error || "Er ging iets mis."); return j;
+      });
     });
   }
   function post(path, body) { return api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); }
