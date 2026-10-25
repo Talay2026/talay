@@ -4774,6 +4774,18 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .chip .count{line-height:18px}
 .th{align-items:baseline}
 .th .tag{align-self:center}
+/* Dashboard (25 Oct): % next to the number, week chart with numbers, equal card heights */
+.fsteps{margin-top:18px}
+.fnum{display:flex;align-items:baseline;gap:8px;margin-top:8px}
+.fpct{position:static;font-size:12px;font-weight:700;color:var(--muted);background:var(--paper);border-radius:999px;padding:1px 8px}
+.wchart{display:flex;gap:6px;height:180px;align-items:stretch}
+.wcol{flex:1;display:flex;gap:6px;justify-content:center;align-items:flex-end}
+.wb{flex:0 1 44px;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px}
+.wb span{font-size:12px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.wb i{display:block;width:100%;border-radius:4px 4px 0 0;max-height:calc(100% - 20px)}
+.dgrid3{align-items:stretch}
+.dgrid3 > .panel{margin:0;display:flex;flex-direction:column}
+.dgrid3 > .panel .hnote{margin-top:auto;padding-top:12px}
 /* Settings (25 Oct): calmer */
 .smsg:empty{min-height:0;margin:0}
 .srow+.smsg:empty+.d{margin-top:18px}
@@ -6102,8 +6114,8 @@ function zoneClient(cfg) {
       var w = Math.max(4, Math.round(s[1] / top * 100));
       var prev = i ? steps[i - 1][1] : 0;
       var conv = i ? '<span class="fpct" title="' + t("of the step before") + '">' + (prev ? Math.round(s[1] / prev * 100) + "%" : "–") + "</span>" : "";
-      return '<div class="fstep">' + conv + '<div class="fbar"><span style="width:' + w + '%"></span></div>' +
-        '<b>' + s[1] + '</b><small>' + s[0] + '</small><em>' + s[2] + "</em></div>";
+      return '<div class="fstep"><div class="fbar"><span style="width:' + w + '%"></span></div>' +
+        '<div class="fnum"><b>' + s[1] + "</b>" + conv + '</div><small>' + s[0] + '</small><em>' + s[2] + "</em></div>";
     }).join("");
     var lost = Math.max(0, f.opened - f.booked);
     var tip = lost ? tn(lost, "1 diver opened the payment page but didn't pay. See <b>Bookings → Not paid yet</b> to send a reminder.", "{n} divers opened the payment page but didn't pay. See <b>Bookings → Not paid yet</b> to send a reminder.") : t("Nobody dropped off at the payment page in this period.");
@@ -6150,10 +6162,9 @@ function zoneClient(cfg) {
     var kp = function (label, val, sub, hi, key, lowerBetter) { return '<div class="kpi' + (hi ? " hi" : "") + '"><small>' + label + "</small><b>" + val + "</b>" + (key ? tr(key, lowerBetter) : "") + (sub ? "<span>" + sub + "</span>" : "") + "</div>"; };
     var maxW = Math.max(1, Math.max.apply(null, d.weeks.map(function (w) { return Math.max(w.conversations, w.bookings); })));
     var W = Math.max(d.weeks.length, 1), bw = 100 / W;
-    var bars = d.weeks.map(function (w, i) {
-      var h1 = w.conversations / maxW * 100, h2 = w.bookings / maxW * 100, x = i * bw;
-      return '<rect x="' + (x + bw * 0.12) + '" y="' + (100 - h1) + '" width="' + (bw * 0.36) + '" height="' + h1 + '" fill="#4E7480" rx="1"><title>' + tn(w.conversations, "1 conversation", "{n} conversations") + "</title></rect>" +
-        '<rect x="' + (x + bw * 0.52) + '" y="' + (100 - h2) + '" width="' + (bw * 0.36) + '" height="' + h2 + '" fill="#DCA44A" rx="1"><title>' + tn(w.bookings, "1 booking", "{n} bookings") + "</title></rect>";
+    var bars = d.weeks.map(function (w) {
+      var col = function (v, c, tip) { return '<div class="wb"><span>' + v + '</span><i style="height:' + Math.max(v ? 2 : 0, v / maxW * 100) + "%;background:" + c + '" title="' + tip + '"></i></div>'; };
+      return '<div class="wcol">' + col(w.conversations, "#4E7480", tn(w.conversations, "1 conversation", "{n} conversations")) + col(w.bookings, "#DCA44A", tn(w.bookings, "1 booking", "{n} bookings")) + "</div>";
     }).join("");
     var labels = d.weeks.map(function (w) { return '<span style="flex:1;text-align:center">' + new Date(w.week + "T12:00:00Z").toLocaleDateString(LOC, { day: "numeric", month: "short" }) + "</span>"; }).join("");
     var langMax = Math.max(1, d.languages.length ? d.languages[0][1] : 1);
@@ -6161,7 +6172,7 @@ function zoneClient(cfg) {
     var mini = function (label, val, sub, key, lowerBetter) { return '<div class="mini"><small>' + label + "</small><b>" + val + "</b>" + (key ? tr(key, lowerBetter) : "") + (sub ? "<span>" + sub + "</span>" : "") + "</div>"; };
     var hp = heatParts(d);
     var weekPanel = '<div class="panel"><h4>' + t("Per week") + '</h4><div class="legend"><span><i style="background:#4E7480"></i>' + t("Conversations") + '</span><span><i style="background:#DCA44A"></i>' + t("Bookings") + "</span></div>" +
-        '<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:160px;display:block">' + bars + "</svg>" +
+        '<div class="wchart">' + bars + "</div>" +
         '<div style="display:flex;font-size:11px;color:var(--muted);margin-top:4px">' + labels + "</div></div>";
     var langPanel = '<div class="panel"><h4>' + t("Languages") + "</h4>" + (d.languages.length ? d.languages.map(function (l) {
           return '<div class="barrow"><span class="lb">' + esc(langName(l[0])) + '</span><span class="bar" style="width:' + (l[1] / langMax * 70) + '%"></span><span>' + l[1] + "</span></div>"; }).join("") : '<div class="bempty">' + t("No conversations yet.") + "</div>") + "</div>";
@@ -6186,7 +6197,7 @@ function zoneClient(cfg) {
       '<div class="kpis main">' +
         kp(t("Revenue via {a}", { a: esc(cfg.assistant) }), thb(k.revenue), tn(k.divers, "1 diver", "{n} divers"), true, "revenue") +
         kp(t("Bookings"), k.bookings, t("{n} after a follow-up", { n: k.afterFollowUp }), false, "bookings") +
-        kp(t("Conversations"), k.conversations, t("{n} outside office hours ({p})", { n: k.outsideHours, p: pct(k.outsideHours, k.conversations) }), false, "conversations") +
+        kp(t("Conversations"), k.conversations, k.outsideHours ? t("{n} outside office hours ({p})", { n: k.outsideHours, p: pct(k.outsideHours, k.conversations) }) : "", false, "conversations") +
         kp(t("Booking conversion"), k.conversion + "%", t("of conversations booked"), false, "conversion") +
       "</div>" +
       '<div class="minis strip">' +
