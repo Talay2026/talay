@@ -3983,8 +3983,23 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 .tag.wait{background:#B3261E;color:#fff}
 .tag.asg{background:#E4EEF6;color:#2E5F86}
 .teamrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 22px 12px;background:var(--card);border-bottom:1px solid var(--line);font-size:13px}
-.teamrow .asg{display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 10px;border-radius:999px;background:#E4EEF6;color:#2E5F86}
-.teamrow .asg select{border:0;background:none;font:inherit;font-weight:700;color:inherit;padding:2px 4px;cursor:pointer;max-width:180px}
+.teamrow .asg{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:0;border-radius:999px;background:#E4EEF6;color:#2E5F86;font:inherit;font-weight:700;cursor:pointer;max-width:220px}
+.teamrow .asg:hover{background:#D6E5F1}
+.teamrow .asg #asgName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.teamrow .asg .chev{opacity:.7;transition:transform .15s}
+.teamrow .asg[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.amenu{position:fixed;z-index:60;min-width:230px;max-width:300px;max-height:60vh;overflow:auto;padding:6px;border-radius:14px;background:var(--card);border:1px solid var(--line);box-shadow:0 18px 40px -12px rgba(10,32,41,.35),0 2px 6px rgba(10,32,41,.08);font-size:14px}
+.amenu[hidden]{display:none}
+.amenu button{display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px;border:0;border-radius:9px;background:none;color:var(--deep);font:inherit;text-align:left;cursor:pointer}
+.amenu button:hover,.amenu button:focus-visible{background:var(--paper);outline:none}
+.amenu .av{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#E4EEF6;color:#2E5F86;font-weight:700;font-size:13px}
+.amenu .av.none{background:var(--paper);color:var(--muted)}
+.amenu .who{display:grid;min-width:0}
+.amenu .who b{font-weight:600}
+.amenu .who small{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.amenu .ck{margin-left:auto;flex:none;color:#2E5F86;visibility:hidden}
+.amenu button.on{background:#F1F6FA}
+.amenu button.on .ck{visibility:visible}
 .teamrow .nbtn{display:inline-flex;align-items:center;gap:6px;max-width:100%;border:1px dashed var(--line);background:none;border-radius:999px;padding:5px 12px;font:inherit;color:var(--muted);cursor:pointer;text-align:left}
 .teamrow .nbtn.has{border-style:solid;background:#FFF6DD;border-color:#F0DDA6;color:#5A4410;font-weight:600}
 .teamrow .nbtn[hidden]{display:none}
@@ -5020,8 +5035,7 @@ function zoneClient(cfg) {
         ((d.bookings || []).filter(function (b) { return !/cancel|refund/i.test(b.status); }).length > 1 ? '<span class="tag ret">' + t("Returning diver") + "</span>" : "") +
         '<div class="actions">' + actions + "</div></div>" +
         (facts ? '<div class="facts">' + facts + "</div>" : "") +
-        (d.hasLead ? '<div class="teamrow"><label class="asg"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><select id="assign" aria-label="' + t("Assigned to") + '"><option value="">' + t("Not assigned") + "</option>" +
-          (L.assigned ? '<option value="' + esc(L.assigned) + '" selected>' + esc(person(L.assigned)) + "</option>" : "") + "</select></label>" +
+        (d.hasLead ? '<div class="teamrow"><button type="button" class="asg" id="assign" aria-haspopup="menu" aria-expanded="false" title="' + t("Assigned to") + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span id="asgName">' + esc(L.assigned ? (L.assigned === String(cfg.email || "").toLowerCase() ? t("You") : person(L.assigned)) : t("Not assigned")) + '</span><svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>' +
           '<button type="button" class="nbtn' + (L.note ? " has" : "") + '" id="nOpen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>' + (L.note ? esc(L.note.length > 70 ? L.note.slice(0, 70) + "…" : L.note) : t("Add a team note")) + "</button>" +
           '<div class="nbox" id="nBox" hidden><textarea id="nTxt" rows="3" maxlength="2000" placeholder="' + t("Only your team sees this, never the diver. E.g. wants to be in the same group as her friend.") + '">' + esc(L.note) + '</textarea><div class="nact"><span class="nmsg" id="nMsg"></span><button type="button" class="ghost" id="nCancel">' + t("Cancel") + '</button><button type="button" class="btn primary" id="nSave">' + t("Save") + "</button></div></div></div>" : "") +
         bookingCard(d.bookings) +
@@ -5143,25 +5157,59 @@ function zoneClient(cfg) {
 
   // Assign and team note (Leads → Assigned to, Team note), only for the team.
   var teamList = null;
-  function person(e) { var n = String(e || "").split("@")[0].split(/[._-]/)[0]; return n ? n.charAt(0).toUpperCase() + n.slice(1) : e; }
+  function person(e) { var n = String(e || "").split("@")[0].split(/[._+-]/)[0]; n = n.replace(/\d+$/, "") || n; return n ? n.charAt(0).toUpperCase() + n.slice(1) : e; }
+  var amenu = document.createElement("div");
+  amenu.className = "amenu"; amenu.id = "amenu"; amenu.setAttribute("role", "menu"); amenu.hidden = true;
+  document.body.appendChild(amenu);
+  function closeAssign() { amenu.hidden = true; var b = $("#assign"); if (b) b.setAttribute("aria-expanded", "false"); }
+  document.addEventListener("click", function (e) { if (!amenu.hidden && !amenu.contains(e.target)) closeAssign(); });
+  addEventListener("resize", closeAssign);
+  amenu.onkeydown = function (e) {
+    var bs = Array.prototype.slice.call(amenu.querySelectorAll("button")), i = bs.indexOf(document.activeElement);
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); bs[(i + (e.key === "ArrowDown" ? 1 : bs.length - 1)) % bs.length].focus(); }
+    if (e.key === "Escape" || e.key === "Tab") { closeAssign(); var b = $("#assign"); if (b) b.focus(); }
+  };
   function teamRow(d) {
-    var L = d.lead, sel = $("#assign"), id = d.id;
-    var fill = function () {
-      if (!teamList || id !== current || !$("#assign")) return;
-      var me = String(cfg.email || "").toLowerCase(), all = teamList.slice();
-      if (L.assigned && all.indexOf(L.assigned) < 0) all.push(L.assigned);
-      sel.innerHTML = '<option value="">' + t("Not assigned") + "</option>" + all.map(function (e) {
-        return '<option value="' + esc(e) + '"' + (e === L.assigned ? " selected" : "") + ">" + esc(e === me ? t("Me ({n})", { n: person(e) }) : person(e)) + "</option>";
-      }).join("");
+    var L = d.lead, btn = $("#assign"), id = d.id, me = String(cfg.email || "").toLowerCase();
+    var ck = '<svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7"/></svg>';
+    var item = function (e, label, sub) {
+      var on = e === (L.assigned || "");
+      return '<button type="button" role="menuitemradio" aria-checked="' + on + '" data-e="' + esc(e) + '"' + (on ? ' class="on"' : "") + ">" +
+        '<span class="av' + (e ? "" : " none") + '">' + (e ? esc(person(e).charAt(0)) : "–") + "</span>" +
+        '<span class="who"><b>' + esc(label) + "</b>" + (sub ? "<small>" + esc(sub) + "</small>" : "") + "</span>" + ck + "</button>";
     };
-    if (teamList) fill(); else api("settings").then(function (s) {
-      var seen = {}; teamList = (s.admins || []).concat(s.staff || []).map(function (e) { return String(e).toLowerCase(); }).filter(function (e) { return e && !seen[e] && (seen[e] = 1); });
+    var fill = function () {
+      var all = (teamList || []).slice();
+      if (L.assigned && all.indexOf(L.assigned) < 0) all.push(L.assigned);
+      all.sort(function (x, y) { return (y === me) - (x === me); });
+      amenu.innerHTML = item("", t("Not assigned"), "") + all.map(function (e) { return item(e, e === me ? t("Me ({n})", { n: person(e) }) : person(e), e); }).join("");
+      amenu.querySelectorAll("button").forEach(function (b) {
+        b.onclick = function () {
+          closeAssign();
+          if (b.dataset.e === (L.assigned || "")) return;
+          btn.disabled = true; $("#asgName").textContent = b.dataset.e ? (b.dataset.e === me ? t("You") : person(b.dataset.e)) : t("Not assigned");
+          post("lead-team", { c: id, assign: b.dataset.e }).then(function () { lastChat = ""; lastList = ""; freshList = true; loadChat(false); loadList(); })
+            .catch(function (e) { alert(e.message); lastChat = ""; loadChat(false); }).finally(function () { btn.disabled = false; });
+        };
+      });
+    };
+    var open = function () {
       fill();
-    }).catch(function () {});
-    sel.onchange = function () {
-      sel.disabled = true;
-      post("lead-team", { c: id, assign: sel.value }).then(function () { lastChat = ""; lastList = ""; freshList = true; loadChat(false); loadList(); })
-        .catch(function (e) { alert(e.message); }).finally(function () { sel.disabled = false; });
+      amenu.hidden = false; btn.setAttribute("aria-expanded", "true");
+      var r = btn.getBoundingClientRect(), w = amenu.offsetWidth, h = amenu.offsetHeight;
+      amenu.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + "px";
+      amenu.style.top = (r.bottom + 6 + h < innerHeight ? r.bottom + 6 : Math.max(8, r.top - h - 6)) + "px";
+      (amenu.querySelector("button.on") || amenu.querySelector("button")).focus();
+    };
+    closeAssign();
+    btn.onclick = function (e) {
+      e.stopPropagation();
+      if (!amenu.hidden) return closeAssign();
+      if (teamList) return open();
+      api("settings").then(function (s) {
+        var seen = {}; teamList = (s.admins || []).concat(s.staff || []).map(function (e) { return String(e).toLowerCase(); }).filter(function (e) { return e && !seen[e] && (seen[e] = 1); });
+        if (id === current && $("#assign") === btn) open();
+      }).catch(function () {});
     };
     var box = $("#nBox"), nt = $("#nTxt");
     $("#nOpen").onclick = function () { box.hidden = false; $("#nOpen").hidden = true; nt.focus(); };
