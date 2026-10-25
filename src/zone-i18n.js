@@ -442,6 +442,7 @@ export const ZONE_ROWS = [
   ["Enter a valid email address.", "Escribe un email válido.", "Saisissez une adresse e-mail valide.", "Geben Sie eine gültige E-Mail-Adresse ein.", "Geef een geldig e-mailadres in."],
   ["Write the WhatsApp number with the country code, for example +66 81 234 5678.", "Escribe el número de WhatsApp con el prefijo del país, por ejemplo +66 81 234 5678.", "Écrivez le numéro WhatsApp avec l’indicatif du pays, par exemple +66 81 234 5678.", "Schreiben Sie die WhatsApp-Nummer mit Ländervorwahl, zum Beispiel +66 81 234 5678.", "Schrijf het WhatsApp-nummer met de landcode, bijvoorbeeld +66 81 234 5678."],
   ["Team details aren't available yet. Ask Jonas to finish the setup.", "Los datos del equipo aún no están disponibles. Pide a Jonas que termine la configuración.", "Les données de l’équipe ne sont pas encore disponibles. Demandez à Jonas de terminer la configuration.", "Die Teamdaten sind noch nicht verfügbar. Bitten Sie Jonas, die Einrichtung abzuschließen.", "De teamgegevens zijn nog niet beschikbaar. Vraag Jonas om de installatie af te ronden."],
+  ["Diver details", "Datos del buceador", "Infos du plongeur", "Taucherdaten", "Gegevens duiker"],
 ];
 
 // { es: { English: Spanish, … }, fr: …, de: …, nl: …, th: … }
@@ -878,5 +879,6 @@ export const ZONE_TH = {
   "Enter a valid email address.": "กรอกอีเมลที่ถูกต้อง",
   "Write the WhatsApp number with the country code, for example +66 81 234 5678.": "ใส่เบอร์ WhatsApp พร้อมรหัสประเทศ เช่น +66 81 234 5678",
   "Team details aren't available yet. Ask Jonas to finish the setup.": "ข้อมูลทีมยังใช้ไม่ได้ ขอให้ Jonas ตั้งค่าให้เสร็จ",
+  "Diver details": "ข้อมูลนักดำน้ำ",
 };
 ZONE_TEXT.th = ZONE_TH;
