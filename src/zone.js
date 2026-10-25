@@ -429,10 +429,10 @@ async function conversations(env, center, view) {
     if (!okId(id)) continue;
     const dir = r.fields["Direction"] || "";
     const when = r.fields["Sent at"] || r.createdTime;
-    if (!byContact.has(id)) byContact.set(id, { id, last: null, lastCustomer: null, lastTeam: null, hay: "" });
+    if (!byContact.has(id)) byContact.set(id, { id, last: null, lastCustomer: null, ask: "", lastTeam: null, hay: "" });
     const c = byContact.get(id);
     if (!c.last) c.last = { text: r.fields["Text"] || "", dir, at: when };
-    if (dir === "Customer" && !c.lastCustomer) c.lastCustomer = when;
+    if (dir === "Customer" && !c.lastCustomer) { c.lastCustomer = when; c.ask = String(r.fields["Text"] || "").slice(0, 140); }
     if (dir === "Team" && !c.lastTeam) c.lastTeam = when;
     if (c.hay.length < 3000) c.hay += " " + String(r.fields["Text"] || "").toLowerCase();
   }
@@ -455,7 +455,7 @@ async function conversations(env, center, view) {
       // Mia is paused, the diver wrote last and nobody answered for 15 minutes: nobody will unless the team looks.
       waitingMin: open && lead.human && !lead.optedOut && c.last.dir === "Customer" && Date.parse(c.last.at) < now - WAIT_MIN * 60000
         ? Math.round((now - Date.parse(c.last.at)) / 60000) : 0,
-      preview: String(c.last.text).slice(0, 140), previewDir: c.last.dir, lastAt: c.last.at,
+      preview: String(c.last.text).slice(0, 140), previewDir: c.last.dir, lastAt: c.last.at, ask: c.ask,
       cc: (countryOf(lead.contact) || [""])[0],
       closesAt: closes ? new Date(closes).toISOString() : null,
       hay: (lead.name.toLowerCase() + " " + c.hay).slice(0, 3000),
@@ -3916,8 +3916,8 @@ function app(center, centers, email, superadmin = false, lang = "en") {
   const T = zoneT(lang), A = esc(center.assistant);
   const langOpts = ZONE_LANGS.map(([code, name]) => `<option value="${code}"${code === lang ? " selected" : ""}>${name}</option>`).join("");
   const switcher = centers.length > 1
-    ? `<select id="center" aria-label="Dive center">${centers.map((c) =>
-      `<option value="${esc(c.slug)}"${c.slug === center.slug ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select>` : "";
+    ? `<button class="csw" id="center" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Dive center"><span>${esc(center.name)}</span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><div class="lmenu" id="cmenu" role="menu" hidden>${centers.map((c) =>
+      `<button type="button" role="menuitemradio" aria-checked="${c.slug === center.slug}" data-c="${esc(c.slug)}"${c.slug === center.slug ? ' class="on"' : ""}>${esc(c.name)}<svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7"/></svg></button>`).join("")}</div>` : "";
   const logo = center.logo
     ? `<img src="${esc(center.logo)}" alt="" class="logo">`
     : `<svg width="32" height="32" viewBox="0 0 100 100" aria-hidden="true" class="logo-svg"><path d="M 12 50 A 38 38 0 0 0 88 50 Z" fill="#DCA44A"/><circle cx="50" cy="50" r="38" fill="none" stroke="#F7F3EA" stroke-width="10"/><line x1="6" y1="50" x2="94" y2="50" stroke="#F7F3EA" stroke-width="10" stroke-linecap="round"/></svg>`;
@@ -4294,7 +4294,7 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
  header{display:contents}
  header .brand{grid-area:brand;padding:22px 20px 20px}
  header .sp{display:none}
- header select{grid-area:switch;margin:0 14px 14px;width:auto}
+ header select,header .csw{grid-area:switch;margin:0 14px 14px;width:auto;max-width:none}
  header .htools{grid-area:tools;flex-direction:column;align-items:stretch;padding:12px 12px 16px;border-top:1px solid rgba(247,243,234,.08)}
  header .htools .lnk,header .htools a{width:100%;justify-content:flex-start;text-align:left}
  nav{grid-area:nav;flex-direction:column;align-items:stretch;gap:2px;padding:4px 12px;border:0;background:none;overflow:visible}
@@ -4689,6 +4689,11 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .item .meta span+span::before{content:"·";margin:0 6px}
 .item .meta .left{margin:0;font-size:inherit}
 .item .meta .bk{color:var(--ok);font-weight:600}
+.csw{display:flex;align-items:center;gap:8px;width:auto;min-width:0;max-width:52vw;font:inherit;font-size:14px;text-align:left;cursor:pointer;background:var(--side-2);color:#F7F3EA;border:1px solid rgba(247,243,234,.12);border-radius:10px;padding:8px 12px}
+.csw span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.csw:hover{border-color:rgba(247,243,234,.25)}
+.csw .chev{flex:none;opacity:.6;transition:transform .15s}
+.csw[aria-expanded="true"] .chev{transform:rotate(180deg)}
 /* Calm chat (25 Oct): one quiet info block above the messages, everything on the same left edge */
 .pane .head{border-bottom:0;padding:16px 22px 6px}
 .cinfo{background:var(--card);border-bottom:1px solid var(--line);padding:0 22px 14px 70px;display:grid;gap:10px}
@@ -4912,26 +4917,31 @@ function zoneClient(cfg) {
   // ---- tabs
   function setLang(l) { document.cookie = "talay-zone-lang=" + l + "; path=/zone; max-age=31536000; samesite=lax; secure"; location.reload(); }
   document.querySelectorAll("select.zlang").forEach(function (zl) { zl.onchange = function () { setLang(zl.value); }; });
-  var hl = $("#hlang"), lm = $("#lmenu");
-  function closeLang() { lm.hidden = true; hl.setAttribute("aria-expanded", "false"); }
-  hl.onclick = function (e) {
-    e.stopPropagation();
-    if (!lm.hidden) return closeLang();
-    lm.hidden = false; hl.setAttribute("aria-expanded", "true");
-    var r = hl.getBoundingClientRect(), w = lm.offsetWidth, h = lm.offsetHeight;
-    lm.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + "px";
-    lm.style.top = (r.bottom + 6 + h < innerHeight ? r.bottom + 6 : Math.max(8, r.top - h - 6)) + "px";
-    (lm.querySelector("button.on") || lm.querySelector("button")).focus();
-  };
-  lm.querySelectorAll("button").forEach(function (b) { b.onclick = function () { closeLang(); if (b.dataset.l !== cfg.lang) setLang(b.dataset.l); }; });
-  lm.onkeydown = function (e) {
-    var bs = Array.prototype.slice.call(lm.querySelectorAll("button")), i = bs.indexOf(document.activeElement);
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); bs[(i + (e.key === "ArrowDown" ? 1 : bs.length - 1)) % bs.length].focus(); }
-    if (e.key === "Escape" || e.key === "Tab") { closeLang(); hl.focus(); }
-  };
-  document.addEventListener("click", function (e) { if (!lm.hidden && !lm.contains(e.target)) closeLang(); });
-  addEventListener("resize", closeLang);
-  var sel = $("#center"); if (sel) sel.onchange = function () { location.href = "/zone?center=" + encodeURIComponent(sel.value); };
+  // A small dropdown in Talay style: opens under (or above) its button, arrow keys, Escape, click outside.
+  function dropMenu(btn, menu, pick) {
+    if (!btn || !menu) return;
+    var close = function () { menu.hidden = true; btn.setAttribute("aria-expanded", "false"); };
+    btn.onclick = function (e) {
+      e.stopPropagation();
+      if (!menu.hidden) return close();
+      menu.hidden = false; btn.setAttribute("aria-expanded", "true");
+      var r = btn.getBoundingClientRect(), w = menu.offsetWidth, h = menu.offsetHeight;
+      menu.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + "px";
+      menu.style.top = (r.bottom + 6 + h < innerHeight ? r.bottom + 6 : Math.max(8, r.top - h - 6)) + "px";
+      menu.style.minWidth = Math.max(200, r.width) + "px";
+      (menu.querySelector("button.on") || menu.querySelector("button")).focus();
+    };
+    menu.querySelectorAll("button").forEach(function (b) { b.onclick = function () { close(); pick(b); }; });
+    menu.onkeydown = function (e) {
+      var bs = Array.prototype.slice.call(menu.querySelectorAll("button")), i = bs.indexOf(document.activeElement);
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); bs[(i + (e.key === "ArrowDown" ? 1 : bs.length - 1)) % bs.length].focus(); }
+      if (e.key === "Escape" || e.key === "Tab") { close(); btn.focus(); }
+    };
+    document.addEventListener("click", function (e) { if (!menu.hidden && !menu.contains(e.target)) close(); });
+    addEventListener("resize", close);
+  }
+  dropMenu($("#hlang"), $("#lmenu"), function (b) { if (b.dataset.l !== cfg.lang) setLang(b.dataset.l); });
+  dropMenu($("#center"), $("#cmenu"), function (b) { if (!b.classList.contains("on")) location.href = "/zone?center=" + encodeURIComponent(b.dataset.c); });
   document.querySelectorAll("nav button").forEach(function (b) {
     b.onclick = function () {
       document.querySelectorAll("nav button").forEach(function (x) { x.classList.toggle("on", x === b); });
@@ -5676,7 +5686,7 @@ function zoneClient(cfg) {
       var open = d.conversations.length;
       $("#tNeed").innerHTML = '<div class="th"><b>' + t("Needs your team") + "</b>" + (need.length ? '<span class="tag need">' + need.length + "</span>" : "") + '<a href="#" class="tlink" id="tAllChats">' + t("All chats ({n})", { n: open }) + "</a></div>" +
         (need.length ? need.slice(0, 5).map(function (c) {
-          return '<button class="trow" data-chat="' + esc(c.id) + '">' + avatar(c.name, c.cc) + '<span class="tr-b"><b>' + esc(dname(c.name)) + (c.waitingMin ? ' <span class="tag wait">' + t("Waiting {t}", { t: waitFor(c.waitingMin) }) + "</span>" : "") + "</b><small>" + esc(String(c.preview || "").slice(0, 90)) + '</small></span><span class="tr-t">' + ago(c.lastAt) + "</span></button>";
+          return '<button class="trow" data-chat="' + esc(c.id) + '">' + avatar(c.name, c.cc) + '<span class="tr-b"><b>' + esc(dname(c.name)) + (c.waitingMin ? ' <span class="tag wait">' + t("Waiting {t}", { t: waitFor(c.waitingMin) }) + "</span>" : "") + "</b><small>" + esc(String(c.ask || c.preview || "").slice(0, 90)) + '</small></span><span class="tr-t">' + ago(c.lastAt) + "</span></button>";
         }).join("") : held.length ? "" : '<p class="tok"><span class="okdot"></span>' + t("Nothing waiting. {a} is handling every conversation.", { a: esc(cfg.assistant) }) + "</p>") +
         held.slice(0, 5).map(function (c) {
           return '<button class="trow" data-chat="' + esc(c.id) + '">' + avatar(c.name, c.cc) + '<span class="tr-b"><b>' + esc(dname(c.name)) + ' <span class="tag team"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg> ' + t("{a} paused", { a: esc(cfg.assistant) }) + "</span></b><small>" + t("Give it back to {a} when you're done.", { a: esc(cfg.assistant) }) + '</small></span><span class="tr-t">' + ago(c.lastAt) + "</span></button>";

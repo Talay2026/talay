@@ -7,7 +7,7 @@
 // No straight double quotes in a translation: the texts also go into HTML attributes.
 
 export const ZONE_LANGS = [["en", "English"], ["es", "Español"], ["fr", "Français"], ["de", "Deutsch"], ["nl", "Nederlands"], ["th", "ไทย"]];
-export const ZONE_LOCALE = { en: "", es: "es-ES", fr: "fr-FR", de: "de-DE", nl: "nl-BE", th: "th-TH" };
+export const ZONE_LOCALE = { en: "en-GB", es: "es-ES", fr: "fr-FR", de: "de-DE", nl: "nl-BE", th: "th-TH" };
 const ORDER = ["es", "fr", "de", "nl"];
 
 export const ZONE_ROWS = [
