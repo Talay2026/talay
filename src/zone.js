@@ -4025,7 +4025,7 @@ function app(center, centers, email, superadmin = false, lang = "en") {
     : `<svg width="32" height="32" viewBox="0 0 100 100" aria-hidden="true" class="logo-svg"><path d="M 12 50 A 38 38 0 0 0 88 50 Z" fill="#DCA44A"/><circle cx="50" cy="50" r="38" fill="none" stroke="#F7F3EA" stroke-width="10"/><line x1="6" y1="50" x2="94" y2="50" stroke="#F7F3EA" stroke-width="10" stroke-linecap="round"/></svg>`;
   const cfg = {
     qs: centers.length > 1 ? `?center=${encodeURIComponent(center.slug)}` : "",
-    assistant: center.assistant, center: center.name, email,
+    assistant: center.assistant, center: center.name, slug: center.slug, email,
     lang, locale: ZONE_LOCALE[lang] || "", tr: ZONE_TEXT[lang] || {},
   };
 
@@ -4838,6 +4838,11 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 }
 /* Dark mode (25 Oct): readable trend pills in the mini strip */
 @media (prefers-color-scheme:dark){.mini em.trend.up{background:rgba(95,192,138,.16);color:#6FCF9B}.mini em.trend.down{background:rgba(240,168,119,.16);color:#F0A877}}
+/* Unread dot (25 Oct) */
+.item .udot{width:9px;height:9px;border-radius:50%;background:var(--sand);flex:none}
+.item.unread .nm{font-weight:800}
+.item.unread .pv{color:var(--deep);font-weight:500}
+@media (prefers-color-scheme:dark){.item.unread .pv{color:inherit}}
 /* Translate in the chat (25 Oct) */
 .m .rep.trb{opacity:1;color:var(--muted)}
 .m .trtxt{display:block}
@@ -5200,6 +5205,18 @@ function zoneClient(cfg) {
   });
   $("#search").oninput = function () { render(); };
 
+  // Unread dot: per device, the time of the last message each conversation had when this person
+  // last opened it. On the first visit everything counts as read.
+  var SEEN_KEY = "talay-seen-" + (cfg.slug || ""), seen = null;
+  try { seen = JSON.parse(localStorage.getItem(SEEN_KEY) || "null"); } catch (e) {}
+  var seenFirst = !seen || typeof seen !== "object"; if (seenFirst) seen = {};
+  function saveSeen() {
+    var ids = Object.keys(seen); if (ids.length > 600) ids.sort(function (a, b) { return String(seen[a]).localeCompare(String(seen[b])); }).slice(0, ids.length - 500).forEach(function (k) { delete seen[k]; });
+    try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch (e) {}
+  }
+  function markSeen(id, at) { if (id && at && (!seen[id] || Date.parse(at) > Date.parse(seen[id]))) { seen[id] = at; saveSeen(); } }
+  function unread(c) { return c.previewDir === "Customer" && c.id !== current && (!seen[c.id] || Date.parse(c.lastAt) > Date.parse(seen[c.id])); }
+
   function loadList() {
     var view = filter === "open" || filter === "need" ? "open" : "all";
     var fr = freshList ? "&fresh=1" : ""; freshList = false;
@@ -5209,6 +5226,7 @@ function zoneClient(cfg) {
       var cur = current && d.conversations.filter(function (c) { return c.id === current; })[0];
       if (cur && chatSeenAt && cur.lastAt !== chatSeenAt) { freshNext = true; loadChat(false); }
       if (key === lastList) { tick(); return; }
+      if (seenFirst) { seenFirst = false; d.conversations.forEach(function (c) { if (!seen[c.id]) seen[c.id] = c.lastAt; }); saveSeen(); }
       lastList = key; items = d.conversations; render();
     }).catch(function (e) { if (e.message !== "auth") $("#list").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; });
   }
@@ -5230,10 +5248,11 @@ function zoneClient(cfg) {
     el.innerHTML = list.map(function (c) {
       var l = left(c.closesAt);
       var who = c.previewDir === "Customer" ? "" : (c.previewDir === "Team" ? t("You") + ": " : cfg.assistant + ": ");
-      return '<button class="item' + (c.id === current ? " on" : "") + '" data-id="' + esc(c.id) + '" data-close="' + esc(c.closesAt || "") + '">' +
+      var un = unread(c);
+      return '<button class="item' + (c.id === current ? " on" : "") + (un ? " unread" : "") + '" data-id="' + esc(c.id) + '" data-close="' + esc(c.closesAt || "") + '">' +
         avatar(c.name, c.cc) + '<div class="ib">' +
         '<div class="top"><span class="nm">' + esc(dname(c.name)) + "</span>" +
-        '<span class="tm">' + ago(c.lastAt) + "</span></div>" +
+        '<span class="tm">' + ago(c.lastAt) + "</span>" + (un ? '<span class="udot" title="' + t("New message") + '" aria-label="' + t("New message") + '"></span>' : "") + "</div>" +
         (c.waitingMin ? '<div class="tags"><span class="tag wait">' + t("Waiting {t}", { t: waitFor(c.waitingMin) }) + "</span></div>"
           : c.needsYou ? '<div class="tags"><span class="tag need">' + t("Needs you") + "</span></div>"
           : c.teamActive ? '<div class="tags"><span class="tag team"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg> ' + t("{a} paused", { a: esc(cfg.assistant) }) + "</span></div>" : "") +
@@ -5257,6 +5276,8 @@ function zoneClient(cfg) {
   // ---- chat
   function openChat(id) {
     current = id; lastChat = ""; chatSeenAt = null;
+    var it = items.filter(function (c) { return c.id === id; })[0]; if (it) markSeen(id, it.lastAt);
+    var row = document.querySelector('.item[data-id="' + id + '"]'); if (row) { row.classList.remove("unread"); var u = row.querySelector(".udot"); if (u) u.remove(); }
     document.querySelectorAll(".item").forEach(function (b) { b.classList.toggle("on", b.dataset.id === id); });
     $("#convos").classList.add("open"); document.body.classList.add("inchat");
     $("#pane").innerHTML = '<div class="skel pad"><i></i><i></i><i></i></div>';
@@ -5270,7 +5291,7 @@ function zoneClient(cfg) {
     var fr = freshNext ? "&fresh=1" : ""; freshNext = false;
     api("chat?c=" + encodeURIComponent(id) + fr).then(function (d) {
       if (id !== current) return;
-      if (d.messages && d.messages.length) chatSeenAt = d.messages[d.messages.length - 1].at;
+      if (d.messages && d.messages.length) { chatSeenAt = d.messages[d.messages.length - 1].at; markSeen(id, chatSeenAt); }
       var key = JSON.stringify([d.messages.length, d.canReply, d.needsYou, d.lead, d.bookings]);
       if (key === lastChat) return;
       var draft = $("#txt") ? $("#txt").value : "";
