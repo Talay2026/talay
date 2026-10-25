@@ -2585,8 +2585,9 @@ async function adminConversion(env, per, fresh) {
 // Make (inbound v2, Airtable 51 "Create in Log") writes per message: Center (slug) and from the
 // Anthropic call: Input tokens, Cache read tokens, Cache write tokens, Output tokens.
 // Older rows without Center are matched to a center through Leads → External ID.
-// Prices of claude-sonnet-5-5 in USD per million tokens (cache write = 5-minute cache).
-const CLAUDE_PRICE = { input: 2, write: 2.5, read: 0.2, output: 10 };
+// Prices of claude-sonnet-5-5 in USD per million tokens. Cache write = 1-hour cache (2x input),
+// used in v2 since 25 Oct 2026; writes before that were 5-minute ($2.50), so older months read slightly high.
+const CLAUDE_PRICE = { input: 2, write: 4, read: 0.2, output: 10 };
 const THB_PER_USD = 33; // rough, only to compare with the commission in baht
 const usdOf = (t) => (t.input * CLAUDE_PRICE.input + t.write * CLAUDE_PRICE.write + t.read * CLAUDE_PRICE.read + t.output * CLAUDE_PRICE.output) / 1e6;
 async function adminCosts(env, month) {
