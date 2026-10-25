@@ -122,6 +122,7 @@ export async function handleZone(request, env, ctx) {
       if (p === "/zone/api/handled") return await leadAction(request, env, center, "handled");
       if (p === "/zone/api/lead-team") return await leadTeam(request, env, center);
       if (p === "/zone/api/translate") return await translate(request, env);
+      if (p === "/zone/api/suggest") return await suggest(request, env, center);
     }
     return json({ error: "Not found" }, 404);
   } catch (err) {
@@ -681,6 +682,62 @@ async function translate(request, env) {
     }));
   } catch (e) {
     return json({ error: "Translating didn't work. Try again." }, 502);
+  }
+}
+
+// Suggest a reply for the team after a handover: Claude drafts one message from the chat and
+// this center's own facts (Centers, Products, FAQ texts in Messages, quick replies, team note).
+// Nothing is sent; the draft lands in the composer and the team edits it. Anything the facts
+// don't answer comes back as [check: …] so the team fills it in. Needs ANTHROPIC_API_KEY.
+const SUGGEST_PROMPT = `You draft a WhatsApp reply for the team of a dive centre. The assistant has handed this conversation to the team, and a team member will read your draft, change it and send it themselves.
+
+Write one reply to the diver's latest open question, in the diver's language, as the team (not as the assistant): warm, short (2 to 5 sentences), plain text, no markdown, at most one emoji. Use only the facts in <centre>. Never invent prices, times, availability, discounts or medical advice. When the reply needs something the facts don't give (a date that has to be checked, a group price, a medical answer from an instructor), put a short placeholder in square brackets in English for the team, like [check: boat space on 14 Nov]. Do not greet again when the chat already has a greeting from the team today. Return only the reply.`;
+async function suggest(request, env, center) {
+  const body = await readBody(request);
+  const id = String(body?.c || "");
+  if (!okId(id)) return json({ error: "Bad request" }, 400);
+  if (!env.ANTHROPIC_API_KEY) return json({ error: "Suggestions aren't switched on yet." }, 503);
+  let c, f, prods, faqs;
+  try {
+    [c, f, prods, faqs] = await Promise.all([
+      chat(env, center, id), centerRecord(env, center),
+      at(env, "Products", { formula: `ARRAYJOIN({C slug}) & '' = '${q(center.slug)}'` }).catch(() => []),
+      at(env, "Messages", { formula: `FIND('${q(center.slug)}/faq.', {Center key}) = 1`, fields: ["Key", "Body EN"], max: 80 }).catch(() => []),
+    ]);
+  } catch (e) {
+    console.error("suggest", e.message);
+    return json({ error: "Could not read this conversation. Try again." }, 502);
+  }
+  if (c.error) return json({ error: c.error }, 404);
+  const s = (k) => String(first(f[k]) ?? "").trim();
+  const facts = [
+    `Name: ${center.name}`, `Assistant: ${s("Assistant name")}`, `Office hours: ${s("Escalation hours")}`, `Meeting point: ${s("Meeting point")}`,
+    `Dive sites: ${s("Dive sites")}`, `Boat departures: ${s("Boat departure times")}`, `Languages spoken: ${s("Languages spoken")}`,
+    "Products (price per person, online deposit):",
+    ...prods.filter((r) => r.fields["Active"]).map((r) => `- ${first(r.fields["Name"])}: ${first(r.fields["Price THB"])} THB, deposit ${first(r.fields["Deposit THB"])} THB`),
+    "Booking links: the team adds them with the Send a booking link button; write [booking link] where one belongs.",
+    "Saved answers:",
+    ...faqs.map((r) => `- ${String(r.fields["Key"] || "").replace(/^faq\./, "")}: ${String(r.fields["Body EN"] || "").replace(/\s+/g, " ").slice(0, 500)}`),
+    ...quickReplies(f).map((x) => `- ${x.title}: ${x.text.replace(/\s+/g, " ").slice(0, 500)}`),
+  ].filter((x) => !/: $/.test(x)).join("\n").slice(0, 14000);
+  const L = c.lead || {};
+  const diver = [`Name: ${L.name || "-"}`, `Language: ${L.language || "unknown, use the language of the diver's messages"}`, `Level: ${L.cert || "-"}`, `On the island: ${L.dates || "-"}`, `Group: ${L.group || "-"}`,
+    `Team note: ${L.note || "-"}`, ...(c.bookings || []).slice(0, 3).map((b) => `Booking: ${b.product} on ${b.date}, ${b.divers} divers, ${b.status}`)].join("\n");
+  const convo = c.messages.slice(-30).map((m) => `${m.dir === "Customer" ? "Diver" : m.dir === "Team" ? "Team" : "Assistant"} (${String(m.at).slice(0, 16).replace("T", " ")}): ${String(m.text).slice(0, 800)}`).join("\n");
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2026-10-21" },
+      body: JSON.stringify({ model: "claude-sonnet-5-5", max_tokens: 1200, system: SUGGEST_PROMPT,
+        messages: [{ role: "user", content: `<centre>\n${facts}\n</centre>\n<diver>\n${diver}\n</diver>\n<conversation>\n${convo}\n</conversation>` }] }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || d.stop_reason === "refusal") { console.error("suggest", r.status, JSON.stringify(d).slice(0, 300)); throw new Error("suggest"); }
+    const out = (d.content || []).filter((x) => x.type === "text").map((x) => x.text).join("").trim();
+    if (!out) throw new Error("suggest");
+    return json({ text: out });
+  } catch (e) {
+    return json({ error: "No suggestion right now. Try again." }, 502);
   }
 }
 
@@ -5496,6 +5553,7 @@ function zoneClient(cfg) {
             '<div class="fchip" id="fchip" hidden></div>' +
             '<div class="epick" id="epick" hidden>' + EMOJI.map(function (x) { return '<button type="button">' + x + "</button>"; }).join("") + "</div>" +
             '<div class="cmeta"><label class="sig"><input type="checkbox" id="sigon"> ' + t("Signed as") + ' <input id="sig" maxlength="30" placeholder="' + t("your name") + '"></label>' +
+            (d.hasLead && (d.needsYou || L.human) ? '<button type="button" class="trout sugg" id="sugg">' + SPARK_ICON + "<span>" + t("Suggest a reply") + "</span></button>" : "") +
             (lastDiver ? '<button type="button" class="trout" id="trOut" disabled>' + TR_ICON + "<span>" + t("Translate to the diver's language") + "</span></button>" : "") +
             '<select id="prod" aria-label="' + t("Booking link") + '" hidden><option value="">' + t("+ Booking link…") + "</option></select>" +
             '<span class="sp"></span><span class="bt' + (l.soon ? " soon" : "") + '">' + esc(l.t) + "</span></div>" +
@@ -5567,6 +5625,24 @@ function zoneClient(cfg) {
         tx.addEventListener("input", function () { quickShow(tx); });
         tx.addEventListener("blur", function () { setTimeout(quickHide, 150); });
         $("#send").onclick = send;
+        var sg = $("#sugg");
+        if (sg) {
+          // After a handover: a draft from the chat and the center's own facts; the team edits and sends it.
+          var sgOrig = null, sgLab = sg.querySelector("span"), sgText = sgLab.textContent;
+          tx.addEventListener("input", function () { if (sgOrig !== null) { sgOrig = null; sgLab.textContent = sgText; } });
+          sg.onclick = function () {
+            if (sgOrig !== null) { tx.value = sgOrig; sgOrig = null; sgLab.textContent = sgText; grow(); tx.focus(); return; }
+            sg.disabled = true; sgLab.textContent = t("Writing a suggestion…");
+            post("suggest", { c: id }).then(function (r) {
+              if (current !== id) return;
+              var before = tx.value; tx.value = r.text; tx.dispatchEvent(new Event("input"));
+              sgOrig = before; sgLab.textContent = t("Undo suggestion"); tx.focus();
+              $("#note").textContent = /\[[^\]]+\]/.test(r.text) ? t("Fill in the parts in [brackets] before you send.") : t("Read it through before you send.");
+              $("#note").className = "note";
+            }).catch(function (e) { sgLab.textContent = sgText; $("#note").textContent = e.message; $("#note").className = "note err"; })
+              .finally(function () { sg.disabled = false; });
+          };
+        }
         var to = $("#trOut");
         if (to) {
           // Translate the draft into the diver's language; the original stays one tap away until the draft changes.
@@ -6249,6 +6325,7 @@ function zoneClient(cfg) {
   var LANGN = { en: "English", nl: "Dutch", fr: "French", de: "German", es: "Spanish", it: "Italian", pt: "Portuguese", th: "Thai" };
   // Leads store the language as a code or a name ("es", "Spanish"); both give "es".
   function langCode(v) { var s = String(v || "").trim().toLowerCase(); if (LANGN[s]) return s; for (var k in LANGN) if (LANGN[k].toLowerCase() === s) return k; return s; }
+  var SPARK_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.9L19 9.7l-5.2 1.8L12 16.4l-1.8-4.9L5 9.7l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>';
   var TR = {}, TR_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h8M8 3v2M10 5c-.6 3.5-2.8 6.4-6 8M6 9c1.2 2 3 3.6 5 4.5M13 21l4-9 4 9M14.5 18h5"/></svg>';
   function langName(v) { var s = String(v || "").trim(); return (LANGN[s.toLowerCase()] && t(LANGN[s.toLowerCase()])) || (s.length <= 3 ? s.toUpperCase() : s.charAt(0).toUpperCase() + s.slice(1)); }
   function human(v) { var s = String(v || "").replace(/_/g, " ").trim(); return s ? t(s.charAt(0).toUpperCase() + s.slice(1)) : ""; }
