@@ -696,7 +696,8 @@ async function checkout(request, env, ctx, url) {
   const t = T[lang];
   const slug = String(input.slug || "").toLowerCase();
   const ref = /^[A-Za-z0-9_-]{1,64}$/.test(String(input.ref || "")) ? String(input.ref) : "";
-  const note = String(input.note || "").replace(/[|;]/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
+  // No " or \ in the note: Make puts it in a JSON body (PATCH Bookings → Note).
+  const note = String(input.note || "").replace(/[|;]/g, " ").replace(/["\\]/g, "'").replace(/\s+/g, " ").trim().slice(0, 300);
   // Old pages send one product at the top level.
   const wanted = Array.isArray(input.items) ? input.items
     : [{ code: input.code, date: input.date, divers: input.divers, slot: input.slot }];
