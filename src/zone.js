@@ -101,7 +101,7 @@ export async function handleZone(request, env, ctx) {
     if (p === "/zone/api/push-key") return json({ key: env.VAPID_PRIVATE ? await vapidPublic(env) : "" });
     if (p === "/zone/api/push-latest") {
       const d = await conversations(env, center, "open");
-      const need = d.conversations.filter((c) => c.needsYou);
+      const need = d.conversations.filter((c) => c.needsYou || c.waitingMin > 0);
       if (!need.length) return json({ title: "", body: "" });
       const c = need[0];
       return json({
@@ -433,14 +433,18 @@ async function conversations(env, center, view) {
       id: c.id, name: lead.name || lead.contact, language: lead.language, status: lead.status,
       needsYou: open && handover > teamAt && !lead.optedOut,
       teamActive: lead.human, open,
+      // Mia is paused, the diver wrote last and nobody answered for 15 minutes: nobody will unless the team looks.
+      waitingMin: open && lead.human && !lead.optedOut && c.last.dir === "Customer" && Date.parse(c.last.at) < now - WAIT_MIN * 60000
+        ? Math.round((now - Date.parse(c.last.at)) / 60000) : 0,
       preview: String(c.last.text).slice(0, 140), previewDir: c.last.dir, lastAt: c.last.at,
       cc: (countryOf(lead.contact) || [""])[0],
       closesAt: closes ? new Date(closes).toISOString() : null,
       hay: (lead.name.toLowerCase() + " " + c.hay).slice(0, 3000),
     };
   });
-  list.sort((a, b) => (b.needsYou - a.needsYou) || (Date.parse(b.lastAt) - Date.parse(a.lastAt)));
-  return { conversations: list, needsCount: list.filter((c) => c.needsYou).length };
+  const urgent = (c) => c.needsYou || c.waitingMin > 0;
+  list.sort((a, b) => (urgent(b) - urgent(a)) || (Date.parse(b.lastAt) - Date.parse(a.lastAt)));
+  return { conversations: list, needsCount: list.filter(urgent).length };
 }
 
 // Linked "Interested in" values come back as record ids (recXXXXXXXXXXXXXX): look up the product names.
@@ -2566,6 +2570,23 @@ export async function runHqAlerts(env, scheduledTime) {
   if (env.ALERT_WEBHOOK && hq.length) await sendAlerts(env, alertMessage(hq, false));
   await teamEscalations(env, alerts, at0).catch((e) => console.error("escalation", e));
   await morningSummaries(env, at0).catch((e) => console.error("morning", e));
+  await pausedWaitPush(env, at0).catch((e) => console.error("paused wait push", e));
+}
+
+// Mia is paused (the team took over) and the diver wrote again without an answer: one push to the
+// center's phones when that wait crosses WAIT_MIN in this cron window (/zone/api/push-latest names the diver).
+async function pausedWaitPush(env, at0) {
+  if (!env.VAPID_PRIVATE) return;
+  const centers = (await at(env, "Centers", { sort: [{ field: "Name" }] })).map(centerMeta)
+    .filter((c) => /^[a-z0-9-]{1,60}$/.test(c.slug));
+  for (const c of centers) {
+    const d = await cached(env, `conv/${c.slug}/open`, 20, () => conversations(env, c, "open"), true).catch(() => null);
+    const hit = (d?.conversations || []).some((x) => {
+      const due = Date.parse(x.lastAt) + WAIT_MIN * 60000;
+      return x.waitingMin > 0 && due >= at0 - ALERT_EVERY && due < at0;
+    });
+    if (hit) await pushToCenter(env, c.slug).catch((e) => console.error("push", c.slug, e));
+  }
 }
 
 // ---------- Notifications for the dive center team (WhatsApp, table Notify) ----------
@@ -3885,6 +3906,7 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 .item .pv{font-size:14px;color:var(--muted);margin-top:3px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .tag{font-size:11px;font-weight:800;border-radius:999px;padding:2px 8px;white-space:nowrap}
 .tag.need{background:var(--sand);color:#0A2029}
+.tag.wait{background:#B3261E;color:#fff}
 .tag.team{background:#FBEADF;color:#8A3F12;display:inline-flex;align-items:center;gap:4px}
 .tag.lang{background:var(--line);color:var(--deep);text-transform:uppercase}
 .tag.st{border:1px solid var(--line);color:var(--muted)}
@@ -4713,6 +4735,7 @@ function zoneClient(cfg) {
     });
   }
   function post(path, body) { return api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); }
+  function waitFor(m) { return m < 60 ? t("{n} min", { n: m }) : t("{n} h", { n: Math.floor(m / 60) }); }
   function ago(iso) { var s = (Date.now() - Date.parse(iso)) / 1000; if (s < 60) return t("now"); if (s < 3600) return t("{n} min", { n: Math.floor(s / 60) }); if (s < 86400) return t("{n} h", { n: Math.floor(s / 3600) }); return new Date(iso).toLocaleDateString(LOC, { day: "numeric", month: "short" }); }
   function left(iso) {
     if (!iso) return { t: "", soon: false };
@@ -4742,7 +4765,7 @@ function zoneClient(cfg) {
     } catch (e) {}
   }
   function badge(list) {
-    var need = list.filter(function (c) { return c.needsYou; });
+    var need = list.filter(function (c) { return c.needsYou || c.waitingMin > 0; });
     var n = need.length, el = $("#count");
     el.hidden = !n; el.textContent = n;
     document.title = (n ? "(" + n + ") " : "") + cfg.center + " · Talay";
@@ -4812,7 +4835,7 @@ function zoneClient(cfg) {
   function render() {
     var term = ($("#search").value || "").trim().toLowerCase();
     var list = items.filter(function (c) {
-      if (filter === "need" && !c.needsYou) return false;
+      if (filter === "need" && !c.needsYou && !c.waitingMin) return false;
       if (filter === "booked" && !/booked/i.test(c.status)) return false;
       return !term || c.hay.indexOf(term) > -1;
     });
@@ -4833,6 +4856,7 @@ function zoneClient(cfg) {
         '<span class="tm">' + ago(c.lastAt) + "</span></div>" +
         ((c.needsYou || c.teamActive || /booked/i.test(c.status) || c.language) ? '<div class="tags">' +
         (c.needsYou ? '<span class="tag need">' + t("Needs you") + "</span>" : "") +
+        (c.waitingMin ? '<span class="tag wait">' + t("Waiting {t}", { t: waitFor(c.waitingMin) }) + "</span>" : "") +
         (c.teamActive ? '<span class="tag team"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg> ' + t("{a} paused", { a: esc(cfg.assistant) }) + "</span>" : "") +
         (/booked/i.test(c.status) ? '<span class="tag st">' + t("Booked") + "</span>" : "") +
         (c.language ? '<span class="tag lang">' + esc(langName(c.language)) + "</span>" : "") + "</div>" : "") +
@@ -5389,12 +5413,12 @@ function zoneClient(cfg) {
     $("#tDate").textContent = new Date().toLocaleDateString(LOC, { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Bangkok" }) + " · " + cfg.center;
     loadDay();
     api("conversations?view=open").then(function (d) {
-      var need = d.conversations.filter(function (c) { return c.needsYou; });
-      var held = d.conversations.filter(function (c) { return c.teamActive && !c.needsYou; });
+      var need = d.conversations.filter(function (c) { return c.needsYou || c.waitingMin > 0; });
+      var held = d.conversations.filter(function (c) { return c.teamActive && !c.needsYou && !c.waitingMin; });
       var open = d.conversations.length;
       $("#tNeed").innerHTML = '<div class="th"><b>' + t("Needs your team") + "</b>" + (need.length ? '<span class="tag need">' + need.length + "</span>" : "") + '<a href="#" class="tlink" id="tAllChats">' + t("All chats ({n})", { n: open }) + "</a></div>" +
         (need.length ? need.slice(0, 5).map(function (c) {
-          return '<button class="trow" data-chat="' + esc(c.id) + '">' + avatar(c.name, c.cc) + '<span class="tr-b"><b>' + esc(dname(c.name)) + "</b><small>" + esc(String(c.preview || "").slice(0, 90)) + '</small></span><span class="tr-t">' + ago(c.lastAt) + "</span></button>";
+          return '<button class="trow" data-chat="' + esc(c.id) + '">' + avatar(c.name, c.cc) + '<span class="tr-b"><b>' + esc(dname(c.name)) + (c.waitingMin ? ' <span class="tag wait">' + t("Waiting {t}", { t: waitFor(c.waitingMin) }) + "</span>" : "") + "</b><small>" + esc(String(c.preview || "").slice(0, 90)) + '</small></span><span class="tr-t">' + ago(c.lastAt) + "</span></button>";
         }).join("") : held.length ? "" : '<p class="tok"><span class="okdot"></span>' + t("Nothing waiting. {a} is handling every conversation.", { a: esc(cfg.assistant) }) + "</p>") +
         held.slice(0, 5).map(function (c) {
           return '<button class="trow" data-chat="' + esc(c.id) + '">' + avatar(c.name, c.cc) + '<span class="tr-b"><b>' + esc(dname(c.name)) + ' <span class="tag team"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg> ' + t("{a} paused", { a: esc(cfg.assistant) }) + "</span></b><small>" + t("Give it back to {a} when you're done.", { a: esc(cfg.assistant) }) + '</small></span><span class="tr-t">' + ago(c.lastAt) + "</span></button>";
