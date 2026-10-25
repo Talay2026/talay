@@ -1,4 +1,4 @@
-// Talay booking page: talay.io/b/[center-slug]?p=[product-code]
+// Talay booking page: talay.io/b/[center-slug] (optional ?p=[product-code], several p= for several bookings)
 // Reads the center and product from Airtable (read-only token) and renders a
 // white-label page: the diver sees the dive center; Talay only appears in the fine print and on Stripe.
 // Everything outside /b/ is served from /public by the assets binding.
@@ -319,6 +319,201 @@ const T = {
   },
 };
 
+// Texts of the booking page with several bookings under each other (added 25 Oct, merged into T below).
+const T_BOOK = {
+  en: {
+    pageTitle: "Book your diving",
+    via: "Secure booking via Talay",
+    reviews: (n) => `${n} Google reviews`,
+    activity: "What would you like to do?",
+    groups: { fun: "Fun dives", course: "Courses", pack: "Packages" },
+    perDiver: "per diver",
+    infoTitle: "What's included",
+    dives: (n) => `${n} dives`,
+    infoDives: "Dives", infoDepth: "Max depth", infoDuration: "Duration", infoFor: "For", infoInc: "Included", infoNot: "Not included", infoBring: "Bring",
+    minAge: (n) => `from ${n} years`,
+    groupNote: "You'll probably dive in more than one group; we'll try to put you on the same boat.",
+    slotLabel: "Morning or afternoon",
+    am: "Morning", pm: "Afternoon", day: "Full day",
+    days: (n) => `${n} days`,
+    chooseActivity: "Choose an activity first.",
+    chooseSlot: "Choose morning or afternoon.",
+    notOpen: "This day is not available.",
+    done: "Done", edit: "Change", remove: "Remove",
+    another: "Book another one",
+    bookingN: (n) => `Booking ${n}`,
+    depositWord: "deposit",
+    overview: "Your plan",
+    overviewEmpty: "Your bookings show up here.",
+    overlap: (d) => `${d}: these bookings overlap. That's fine if they're for different divers; otherwise choose another day.`,
+    noteLabel: "Anything we should know?",
+    notePh: "For example: we dive together with Anna and Tom.",
+    totalAll: "Total",
+    unknown: (n) => `${n} can't be booked online right now. Choose another activity or ask in the chat.`,
+    prevMonth: "Previous month", nextMonth: "Next month",
+    fixFirst: "Finish the booking marked in red first.",
+    tooMany: "You can book up to 8 activities at once.",
+    confirmHi: (n) => `Hi ${n}, you're booked! ✅`,
+    confirmHiNo: "You're booked! ✅",
+    confirmPaid: (x) => `Paid now: ${x} THB`,
+    confirmShop: (x) => `At the shop: ${x} THB`,
+    confirmEnd: "Questions? Just reply here.",
+  },
+  fr: {
+    pageTitle: "Réservez vos plongées",
+    via: "Réservation sécurisée via Talay",
+    reviews: (n) => `${n} avis Google`,
+    activity: "Que souhaitez-vous faire ?",
+    groups: { fun: "Plongées loisir", course: "Formations", pack: "Forfaits" },
+    perDiver: "par plongeur",
+    infoTitle: "Ce qui est inclus",
+    dives: (n) => `${n} plongées`,
+    infoDives: "Plongées", infoDepth: "Profondeur max.", infoDuration: "Durée", infoFor: "Pour", infoInc: "Inclus", infoNot: "Non inclus", infoBring: "À apporter",
+    minAge: (n) => `à partir de ${n} ans`,
+    groupNote: "Vous plongerez probablement en plusieurs groupes ; nous essaierons de vous mettre sur le même bateau.",
+    slotLabel: "Matin ou après-midi",
+    am: "Matin", pm: "Après-midi", day: "Journée entière",
+    days: (n) => `${n} jours`,
+    chooseActivity: "Choisissez d'abord une activité.",
+    chooseSlot: "Choisissez le matin ou l'après-midi.",
+    notOpen: "Ce jour n'est pas disponible.",
+    done: "Valider", edit: "Modifier", remove: "Supprimer",
+    another: "Réserver autre chose",
+    bookingN: (n) => `Réservation ${n}`,
+    depositWord: "acompte",
+    overview: "Votre programme",
+    overviewEmpty: "Vos réservations apparaissent ici.",
+    overlap: (d) => `${d} : ces réservations se chevauchent. Pas de souci si ce sont d'autres plongeurs ; sinon choisissez un autre jour.`,
+    noteLabel: "Quelque chose à nous dire ?",
+    notePh: "Par exemple : nous plongeons avec Anna et Tom.",
+    totalAll: "Total",
+    unknown: (n) => `${n} ne peut pas être réservé en ligne pour le moment. Choisissez une autre activité ou demandez dans la conversation.`,
+    prevMonth: "Mois précédent", nextMonth: "Mois suivant",
+    fixFirst: "Terminez d'abord la réservation marquée en rouge.",
+    tooMany: "Vous pouvez réserver jusqu'à 8 activités à la fois.",
+    confirmHi: (n) => `Bonjour ${n}, c'est réservé ! ✅`,
+    confirmHiNo: "C'est réservé ! ✅",
+    confirmPaid: (x) => `Payé maintenant : ${x} THB`,
+    confirmShop: (x) => `Au centre : ${x} THB`,
+    confirmEnd: "Des questions ? Répondez simplement ici.",
+  },
+  de: {
+    pageTitle: "Buche deine Tauchgänge",
+    via: "Sichere Buchung über Talay",
+    reviews: (n) => `${n} Google-Bewertungen`,
+    activity: "Was möchtest du machen?",
+    groups: { fun: "Fun Dives", course: "Kurse", pack: "Pakete" },
+    perDiver: "pro Taucher",
+    infoTitle: "Was inklusive ist",
+    dives: (n) => `${n} Tauchgänge`,
+    infoDives: "Tauchgänge", infoDepth: "Max. Tiefe", infoDuration: "Dauer", infoFor: "Für", infoInc: "Inklusive", infoNot: "Nicht inklusive", infoBring: "Mitbringen",
+    minAge: (n) => `ab ${n} Jahren`,
+    groupNote: "Ihr taucht wahrscheinlich in mehreren Gruppen; wir versuchen, euch auf dasselbe Boot zu setzen.",
+    slotLabel: "Vormittag oder Nachmittag",
+    am: "Vormittag", pm: "Nachmittag", day: "Ganzer Tag",
+    days: (n) => `${n} Tage`,
+    chooseActivity: "Wähle zuerst eine Aktivität.",
+    chooseSlot: "Wähle Vormittag oder Nachmittag.",
+    notOpen: "Dieser Tag ist nicht verfügbar.",
+    done: "Fertig", edit: "Ändern", remove: "Entfernen",
+    another: "Noch etwas buchen",
+    bookingN: (n) => `Buchung ${n}`,
+    depositWord: "Anzahlung",
+    overview: "Dein Plan",
+    overviewEmpty: "Deine Buchungen erscheinen hier.",
+    overlap: (d) => `${d}: Diese Buchungen überschneiden sich. Kein Problem, wenn es andere Taucher sind; sonst wähle einen anderen Tag.`,
+    noteLabel: "Sollen wir noch etwas wissen?",
+    notePh: "Zum Beispiel: Wir tauchen zusammen mit Anna und Tom.",
+    totalAll: "Gesamt",
+    unknown: (n) => `${n} kann gerade nicht online gebucht werden. Wähle eine andere Aktivität oder frag im Chat.`,
+    prevMonth: "Vorheriger Monat", nextMonth: "Nächster Monat",
+    fixFirst: "Schließe zuerst die rot markierte Buchung ab.",
+    tooMany: "Du kannst bis zu 8 Aktivitäten auf einmal buchen.",
+    confirmHi: (n) => `Hallo ${n}, du bist gebucht! ✅`,
+    confirmHiNo: "Du bist gebucht! ✅",
+    confirmPaid: (x) => `Jetzt bezahlt: ${x} THB`,
+    confirmShop: (x) => `Im Shop: ${x} THB`,
+    confirmEnd: "Fragen? Antworte einfach hier.",
+  },
+  es: {
+    pageTitle: "Reserva tus inmersiones",
+    via: "Reserva segura a través de Talay",
+    reviews: (n) => `${n} reseñas de Google`,
+    activity: "¿Qué te gustaría hacer?",
+    groups: { fun: "Fun dives", course: "Cursos", pack: "Paquetes" },
+    perDiver: "por buceador",
+    infoTitle: "Qué incluye",
+    dives: (n) => `${n} inmersiones`,
+    infoDives: "Inmersiones", infoDepth: "Profundidad máx.", infoDuration: "Duración", infoFor: "Para", infoInc: "Incluye", infoNot: "No incluye", infoBring: "Trae",
+    minAge: (n) => `desde ${n} años`,
+    groupNote: "Probablemente buceéis en más de un grupo; intentaremos poneros en el mismo barco.",
+    slotLabel: "Mañana o tarde",
+    am: "Mañana", pm: "Tarde", day: "Día completo",
+    days: (n) => `${n} días`,
+    chooseActivity: "Elige primero una actividad.",
+    chooseSlot: "Elige mañana o tarde.",
+    notOpen: "Este día no está disponible.",
+    done: "Listo", edit: "Cambiar", remove: "Quitar",
+    another: "Reservar otra cosa",
+    bookingN: (n) => `Reserva ${n}`,
+    depositWord: "depósito",
+    overview: "Tu plan",
+    overviewEmpty: "Tus reservas aparecen aquí.",
+    overlap: (d) => `${d}: estas reservas se solapan. No pasa nada si son buceadores distintos; si no, elige otro día.`,
+    noteLabel: "¿Algo que debamos saber?",
+    notePh: "Por ejemplo: buceamos junto con Anna y Tom.",
+    totalAll: "Total",
+    unknown: (n) => `${n} no se puede reservar online ahora mismo. Elige otra actividad o pregunta en el chat.`,
+    prevMonth: "Mes anterior", nextMonth: "Mes siguiente",
+    fixFirst: "Termina primero la reserva marcada en rojo.",
+    tooMany: "Puedes reservar hasta 8 actividades a la vez.",
+    confirmHi: (n) => `¡Hola ${n}, ya tienes tu reserva! ✅`,
+    confirmHiNo: "¡Ya tienes tu reserva! ✅",
+    confirmPaid: (x) => `Pagado ahora: ${x} THB`,
+    confirmShop: (x) => `En la tienda: ${x} THB`,
+    confirmEnd: "¿Preguntas? Responde aquí.",
+  },
+  nl: {
+    pageTitle: "Boek je duiken",
+    via: "Veilig boeken via Talay",
+    reviews: (n) => `${n} Google-reviews`,
+    activity: "Wat wil je doen?",
+    groups: { fun: "Fun dives", course: "Opleidingen", pack: "Pakketten" },
+    perDiver: "per duiker",
+    infoTitle: "Wat is inbegrepen",
+    dives: (n) => `${n} duiken`,
+    infoDives: "Duiken", infoDepth: "Max. diepte", infoDuration: "Duur", infoFor: "Voor", infoInc: "Inbegrepen", infoNot: "Niet inbegrepen", infoBring: "Meebrengen",
+    minAge: (n) => `vanaf ${n} jaar`,
+    groupNote: "Jullie duiken waarschijnlijk in meerdere groepen; we proberen jullie wel op dezelfde boot te zetten.",
+    slotLabel: "Voormiddag of namiddag",
+    am: "Voormiddag", pm: "Namiddag", day: "Hele dag",
+    days: (n) => `${n} dagen`,
+    chooseActivity: "Kies eerst een activiteit.",
+    chooseSlot: "Kies voormiddag of namiddag.",
+    notOpen: "Deze dag is niet beschikbaar.",
+    done: "Klaar", edit: "Aanpassen", remove: "Verwijderen",
+    another: "Nog iets boeken",
+    bookingN: (n) => `Boeking ${n}`,
+    depositWord: "voorschot",
+    overview: "Jouw planning",
+    overviewEmpty: "Je boekingen verschijnen hier.",
+    overlap: (d) => `${d}: deze boekingen overlappen. Geen probleem als het andere duikers zijn; anders kies je een andere dag.`,
+    noteLabel: "Iets wat we moeten weten?",
+    notePh: "Bijvoorbeeld: we duiken samen met Anna en Tom.",
+    totalAll: "Totaal",
+    unknown: (n) => `${n} kan nu niet online geboekt worden. Kies een andere activiteit of vraag het in de chat.`,
+    prevMonth: "Vorige maand", nextMonth: "Volgende maand",
+    fixFirst: "Werk eerst de rood gemarkeerde boeking af.",
+    tooMany: "Je kunt tot 8 activiteiten tegelijk boeken.",
+    confirmHi: (n) => `Hoi ${n}, je bent geboekt! ✅`,
+    confirmHiNo: "Je bent geboekt! ✅",
+    confirmPaid: (x) => `Nu betaald: ${x} THB`,
+    confirmShop: (x) => `In de shop: ${x} THB`,
+    confirmEnd: "Vragen? Antwoord gewoon hier.",
+  },
+};
+for (const l of LANGS) Object.assign(T[l], T_BOOK[l]);
+
 const okLang = (l) => (LANGS.includes(String(l || "").toLowerCase()) ? String(l).toLowerCase() : "");
 
 function pickLang(request, url) {
@@ -354,11 +549,13 @@ function chatLink(c) {
 }
 
 // Google Maps link for the meeting point. Centers field "Map link" (optional) wins over a search on the name.
-function mapLink(c, name, island, t) {
+function mapUrl(c, name, island) {
   const own = String(first(c["Map link"]) || "").trim();
-  const url = /^https:\/\//.test(own) ? own
+  return /^https:\/\//.test(own) ? own
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([name, island].filter(Boolean).join(", "))}`;
-  return `<br><a class="map" href="${esc(url)}" target="_blank" rel="noopener">${esc(t.map)}</a>`;
+}
+function mapLink(c, name, island, t) {
+  return `<br><a class="map" href="${esc(mapUrl(c, name, island))}" target="_blank" rel="noopener">${esc(t.map)}</a>`;
 }
 
 function tr(rec, field, lang) {
@@ -418,14 +615,16 @@ export default {
         return await manageAction(request, env, ctx);
       }
 
+      if (url.pathname === "/b/order") {
+        return await orderInfo(env, ctx, url);
+      }
+
       const slug = url.pathname.slice(3).replace(/\/+$/, "").toLowerCase();
-      const code = (url.searchParams.get("p") || "").toUpperCase();
-      const found = await loadBooking(env, ctx, slug, code);
+      const found = await loadCenter(env, ctx, slug);
       if (!found) return page(notFound(lang), 404, lang);
-      if (!found.product["Active"]) return page(closedPage(found.center, found.product, lang), 200, lang);
       const ref = (url.searchParams.get("c") || "").slice(0, 64);
-      return page(bookingPage(found.center, found.product, code, slug, env, lang,
-        /^[A-Za-z0-9_-]{1,64}$/.test(ref) ? ref : ""), 200, lang);
+      return page(bookingPage(found.center, found.products, slug, env, lang,
+        /^[A-Za-z0-9_-]{1,64}$/.test(ref) ? ref : "", linkItems(url)), 200, lang, T[lang].pageTitle, true);
     } catch (err) {
       console.error(err);
       return page(problem(T[lang].loadFail, lang), 502, lang);
@@ -477,62 +676,103 @@ function descriptorSuffix(name) {
   return /[A-Z]/.test(s) ? s.slice(0, 12).trim() : "";
 }
 
+// The items of an order travel in Stripe metadata "items": CODE|date|slot|divers|price|deposit;CODE|…
+// (prices as they were at payment). Orders from before 26 Oct only have the single-product fields.
+function orderItems(m) {
+  const list = String(m.items || "").split(";").filter(Boolean).map((x) => {
+    const [code, date, slot, n, price, deposit] = x.split("|");
+    return { code, date, slot: slot || "", divers: Number(n) || 1, price: Number(price) || 0, deposit: Number(deposit) || 0 };
+  });
+  if (list.length) return list;
+  const n = Number(m.divers) || 1;
+  return [{ code: m.product_code || "", date: m.activity_date || "", slot: m.time_slot || "", divers: n,
+    price: (Number(m.total_thb) || 0) / n, deposit: (Number(m.deposit_thb) || 0) / n }];
+}
+
 async function checkout(request, env, ctx, url) {
   let input;
   try { input = await request.json(); } catch { return json({ error: T.en.invalid }, 400); }
   const lang = okLang(input.lang) || "en";
   const t = T[lang];
   const slug = String(input.slug || "").toLowerCase();
-  const code = String(input.code || "").toUpperCase();
-  const date = String(input.date || "");
-  const divers = Number(input.divers);
   const ref = /^[A-Za-z0-9_-]{1,64}$/.test(String(input.ref || "")) ? String(input.ref) : "";
+  const note = String(input.note || "").replace(/[|;]/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
+  // Old pages send one product at the top level.
+  const wanted = Array.isArray(input.items) ? input.items
+    : [{ code: input.code, date: input.date, divers: input.divers, slot: input.slot }];
+  if (!wanted.length || wanted.length > MAX_ITEMS) return json({ error: t.tooMany }, 400);
 
   // Never trust the browser: reload prices and re-check every rule here.
-  const found = await loadBooking(env, ctx, slug, code);
+  const found = await loadCenter(env, ctx, slug);
   if (!found) return json({ error: t.notFoundTitle }, 404);
-  const { center, product } = found;
-  if (!product["Active"]) return json({ error: CLOSED[lang].title }, 409);
+  const { center, products } = found;
+  if (wanted.length > 1 && !center["Multi booking"]) return json({ error: t.invalid }, 400);
   const key = stripeKey(env, centerLive(env, center));
   if (!key) return json({ error: t.notAvailable }, 503);
-  const minDate = earliestDate(num(product["Cutoff hour"]) || 15);
-  const maxDate = plusDays(minDate, 180);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < minDate || date > maxDate) {
-    return json({ error: t.chooseFrom(fmtDate(minDate, lang)) }, 400);
-  }
-  if (!Number.isInteger(divers) || divers < 1 || divers > MAX_DIVERS) {
-    return json({ error: t.chooseDivers }, 400);
+  const tz = centerTz(center);
+  const closed = closedDates(center);
+  const centerName = first(center["Name"]) || "Dive center";
+
+  const items = [];
+  for (const w of wanted) {
+    const code = String(w.code || "").toUpperCase();
+    const product = products.find((p) => String(first(p["Code"]) || "").toUpperCase() === code);
+    if (!product) return json({ error: t.notFoundTitle }, 404);
+    if (!product["Active"]) return json({ error: `${CLOSED[lang].title}: ${tr(product, "Name", lang).v || code}` }, 409);
+    const date = String(w.date || "");
+    const divers = Number(w.divers);
+    const minDate = earliestDate(num(product["Cutoff hour"]) || 15, tz);
+    const maxDate = plusDays(earliestDate(99, tz), 180);
+    const days = productDays(product);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < minDate || date > maxDate) {
+      return json({ error: t.chooseFrom(fmtDate(minDate, lang)) }, 400);
+    }
+    for (let k = 0; k < days; k++) if (closed.includes(plusDays(date, k))) return json({ error: t.notOpen }, 400);
+    if (!Number.isInteger(divers) || divers < 1 || divers > MAX_DIVERS) {
+      return json({ error: t.chooseDivers }, 400);
+    }
+    const kind = slotKind(product, days);
+    const slot = kind === "CHOOSE" ? String(w.slot || "").toUpperCase() : kind;
+    if (kind === "CHOOSE" && slot !== "AM" && slot !== "PM") return json({ error: t.chooseSlot }, 400);
+    items.push({
+      code, date, divers, slot: slot === "AM" || slot === "PM" || slot === "DAY" ? slot : "",
+      name: first(product["Name"]) || code, // English name: used in Airtable, Make and mails
+      shownName: tr(product, "Name", lang).v || first(product["Name"]) || code,
+      price: num(product["Price THB"]), deposit: num(product["Deposit THB"]),
+    });
   }
 
-  const centerName = first(center["Name"]) || "Dive center";
-  const name = first(product["Name"]) || code; // English name: used in Airtable, Make and mails
-  const shownName = tr(product, "Name", lang).v || name;
-  const price = num(product["Price THB"]);
-  const deposit = num(product["Deposit THB"]);
-  const total = price * divers, paid = deposit * divers, balance = total - paid;
-  const back = `${url.origin}/b/${slug}?p=${code}${ref ? `&c=${ref}` : ""}&l=${lang}`;
+  const total = items.reduce((a, x) => a + x.price * x.divers, 0);
+  const paid = items.reduce((a, x) => a + x.deposit * x.divers, 0);
+  const one = items.length === 1 ? items[0] : null;
+  const back = `${url.origin}/b/${slug}?${items.map((x) => `p=${x.code}*${x.divers}@${x.date}${x.slot === "AM" || x.slot === "PM" ? `~${x.slot}` : ""}`).join("&")}${ref ? `&c=${ref}` : ""}&l=${lang}`;
 
   const meta = {
-    center_slug: slug, center_name: centerName, product_code: code, product_name: name,
-    activity_date: date, divers: String(divers),
-    total_thb: String(total), deposit_thb: String(paid), balance_thb: String(balance),
-    lead_ref: ref, lang,
+    center_slug: slug, center_name: centerName, lead_ref: ref, lang, note,
+    count: String(items.length),
+    items: items.map((x) => [x.code, x.date, x.slot, x.divers, x.price, x.deposit].join("|")).join(";"),
+    total_thb: String(total), deposit_thb: String(paid), balance_thb: String(total - paid),
+    // One product: the same fields as before, so Make keeps working without the order step.
+    ...(one ? { product_code: one.code, product_name: one.name, activity_date: one.date, divers: String(one.divers), time_slot: SLOT_EN[one.slot] } : {}),
   };
   const params = {
     mode: "payment",
     locale: lang,
-    "line_items[0][quantity]": String(divers),
-    "line_items[0][price_data][currency]": "thb",
-    "line_items[0][price_data][unit_amount]": String(deposit * 100), // THB in satang
-    "line_items[0][price_data][product_data][name]": t.deposit(shownName, centerName),
-    "line_items[0][price_data][product_data][description]":
-      t.stripeDesc(fmtDate(date, lang), diversLabel(divers, lang), thb(balance, lang)),
     "phone_number_collection[enabled]": "true",
     success_url: `${url.origin}/b/thanks?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: back,
-    "payment_intent_data[description]": `${name} at ${centerName}, ${date}, ${divers}x`,
+    "payment_intent_data[description]": items.map((x) => `${x.name} at ${centerName}, ${x.date}${x.slot ? ` ${SLOT_EN[x.slot]}` : ""}, ${x.divers}x`).join("; ").slice(0, 900),
     "custom_text[submit][message]": t.termsStripe,
   };
+  items.forEach((x, i) => {
+    const when = [fmtDate(x.date, lang), { AM: t.am, PM: t.pm, DAY: t.day }[x.slot] || ""].filter(Boolean).join(", ");
+    params[`line_items[${i}][quantity]`] = String(x.divers);
+    params[`line_items[${i}][price_data][currency]`] = "thb";
+    params[`line_items[${i}][price_data][unit_amount]`] = String(x.deposit * 100); // THB in satang
+    params[`line_items[${i}][price_data][product_data][name]`] = t.deposit(x.shownName, centerName);
+    params[`line_items[${i}][price_data][product_data][description]`] =
+      t.stripeDesc(when, diversLabel(x.divers, lang), thb((x.price - x.deposit) * x.divers, lang));
+  });
   // Card statement: "TALAY* <CENTER>" (prefix set in Stripe, suffix per center).
   const suffix = descriptorSuffix(centerName);
   if (suffix) params["payment_intent_data[statement_descriptor_suffix]"] = suffix;
@@ -552,6 +792,56 @@ async function checkout(request, env, ctx, url) {
   return json({ url: session.url });
 }
 
+// Called by Make (Talay - bookings, test and live) right after the payment: one row per booking.
+// talay.io/b/order?session_id=cs_… → { count, items: [{ item, product_code, product_name, activity_date,
+// time_slot, divers, total_thb, deposit_thb, balance_thb }], note, confirm, center_text, … }
+async function orderInfo(env, ctx, url) {
+  const id = url.searchParams.get("session_id") || "";
+  if (!sessionKey(env, id) || !/^cs_[A-Za-z0-9_]{10,200}$/.test(id)) return json({ error: "Unknown session." }, 404);
+  const s = await stripe(sessionKey(env, id), "GET", `checkout/sessions/${id}`);
+  const m = s.metadata || {};
+  const lang = okLang(m.lang) || "en";
+  const t = T[lang];
+  const found = m.center_slug ? await loadCenter(env, ctx, m.center_slug) : null;
+  const byCode = (code) => (found?.products || []).find((p) => String(first(p["Code"]) || "").toUpperCase() === code) || {};
+  const items = orderItems(m).map((x, i) => {
+    const p = byCode(x.code);
+    return {
+      item: i + 1, product_code: x.code, product_name: first(p["Name"]) || m.product_name || x.code,
+      shown: tr(p, "Name", lang).v || first(p["Name"]) || m.product_name || x.code,
+      activity_date: x.date, time_slot: SLOT_EN[x.slot] || "", divers: x.divers,
+      total_thb: x.price * x.divers, deposit_thb: x.deposit * x.divers, balance_thb: (x.price - x.deposit) * x.divers,
+    };
+  });
+  const total = items.reduce((a, x) => a + x.total_thb, 0), paid = items.reduce((a, x) => a + x.deposit_thb, 0);
+  const payer = s.customer_details?.name || "";
+  const firstName = cap(String(payer).trim().split(/\s+/)[0] || "");
+  const when = (x, l, lower = false) => {
+    const slot = { Morning: T[l].am, Afternoon: T[l].pm, "Full day": T[l].day }[x.time_slot] || "";
+    return [fmtDate(x.activity_date, l), lower ? slot.toLowerCase() : slot].filter(Boolean).join(", ");
+  };
+  // One WhatsApp for the whole order (Make sends it after the last booking when count > 1).
+  const confirm = [
+    firstName ? t.confirmHi(firstName) : t.confirmHiNo, "",
+    ...[...items].sort((x, y) => x.activity_date.localeCompare(y.activity_date))
+      .map((x) => `• ${x.shown}, ${when(x, lang, lang !== "de")}, ${diversLabel(x.divers, lang)}`), "",
+    t.confirmPaid(thb(paid, lang)), t.confirmShop(thb(total - paid, lang)), "", t.confirmEnd,
+  ].join("\n");
+  const centerText = [
+    `New booking via Talay (${items.length} ${items.length === 1 ? "activity" : "activities"})`,
+    `Diver: ${payer || "-"} ${s.customer_details?.phone || ""}`.trim(), "",
+    ...items.map((x) => `- ${x.product_name}: ${when(x, "en")}, ${diversLabel(x.divers, "en")}. Paid online ${thb(x.deposit_thb)} THB, at the shop ${thb(x.balance_thb)} THB.`),
+    "", `Total paid online: ${thb(paid)} THB. To collect at the shop: ${thb(total - paid)} THB.`,
+    ...(m.note ? ["", `Note from the diver: ${m.note}`] : []),
+  ].join("\n");
+  return json({
+    session_id: id, paid: s.payment_status === "paid", center_slug: m.center_slug || "", center_name: m.center_name || "",
+    lead_ref: m.lead_ref || "", lang, note: m.note || "", payer_name: payer, payer_phone: s.customer_details?.phone || "",
+    count: items.length, total_thb: total, deposit_thb: paid, balance_thb: total - paid,
+    items: items.map(({ shown, ...x }) => x), confirm, center_text: centerText,
+  });
+}
+
 async function thanks(request, env, ctx, url) {
   const id = url.searchParams.get("session_id") || "";
   let lang = pickLang(request, url);
@@ -563,16 +853,21 @@ async function thanks(request, env, ctx, url) {
   if (s.payment_status !== "paid") {
     return page(problem(t.notPaid, lang), 402, lang);
   }
-  const found = await loadBooking(env, ctx, m.center_slug, m.product_code);
-  const c = found?.center || {}, p = found?.product || {};
+  const found = await loadCenter(env, ctx, String(m.center_slug || ""));
+  const c = found?.center || {};
+  const byCode = (code) => (found?.products || []).find((p) => String(first(p["Code"]) || "").toUpperCase() === code) || {};
   const logo = first(c["Logo"])?.thumbnails?.large?.url || first(c["Logo"])?.url || "";
   const assistant = first(c["Assistant name"]) || m.center_name || "";
   const meeting = cap(tr(c, "Meeting point", lang).v);
-  const checkIn = cap(tr(p, "Check-in", lang).v);
-  const productName = tr(p, "Name", lang).v || m.product_name;
-  const isCourse = m.product_code === "OW" || /course|diver/i.test(first(p["Name"]) || m.product_name || "");
   const chat = chatLink(c);
-  const n = Number(m.divers) || 1;
+  const items = orderItems(m).sort((a, b) => a.date.localeCompare(b.date)).map((x) => {
+    const p = byCode(x.code);
+    const english = first(p["Name"]) || m.product_name || x.code;
+    return { ...x, p, name: tr(p, "Name", lang).v || english, checkIn: cap(tr(p, "Check-in", lang).v),
+      isCourse: x.code === "OW" || /course|diver/i.test(english) };
+  });
+  const checkIns = [...new Set(items.map((x) => x.checkIn).filter(Boolean))];
+  const slotWord = { AM: t.am, PM: t.pm, DAY: t.day };
 
   return page(`
 <header class="center">
@@ -581,7 +876,7 @@ async function thanks(request, env, ctx, url) {
 </header>
 <main>
   <h1>${esc(t.booked)}</h1>
-  <p class="intro"><strong>${esc(productName)}</strong>, ${esc(fmtDate(m.activity_date, lang))}, ${esc(diversLabel(n, lang))}.</p>
+  <ul class="booked">${items.map((x) => `<li><strong>${esc(x.name)}</strong>, ${esc(fmtDate(x.date, lang))}${slotWord[x.slot] ? `, ${esc(lang === "de" ? slotWord[x.slot] : slotWord[x.slot].toLowerCase())}` : ""}, ${esc(diversLabel(x.divers, lang))}</li>`).join("")}</ul>
   <section class="slate" aria-label="${esc(t.paidNow)}">
     <div class="above">
       <div class="row now"><span>${esc(t.paidNow)}</span><span><b>${thb(Number(m.deposit_thb), lang)}</b> THB</span></div>
@@ -595,15 +890,16 @@ async function thanks(request, env, ctx, url) {
   </section>
   <p class="msg">${esc(t.change)}</p>
   <h2 class="next">${esc(t.nextTitle)}</h2>
-  ${isCourse ? `<p class="course">${esc(t.courseNote)}</p>` : ""}
+  ${items.some((x) => x.isCourse) ? `<p class="course">${esc(t.courseNote)}</p>` : ""}
   <dl class="practical">
-    ${checkIn ? `<div><dt>${esc(t.checkIn)}</dt><dd>${esc(checkIn)}</dd></div>` : ""}
+    ${checkIns.length ? `<div><dt>${esc(t.checkIn)}</dt><dd>${checkIns.map(esc).join("<br>")}</dd></div>` : ""}
     ${meeting ? `<div><dt>${esc(t.meeting)}</dt><dd>${esc(meeting)}${mapLink(c, m.center_name, first(c["Island"]) || "", t)}</dd></div>` : ""}
     <div><dt>${esc(t.bring)}</dt><dd>${esc(t.bringText)}</dd></div>
   </dl>
   <p class="hint" style="margin-top:2rem">${esc(t.questions(assistant))}</p>
   ${chat ? `<a class="book chat" href="${esc(chat)}">${esc(t.backToChat)}</a>` : ""}
-</main>`, 200, lang);
+</main>
+<script>try{localStorage.removeItem(${JSON.stringify(`talay-b:${m.center_slug || ""}:${m.lead_ref || "-"}`).replace(/</g, "\\u003c")})}catch(e){}</script>`, 200, lang);
 }
 
 // ---------- Manage booking (for the dive center) ----------
@@ -635,10 +931,13 @@ async function loadManaged(env, ctx, token) {
   if (!key || !/^cs_[A-Za-z0-9_]{10,200}$/.test(sessionId)) return null;
   const session = await stripe(key, "GET", `checkout/sessions/${sessionId}`);
   const m = session.metadata || {};
-  const found = await loadBooking(env, ctx, m.center_slug, m.product_code);
+  // Which product: Bookings → P code (lookup) when it exists, otherwise the order (one product) in Stripe.
+  const items = orderItems(m);
+  const code = String(first(f["P code"]) || (items.length === 1 ? items[0].code : "") || m.product_code || "");
+  const found = await loadBooking(env, ctx, m.center_slug, code);
   const created = Date.parse(rec.createdTime);
   return {
-    rec, f, session, m, key,
+    rec, f, session, m, key, count: items.length,
     center: found?.center || {}, product: found?.product || {},
     created, late: Date.now() > created + WINDOW_MS,
     cancelled: /cancel|refund/i.test(String(first(f["Status"]) || "")),
@@ -784,8 +1083,12 @@ async function manageAction(request, env, ctx) {
     const pi = typeof b.session.payment_intent === "string" ? b.session.payment_intent : b.session.payment_intent?.id;
     if (!pi) return json({ error: "No payment found for this booking. Contact Talay." }, 409);
     try {
+      // An order with several bookings: refund only the deposit of this booking.
+      const paid = Number(first(b.f["Deposit paid THB"])) || 0;
+      if (b.count > 1 && !paid) return json({ error: "No deposit found for this booking. Contact Talay." }, 409);
       await stripe(b.key, "POST", "refunds",
-        { payment_intent: pi, "metadata[cancelled_by]": "center", "metadata[booking]": String(first(b.f["Ref"]) || "") },
+        { payment_intent: pi, "metadata[cancelled_by]": "center", "metadata[booking]": String(first(b.f["Ref"]) || ""),
+          ...(b.count > 1 ? { amount: String(Math.round(paid * 100)) } : {}) },
         { "Idempotency-Key": `cancel-${token}` });
     } catch (err) {
       if (!/already.?refunded/i.test(String(err.message))) throw err;
@@ -817,6 +1120,25 @@ async function airtableOne(env, ctx, table, formula) {
   return JSON.parse(body).records?.[0]?.fields || null;
 }
 
+async function airtableList(env, ctx, table, formula) {
+  const api = new URL(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/${encodeURIComponent(table)}`);
+  api.searchParams.set("filterByFormula", formula);
+  api.searchParams.set("pageSize", "100");
+
+  const cache = caches.default;
+  const cacheKey = new Request(`https://cache.talay.internal/list/${table}?${api.searchParams}`);
+  const hit = await cache.match(cacheKey);
+  if (hit) return ((await hit.json()).records || []).map((r) => r.fields);
+
+  const res = await fetch(api, { headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` } });
+  if (!res.ok) throw new Error(`Airtable ${table}: ${res.status} ${await res.text()}`);
+  const body = await res.text();
+  ctx.waitUntil(cache.put(cacheKey, new Response(body, {
+    headers: { "Content-Type": "application/json", "Cache-Control": `max-age=${CACHE_SECONDS}` },
+  })));
+  return (JSON.parse(body).records || []).map((r) => r.fields);
+}
+
 // ---------- Helpers ----------
 
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) =>
@@ -828,12 +1150,12 @@ const cap = (t) => String(t).charAt(0).toUpperCase() + String(t).slice(1);
 const SEP = { en: ",", nl: ".", de: ".", es: ".", fr: "\u00A0" };
 const thb = (n, lang = "en") => Math.round(n).toLocaleString("en-US").replace(/,/g, SEP[lang] ?? ",");
 
-function earliestDate(cutoffHour) {
-  // Booking for day D closes at the cutoff hour (Thai time) on D-1.
-  const now = new Date(Date.now() + 7 * 3600 * 1000); // Asia/Bangkok, no DST
-  const daysAhead = now.getUTCHours() < cutoffHour ? 1 : 2;
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysAhead));
-  return d.toISOString().slice(0, 10);
+function earliestDate(cutoffHour, tz = "Asia/Bangkok") {
+  // Booking for day D closes at the cutoff hour (time of the dive center) on D-1.
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23",
+  }).formatToParts(new Date()).map((x) => [x.type, x.value]));
+  return plusDays(`${parts.year}-${parts.month}-${parts.day}`, Number(parts.hour) < cutoffHour ? 1 : 2);
 }
 function plusDays(iso, days) {
   const d = new Date(iso + "T00:00:00Z");
@@ -843,151 +1165,507 @@ function plusDays(iso, days) {
 
 // ---------- Pages ----------
 
-function bookingPage(c, p, code, slug, env, lang, ref = "") {
+// ---------- Booking page (several bookings, one payment) ----------
+// talay.io/b/[slug] shows every active product of the center. Links from the chat can pre-fill it:
+//   ?p=FUN                         one product (old links keep working)
+//   ?p=FUN*2@2026-11-26~PM&p=OW*3  several products, with number of divers, date and morning/afternoon
+// The same product with the same date twice (Mia sent the link twice) is shown once.
+// Optional Airtable fields (the page shows less when they are empty):
+//   Products: Time slot ("Morning or afternoon", "Morning", "Afternoon", "Full day"), Days (number),
+//             Max group (number), Dives (number), Max depth, Level (+ FR/DE/ES/NL), Bring (+ FR/DE/ES/NL),
+//             Not included (+ FR/DE/ES/NL), Short (label in the plan, default the Code), Group (Fun dive/Course/Package)
+//   Centers:  Photos (first one on top), Google rating, Google reviews, Closed dates (2026-12-24, 2026-12-25),
+//             Timezone (default Asia/Bangkok), Multi booking (checkbox: "Book another one" and one payment for all)
+
+const MAX_ITEMS = 8;
+
+// Morning/afternoon per product: "" (not asked), AM, PM, CHOOSE (diver picks), DAY (whole day).
+function slotKind(p, days) {
+  if (days > 1) return "DAY";
+  const v = String(first(p["Time slot"]) || "").toLowerCase();
+  const am = /morning|\bam\b/.test(v), pm = /afternoon|\bpm\b/.test(v);
+  if ((am && pm) || /both|either|choose/.test(v)) return "CHOOSE";
+  if (am) return "AM";
+  if (pm) return "PM";
+  return /full|whole|day/.test(v) ? "DAY" : "";
+}
+function productDays(p) {
+  const n = num(p["Days"]);
+  if (n >= 1) return Math.min(Math.round(n), 14);
+  const m = String(first(p["Duration"]) || "").match(/(\d+)\s*(?:-\s*\d+\s*)?days?\b/i);
+  return m ? Math.min(Math.max(Number(m[1]), 1), 14) : 1;
+}
+function productGroup(p) {
+  const v = `${first(p["Group"]) || ""} ${first(p["Category"]) || ""} ${first(p["Name"]) || ""}`;
+  if (/package|pack\b|pakket|\d+\s*-?\s*pack/i.test(v)) return "pack";
+  if (/fun ?dive/i.test(first(p["Group"]) || first(p["Category"]) || "")) return "fun";
+  return "course";
+}
+const SLOT_EN = { AM: "Morning", PM: "Afternoon", DAY: "Full day", "": "" };
+
+// Center time: Centers → Timezone (IANA name, default Asia/Bangkok).
+function centerTz(c) {
+  const tz = String(first(c?.["Timezone"]) || "").trim();
+  try { if (tz) { new Intl.DateTimeFormat("en", { timeZone: tz }); return tz; } } catch { /* unknown zone */ }
+  return "Asia/Bangkok";
+}
+function closedDates(c) {
+  return [...new Set(String(first(c["Closed dates"]) || "").match(/\d{4}-\d{2}-\d{2}/g) || [])];
+}
+
+function productView(p, c, lang) {
+  const t = T[lang];
+  const days = productDays(p);
+  const slot = slotKind(p, days);
+  const code = String(first(p["Code"]) || "").toUpperCase();
+  const level = tr(p, "Level", lang).v
+    || [first(p["Prerequisites"]), num(p["Min age"]) ? t.minAge(num(p["Min age"])) : ""].filter(Boolean).join(", ");
+  return {
+    code,
+    name: tr(p, "Name", lang).v || first(p["Name"]) || code,
+    group: productGroup(p),
+    price: num(p["Price THB"]),
+    deposit: num(p["Deposit THB"]),
+    slot, days,
+    maxGroup: num(p["Max group"]) || 0,
+    minDate: earliestDate(num(p["Cutoff hour"]) || 15, centerTz(c)),
+    short: String(first(p["Short"]) || code).slice(0, 8),
+    info: {
+      dives: num(p["Dives"]) ? t.dives(num(p["Dives"])) : "",
+      depth: String(first(p["Max depth"]) || ""),
+      duration: cap(tr(p, "Duration", lang).v),
+      level: cap(level),
+      inc: cap(tr(p, "Included", lang).v),
+      not: cap(tr(p, "Not included", lang).v),
+      bring: cap(tr(p, "Bring", lang).v),
+      checkIn: cap(tr(p, "Check-in", lang).v),
+    },
+  };
+}
+
+// Items from the link: ?p=FUN*2@2026-11-26~PM (number, date and time are optional), repeated or comma-separated.
+function linkItems(url) {
+  const out = [];
+  for (const raw of url.searchParams.getAll("p")) {
+    for (const part of raw.split(",")) {
+      const m = part.trim().match(/^([A-Za-z0-9]{1,12})(?:\*(\d{1,2}))?(?:@(\d{4}-\d{2}-\d{2}))?(?:~(AM|PM))?$/i);
+      if (!m) continue;
+      const it = { code: m[1].toUpperCase(), n: Math.min(Math.max(Number(m[2]) || 1, 1), MAX_DIVERS), date: m[3] || "", slot: (m[4] || "").toUpperCase() };
+      if (!out.some((x) => x.code === it.code && x.date === it.date)) out.push(it);
+    }
+  }
+  return out.slice(0, MAX_ITEMS);
+}
+
+async function loadCenter(env, ctx, slug) {
+  if (!/^[a-z0-9-]{1,60}$/.test(slug)) return null;
+  const [center, products] = await Promise.all([
+    airtableOne(env, ctx, "Centers", `{Slug} = '${slug}'`),
+    airtableList(env, ctx, "Products", `FIND('${slug}', ARRAYJOIN({C slug}))`),
+  ]);
+  if (!center) return null;
+  const own = products.filter((p) => [].concat(p["C slug"] || []).map(String).includes(slug));
+  return { center, products: own };
+}
+
+function bookingPage(c, products, slug, env, lang, ref, wanted) {
   const t = T[lang];
   const centerName = first(c["Name"]) || "Dive center";
   const island = first(c["Island"]) || "";
   const assistant = first(c["Assistant name"]) || centerName;
   const logo = first(c["Logo"])?.thumbnails?.large?.url || first(c["Logo"])?.url || "";
+  const photo = first(c["Photos"])?.thumbnails?.large?.url || first(c["Photos"])?.url || "";
+  const rating = num(c["Google rating"]);
+  const reviews = num(c["Google reviews"]);
   const meeting = cap(tr(c, "Meeting point", lang).v);
-
-  const englishName = first(p["Name"]) || code;
-  const name = tr(p, "Name", lang).v || englishName;
-  const price = num(p["Price THB"]);
-  const deposit = num(p["Deposit THB"]);
-  const duration = tr(p, "Duration", lang).v;
-  const inc = tr(p, "Included", lang);
-  const includesWord = inc.translated ? t.includes : T.en.includes;
-  const checkIn = cap(tr(p, "Check-in", lang).v);
-  const cutoff = num(p["Cutoff hour"]) || 15;
   const chat = chatLink(c);
-
-  const minDate = earliestDate(cutoff);
-  const maxDate = plusDays(minDate, 180);
   const key = stripeKey(env, centerLive(env, c));
-  const payments = !!key;
   const testMode = key.startsWith("sk_test_");
-  const isCourse = code === "OW" || /course|diver/i.test(englishName);
-  const minLabel = fmtDate(minDate, lang);
+  const multi = !!c["Multi booking"];
+
+  const order = { fun: 0, course: 1, pack: 2 };
+  const views = products.filter((p) => p["Active"]).map((p) => productView(p, c, lang))
+    .filter((p) => p.code && p.price > 0)
+    .sort((a, b) => order[a.group] - order[b.group] || a.price - b.price);
+  const known = new Set(views.map((p) => p.code));
+  const unknown = wanted.filter((w) => !known.has(w.code)).map((w) => {
+    const p = products.find((x) => String(first(x["Code"]) || "").toUpperCase() === w.code);
+    return p ? tr(p, "Name", lang).v || first(p["Name"]) || w.code : "";
+  }).filter(Boolean);
+  let init = wanted.filter((w) => known.has(w.code));
+  if (!multi) init = init.slice(0, 1);
+
+  const today = earliestDate(99, centerTz(c)); // tomorrow in center time: start of the calendar
   const data = {
-    price, deposit, sep: SEP[lang] ?? ",", max: MAX_DIVERS, payments, slug, code, ref, lang, minDate, maxDate,
+    lang, locale: LOCALES[lang], sep: SEP[lang] ?? ",", max: MAX_DIVERS, maxItems: MAX_ITEMS,
+    payments: !!key, multi, slug, ref, init, products: views,
+    maxDate: plusDays(today, 180), closed: closedDates(c),
     s: {
-      diver: t.diver, divers: t.divers, chooseDate: t.chooseDate,
-      tooSoon: t.tooSoon(minLabel), tooFar: t.tooFar(assistant), noPay: t.noPay(assistant),
-      opening: t.opening, wrong: t.wrong, noConn: t.noConn,
+      diver: t.diver, divers: t.divers, chooseDate: t.chooseDate, chooseActivity: t.chooseActivity, chooseSlot: t.chooseSlot,
+      tooSoon: t.tooSoon("{d}"), tooFar: t.tooFar(assistant), notOpen: t.notOpen, noPay: t.noPay(assistant),
+      opening: t.opening, wrong: t.wrong, noConn: t.noConn, fixFirst: t.fixFirst, tooMany: t.tooMany,
+      groups: t.groups, perDiver: t.perDiver, infoTitle: t.infoTitle,
+      info: { dives: t.infoDives, depth: t.infoDepth, duration: t.infoDuration, level: t.infoFor, inc: t.infoInc, not: t.infoNot, bring: t.infoBring, checkIn: t.checkIn },
+      bringDefault: t.bringText, groupNote: t.groupNote, group: t.group(assistant),
+      diversLabel: t.diversLabel, less: t.less, more: t.more, date: t.date, startDate: t.startDate,
+      slotLabel: t.slotLabel, am: t.am, pm: t.pm, day: t.day, daysN: t.days("{n}"),
+      done: t.done, edit: t.edit, remove: t.remove, bookingN: t.bookingN("{n}"), depositWord: t.depositWord,
+      overviewEmpty: t.overviewEmpty, overlap: t.overlap("{d}"), prevMonth: t.prevMonth, nextMonth: t.nextMonth,
+      totalFor: t.totalFor, totalAll: t.totalAll,
     },
   };
 
+  if (!views.length) return closedPage(c, products[0] || {}, lang);
+
   return `
 ${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
-<header class="center">
-  ${logo ? `<img class="logo" src="${esc(logo)}" alt="${esc(centerName)} logo">` : ""}
-  <div>
-    <p class="center-name">${esc(centerName)}</p>
-    ${island ? `<p class="island">${esc(island)}</p>` : ""}
+<header class="center${photo ? " has-photo" : ""}">
+  ${photo ? `<div class="photo" style="background-image:url('${esc(photo)}')" role="img" aria-label="${esc(centerName)}"></div>` : ""}
+  <div class="hrow">
+    ${logo ? `<img class="logo" src="${esc(logo)}" alt="${esc(centerName)} logo">` : ""}
+    <div>
+      <p class="center-name">${esc(centerName)}</p>
+      ${island ? `<p class="island">${esc(island)}</p>` : ""}
+      ${rating ? `<p class="rating"><a href="${esc(mapUrl(c, centerName, island))}" target="_blank" rel="noopener"><span aria-hidden="true">★</span> ${esc(String(rating).replace(".", lang === "en" ? "." : ","))}${reviews ? ` · ${esc(t.reviews(thb(reviews, lang)))}` : ""}</a></p>` : ""}
+    </div>
+    ${langMenu(lang)}
   </div>
-  ${langMenu(lang)}
+  <p class="via"><span aria-hidden="true">🔒</span> ${esc(t.via)}</p>
 </header>
 
-<main>
-  <h1>${esc(name)}</h1>
-  <p class="intro">
-    ${duration ? `<strong>${esc(duration)}.</strong> ` : ""}
-    ${inc.v ? `${esc(includesWord)} ${esc(inc.v)}.` : ""}
-  </p>
+<div class="layout">
+<div class="top">
+  <h1>${esc(t.pageTitle)}</h1>
+  ${unknown.map((n) => `<p class="warn">${esc(t.unknown(n))}</p>`).join("")}
+  <div id="items"></div>
+  <button type="button" id="another" class="another" hidden><span aria-hidden="true">＋</span> ${esc(t.another)}</button>
+  <div id="overlap" class="warn" role="status" hidden></div>
+</div>
 
-  <div class="field">
-    <label for="date">${esc(isCourse ? t.startDate : t.date)}</label>
-    <input id="date" type="date" min="${minDate}" max="${maxDate}" required aria-describedby="date-error">
-    <p id="date-error" class="error" role="alert" hidden></p>
-    <p class="hint">${esc(t.earliest(minLabel))}</p>
-  </div>
+<aside class="plan" aria-label="${esc(t.overview)}">
+  <h2>${esc(t.overview)}</h2>
+  <div id="plan"></div>
+</aside>
 
-  <div class="field">
-    <label id="divers-label">${esc(t.diversLabel)}</label>
-    <div class="stepper" role="group" aria-labelledby="divers-label">
-      <button type="button" id="minus" aria-label="${esc(t.less)}">−</button>
-      <output id="divers" aria-live="polite">1</output>
-      <button type="button" id="plus" aria-label="${esc(t.more)}">+</button>
-    </div>
-    <p class="hint">${esc(t.group(assistant))}</p>
-  </div>
-
+<div class="bottom">
   <section class="slate" aria-label="${esc(t.payNow)}">
     <div class="above">
-      <div class="row total"><span>${esc(t.totalFor)} <span id="lbl-divers">${esc(diversLabel(1, lang))}</span></span><span><b id="total">${thb(price, lang)}</b> THB</span></div>
-      <div class="row now"><span>${esc(t.payNow)}</span><span><b id="deposit">${thb(deposit, lang)}</b> THB</span></div>
+      <div id="lines"></div>
+      <div class="row total"><span>${esc(t.totalAll)}</span><span><b id="total">0</b> THB</span></div>
+      <div class="row now"><span>${esc(t.payNow)}</span><span><b id="deposit">0</b> THB</span></div>
     </div>
     <svg class="waterline" viewBox="0 0 400 24" preserveAspectRatio="none" aria-hidden="true">
       <path d="M0 12 C 50 2, 100 22, 150 12 S 250 2, 300 12 S 380 20, 400 12 V24 H0Z"/>
     </svg>
     <div class="below">
-      <div class="row"><span>${esc(t.payShop)}</span><span><b id="balance">${thb(price - deposit, lang)}</b> THB</span></div>
+      <div class="row"><span>${esc(t.payShop)}</span><span><b id="balance">0</b> THB</span></div>
       <p class="fine">${esc(t.never)}</p>
     </div>
   </section>
+
+  <div class="field">
+    <label for="note">${esc(t.noteLabel)}</label>
+    <textarea id="note" maxlength="300" rows="2" placeholder="${esc(t.notePh)}"></textarea>
+  </div>
 
   <section class="policy" aria-label="${esc(t.policyTitle)}">
     <p class="policy-title">${esc(t.policyTitle)}</p>
     <ul>${t.policy.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
   </section>
 
-  <button type="button" id="book" class="book">${esc(t.btn[0])}<span id="btn-amount">${thb(deposit, lang)}</span>${esc(t.btn[1])}</button>
+  <button type="button" id="book" class="book">${esc(t.btn[0])}<span id="btn-amount">0</span>${esc(t.btn[1])}</button>
   <p id="msg" class="msg" role="status" hidden></p>
   <p class="terms"><span class="lock" aria-hidden="true">🔒</span> ${esc(t.secure)} ${esc(t.terms[0])}<a href="${termsUrl(lang)}" target="_blank" rel="noopener">${esc(t.terms[1])}</a></p>
 
-  ${(checkIn || meeting) ? `<dl class="practical">
-    ${checkIn ? `<div><dt>${esc(t.checkIn)}</dt><dd>${esc(checkIn)}</dd></div>` : ""}
-    ${meeting ? `<div><dt>${esc(t.meeting)}</dt><dd>${esc(meeting)}${mapLink(c, centerName, island, t)}</dd></div>` : ""}
+  ${meeting ? `<dl class="practical small">
+    <div><dt>${esc(t.meeting)}</dt><dd>${esc(meeting)}${mapLink(c, centerName, island, t)}</dd></div>
   </dl>` : ""}
   ${chat ? `<p class="ask">${esc(t.askFirst(assistant))} <a href="${esc(chat)}">${esc(t.backToChat)}</a></p>` : ""}
-</main>
+</div>
+</div>
 
 <script id="data" type="application/json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>
-<script>
+<script>${BOOK_JS}</script>`;
+}
+
+// Browser code of the booking page (plain string: no template literals inside).
+const BOOK_JS = String.raw`
 (() => {
   const d = JSON.parse(document.getElementById("data").textContent);
   const s = d.s;
   const $ = (id) => document.getElementById(id);
+  const P = {};
+  d.products.forEach((p) => { P[p.code] = p; });
   const f = (n) => Math.round(n).toLocaleString("en-US").replace(/,/g, d.sep || ",");
-  let n = 1;
-  function render() {
-    $("divers").textContent = n;
-    $("lbl-divers").textContent = n + " " + (n === 1 ? s.diver : s.divers);
-    $("total").textContent = f(d.price * n);
-    $("deposit").textContent = f(d.deposit * n);
-    $("btn-amount").textContent = f(d.deposit * n);
-    $("balance").textContent = f((d.price - d.deposit) * n);
-    $("minus").disabled = n <= 1;
-    $("plus").disabled = n >= d.max;
+  const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fill = (tpl, k, v) => tpl.split("{" + k + "}").join(v);
+  const addDays = (iso, n) => { const x = new Date(iso + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+  const fmt = (iso, o) => new Date(iso + "T00:00:00Z").toLocaleDateString(d.locale, Object.assign({ timeZone: "UTC" }, o || { weekday: "short", day: "numeric", month: "short" }));
+  const hover = window.matchMedia && window.matchMedia("(hover: hover)").matches;
+  const KEY = "talay-b:" + d.slug + ":" + (d.ref || "-");
+  let uid = 0;
+  const mk = (x) => ({ id: ++uid, code: x.code || "", n: x.n || 1, date: x.date || "", slot: x.slot || "", open: true, pick: !x.code, err: "", month: "" });
+
+  // The plan on this phone (same chat link, last 3 days) plus what the link brings, without doubles.
+  let items = [], note = "";
+  if (d.multi) {
+    try {
+      const saved = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (saved && Date.now() - saved.at < 3 * 864e5) {
+        items = (saved.items || []).filter((x) => P[x.code]).slice(0, d.maxItems).map(mk);
+        note = saved.note || "";
+      }
+    } catch (e) { /* private mode */ }
   }
-  $("minus").onclick = () => { if (n > 1) { n--; render(); } };
-  $("plus").onclick = () => { if (n < d.max) { n++; render(); } };
-  // iPhones ignore min/max on date fields, so check the date ourselves.
-  function dateProblem() {
-    const v = $("date").value;
-    if (!v) return s.chooseDate;
-    if (v < d.minDate) return s.tooSoon;
-    if (v > d.maxDate) return s.tooFar;
+  d.init.forEach((x) => {
+    const twin = items.find((y) => y.code === x.code && (y.date === x.date || !x.date || !y.date));
+    if (twin) { if (!twin.date && x.date) twin.date = x.date; return; }
+    if (items.length < d.maxItems) items.push(mk(x));
+  });
+  if (!items.length) items.push(mk({}));
+  // Finished bookings start folded; the first unfinished one is open.
+  let opened = false;
+  items.forEach((it) => { const ok = !problem(it); it.open = !ok && !opened; if (it.open) opened = true; });
+  if (!opened && items.length === 1 && !items[0].code) items[0].open = true;
+  $("note").value = note;
+
+  function slotOf(it) { const p = P[it.code]; if (!p) return ""; return p.slot === "CHOOSE" ? it.slot : p.slot; }
+  function blocked(p, date) {
+    for (let k = 0; k < p.days; k++) if (d.closed.indexOf(addDays(date, k)) >= 0) return true;
+    return false;
+  }
+  function problem(it) {
+    const p = P[it.code];
+    if (!p) return s.chooseActivity;
+    if (!(it.n >= 1 && it.n <= d.max)) return s.group;
+    if (!it.date) return s.chooseDate;
+    if (it.date < p.minDate) return fill(s.tooSoon, "d", fmt(p.minDate, { weekday: "long", day: "numeric", month: "long" }));
+    if (it.date > d.maxDate) return s.tooFar;
+    if (blocked(p, it.date)) return s.notOpen;
+    if (p.slot === "CHOOSE" && it.slot !== "AM" && it.slot !== "PM") return s.chooseSlot;
     return "";
   }
-  function showDateError(problem) {
-    const box = $("date-error");
-    $("date").classList.toggle("invalid", !!problem);
-    box.hidden = !problem;
-    box.textContent = problem || "";
+  const slotWord = (k) => ({ AM: s.am, PM: s.pm, DAY: s.day }[k] || "");
+
+  // ---- one booking, open ----
+  function infoHtml(p) {
+    const i = p.info, rows = [];
+    const add = (k, v) => { if (v) rows.push("<div><dt>" + esc(s.info[k]) + "</dt><dd>" + esc(v) + "</dd></div>"); };
+    add("dives", i.dives); add("depth", i.depth); add("duration", i.duration || (p.days > 1 ? fill(s.daysN, "n", p.days) : ""));
+    add("level", i.level); add("inc", i.inc); add("not", i.not); add("bring", i.bring || s.bringDefault); add("checkIn", i.checkIn);
+    return '<details class="info"><summary>' + esc(s.infoTitle) + "</summary><dl>" + rows.join("") + "</dl></details>";
   }
-  $("date").addEventListener("change", () => {
-    showDateError($("date").value ? dateProblem() : "");
+  function actCard(p, it) {
+    const on = it.code === p.code;
+    return '<div class="act' + (on ? " on" : "") + '"><button type="button" class="pick" data-act="' + esc(p.code) + '" aria-pressed="' + on + '">' +
+      '<span class="aname">' + esc(p.name) + '</span><span class="aprice">' + f(p.price) + " THB · " + esc(s.perDiver) + "</span></button>" + infoHtml(p) + "</div>";
+  }
+  function calHtml(it, p) {
+    // Open on the month of this booking, else of the bookings above it, never before the first bookable day.
+    const near = it.date || items.map((x) => x.date).filter(Boolean).sort().pop() || p.minDate;
+    const first = it.month || (near < p.minDate ? p.minDate : near).slice(0, 7);
+    const start = new Date(first + "-01T00:00:00Z");
+    const lead = (start.getUTCDay() + 6) % 7; // Monday first
+    const daysIn = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)).getUTCDate();
+    const prev = addDays(first + "-01", -1).slice(0, 7), next = addDays(first + "-01", 32).slice(0, 7);
+    const canPrev = prev >= p.minDate.slice(0, 7), canNext = next <= d.maxDate.slice(0, 7);
+    let h = '<div class="cal" data-cal><div class="calh"><button type="button" data-month="' + prev + '"' + (canPrev ? "" : " disabled") + ' aria-label="' + esc(s.prevMonth) + '">‹</button><b>' +
+      esc(fmt(first + "-01", { month: "long", year: "numeric" })) + '</b><button type="button" data-month="' + next + '"' + (canNext ? "" : " disabled") + ' aria-label="' + esc(s.nextMonth) + '">›</button></div><div class="calg">';
+    for (let w = 0; w < 7; w++) h += '<span class="wd">' + esc(fmt(addDays("2024-01-01", w), { weekday: "narrow" })) + "</span>";
+    for (let k = 0; k < lead; k++) h += "<span></span>";
+    const span = it.date && p.days > 1 ? addDays(it.date, p.days - 1) : it.date;
+    for (let day = 1; day <= daysIn; day++) {
+      const iso = first + "-" + String(day).padStart(2, "0");
+      const off = iso < p.minDate || iso > d.maxDate || blocked(p, iso);
+      const cls = (iso === it.date ? " sel" : it.date && iso > it.date && iso <= span ? " in" : "") + (off ? " off" : "");
+      h += '<button type="button" class="day' + cls + '" data-day="' + iso + '"' + (off ? ' disabled aria-disabled="true"' : "") + ' aria-label="' + esc(fmt(iso, { weekday: "long", day: "numeric", month: "long" })) + '">' + day + "</button>";
+    }
+    return h + "</div></div>";
+  }
+  function openHtml(it, i) {
+    const p = P[it.code];
+    let h = '<section class="item open' + (it.err ? " bad" : "") + '" data-id="' + it.id + '"><div class="ihead"><h2>' + esc(fill(s.bookingN, "n", i + 1)) + "</h2>" +
+      (items.length > 1 ? '<button type="button" class="linkbtn" data-remove>' + esc(s.remove) + "</button>" : "") + "</div>";
+    if (it.pick || !p) {
+      ["fun", "course", "pack"].forEach((g) => {
+        const list = d.products.filter((x) => x.group === g);
+        if (list.length) h += '<p class="glabel">' + esc(s.groups[g]) + '</p><div class="acts">' + list.map((x) => actCard(x, it)).join("") + "</div>";
+      });
+    } else {
+      h += '<div class="acts">' + actCard(p, it) + '</div><button type="button" class="linkbtn change" data-repick>' + esc(s.edit) + "</button>";
+    }
+    if (p && !it.pick) {
+      h += '<div class="field"><span class="lbl">' + esc(s.diversLabel) + '</span><div class="stepper"><button type="button" data-n="-1" aria-label="' + esc(s.less) + '"' + (it.n <= 1 ? " disabled" : "") + '>−</button><output>' + it.n +
+        '</output><button type="button" data-n="1" aria-label="' + esc(s.more) + '"' + (it.n >= d.max ? " disabled" : "") + ">+</button></div>" +
+        (p.maxGroup && it.n > p.maxGroup ? '<p class="note-orange">' + esc(s.groupNote) + "</p>" : "") +
+        (it.n >= d.max ? '<p class="hint">' + esc(s.group) + "</p>" : "") + "</div>";
+      h += '<div class="field"><span class="lbl">' + esc(p.days > 1 ? s.startDate : s.date) +
+        (it.date ? ' <span class="chosen">' + esc(fmt(it.date, { weekday: "long", day: "numeric", month: "long" })) + (p.days > 1 ? " → " + esc(fmt(addDays(it.date, p.days - 1))) : "") + "</span>" : "") + "</span>" + calHtml(it, p) + "</div>";
+      if (p.slot === "CHOOSE") {
+        h += '<div class="field"><span class="lbl">' + esc(s.slotLabel) + '</span><div class="slots">' +
+          ["AM", "PM"].map((k) => '<button type="button" data-slot="' + k + '" aria-pressed="' + (it.slot === k) + '" class="' + (it.slot === k ? "on" : "") + '">' + esc(slotWord(k)) + "</button>").join("") + "</div></div>";
+      } else if (p.slot) {
+        h += '<p class="hint slotfix">' + esc(slotWord(p.slot)) + (p.days > 1 ? " · " + esc(fill(s.daysN, "n", p.days)) : "") + "</p>";
+      }
+      h += (it.err ? '<p class="error" role="alert">' + esc(it.err) + "</p>" : "") + '<button type="button" class="done" data-done>' + esc(s.done) + "</button>";
+    } else if (it.err) {
+      h += '<p class="error" role="alert">' + esc(it.err) + "</p>";
+    }
+    return h + "</section>";
+  }
+  // ---- one booking, folded to one line ----
+  function lineText(it) {
+    const p = P[it.code];
+    if (!p) return s.chooseActivity;
+    return [it.n + " p", p.name, it.date ? fmt(it.date, { day: "numeric", month: "short" }) : "", slotWord(slotOf(it)), f(p.deposit * it.n) + " THB " + s.depositWord].filter(Boolean).join(" · ");
+  }
+  function lineHtml(it) {
+    return '<section class="item line' + (it.err ? " bad" : "") + '" data-id="' + it.id + '"><button type="button" class="lbtn" data-edit><span>' + esc(lineText(it)) + '</span><span class="pen">' + esc(s.edit) + "</span></button>" +
+      '<button type="button" class="x" data-remove aria-label="' + esc(s.remove) + '">×</button>' + (it.err ? '<p class="error">' + esc(it.err) + "</p>" : "") + "</section>";
+  }
+
+  // ---- plan on the right: mornings and afternoons per day ----
+  function occupancy() {
+    const occ = {};
+    items.forEach((it) => {
+      const p = P[it.code];
+      if (!p || !it.date) return;
+      const k = slotOf(it), lbl = it.n + "p " + p.short;
+      for (let j = 0; j < p.days; j++) {
+        const day = addDays(it.date, j);
+        (occ[day] = occ[day] || []).push({ lbl: lbl, part: p.days > 1 || k === "DAY" ? "day" : k === "AM" ? "am" : k === "PM" ? "pm" : "any" });
+      }
+    });
+    return occ;
+  }
+  function renderPlan(occ) {
+    const days = Object.keys(occ).sort();
+    if (!days.length) { $("plan").innerHTML = '<p class="hint">' + esc(s.overviewEmpty) + "</p>"; return; }
+    const monday = (iso) => addDays(iso, -((new Date(iso + "T00:00:00Z").getUTCDay() + 6) % 7));
+    let start = monday(days[0]);
+    const last = days[days.length - 1];
+    let end = addDays(monday(last), 6);
+    if (end > addDays(start, 41)) end = addDays(start, 41);
+    let h = '<div class="pgrid">';
+    for (let w = 0; w < 7; w++) h += '<span class="wd">' + esc(fmt(addDays("2024-01-01", w), { weekday: "short" })) + "</span>";
+    for (let day = start; day <= end; day = addDays(day, 1)) {
+      const e = occ[day] || [];
+      const chip = (x) => '<i class="' + x.part + '">' + esc(x.lbl) + "</i>";
+      const full = e.filter((x) => x.part === "day");
+      const am = e.filter((x) => x.part === "am" || x.part === "any"), pm = e.filter((x) => x.part === "pm");
+      h += '<div class="pday' + (e.length ? " busy" : "") + '"><b>' + esc(fmt(day, { day: "numeric", month: day.slice(8) === "01" || day === start ? "short" : undefined })) + "</b>" +
+        (full.length ? '<div class="pfull">' + full.map(chip).join("") + "</div>" : "") +
+        (am.length || pm.length || !full.length ? '<div class="pam">' + am.map(chip).join("") + '</div><div class="ppm">' + pm.map(chip).join("") + "</div>" : "") + "</div>";
+    }
+    $("plan").innerHTML = h + "</div>";
+  }
+  function overlaps(occ) {
+    return Object.keys(occ).sort().filter((day) => {
+      const e = occ[day], n = (k) => e.filter((x) => x.part === k).length;
+      return (n("day") && e.length > 1) || n("am") > 1 || n("pm") > 1;
+    });
+  }
+
+  function totals() {
+    let total = 0, dep = 0;
+    const lines = [];
+    items.forEach((it) => {
+      const p = P[it.code];
+      if (!p) return;
+      total += p.price * it.n; dep += p.deposit * it.n;
+      if (items.length > 1) lines.push('<div class="row sub"><span>' + esc(it.n + " × " + p.name) + "</span><span>" + f(p.deposit * it.n) + " THB</span></div>");
+    });
+    $("lines").innerHTML = lines.join("");
+    $("total").textContent = f(total);
+    $("deposit").textContent = f(dep);
+    $("btn-amount").textContent = f(dep);
+    $("balance").textContent = f(total - dep);
+  }
+  function save() {
+    if (!d.multi) return;
+    try { localStorage.setItem(KEY, JSON.stringify({ at: Date.now(), note: $("note").value, items: items.filter((x) => x.code).map((x) => ({ code: x.code, n: x.n, date: x.date, slot: x.slot })) })); } catch (e) { /* private mode */ }
+  }
+
+  function render() {
+    $("items").innerHTML = items.map((it, i) => (it.open ? openHtml(it, i) : lineHtml(it))).join("");
+    const occ = occupancy();
+    renderPlan(occ);
+    const ov = overlaps(occ);
+    $("overlap").hidden = !ov.length;
+    $("overlap").innerHTML = ov.map((day) => "<p>" + esc(fill(s.overlap, "d", fmt(day, { weekday: "short", day: "numeric", month: "short" }))) + "</p>").join("");
+    $("another").hidden = !d.multi || items.length >= d.maxItems;
+    totals();
+    save();
+    if (hover) document.querySelectorAll("#items details.info").forEach((det) => {
+      det.addEventListener("mouseenter", () => { if (!det.dataset.pin) det.open = true; });
+      det.addEventListener("mouseleave", () => { if (!det.dataset.pin) det.open = false; });
+      det.querySelector("summary").addEventListener("click", (e) => { e.preventDefault(); det.dataset.pin = det.dataset.pin ? "" : "1"; det.open = !!det.dataset.pin; });
+    });
+  }
+  // Close finished open bookings; returns the first one that still has a problem.
+  function settle(markErrors) {
+    let bad = null;
+    items.forEach((it) => {
+      if (!it.open) return;
+      const pr = problem(it);
+      if (!pr) { it.open = false; it.err = ""; it.pick = false; }
+      else if (markErrors) { it.err = pr; bad = bad || it; }
+      else if (!bad) bad = it;
+    });
+    return bad;
+  }
+  function focusItem(it) {
+    const el = document.querySelector('[data-id="' + it.id + '"]');
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  $("items").addEventListener("click", (e) => {
+    const sec = e.target.closest("[data-id]");
+    if (!sec) return;
+    const it = items.find((x) => String(x.id) === sec.dataset.id);
+    const b = e.target.closest("button");
+    if (!it || !b) return;
     $("msg").hidden = true;
+    if (b.dataset.act) {
+      if (it.code !== b.dataset.act) { it.code = b.dataset.act; it.slot = ""; it.month = ""; if (it.date && it.date < P[it.code].minDate) it.date = ""; }
+      it.pick = false; it.err = "";
+    } else if (b.hasAttribute("data-repick")) { it.pick = true; }
+    else if (b.dataset.n) { it.n = Math.min(Math.max(it.n + Number(b.dataset.n), 1), d.max); }
+    else if (b.dataset.month) { it.month = b.dataset.month; }
+    else if (b.dataset.day) { it.date = b.dataset.day; it.err = ""; }
+    else if (b.dataset.slot) { it.slot = b.dataset.slot; it.err = ""; }
+    else if (b.hasAttribute("data-done")) {
+      const pr = problem(it);
+      it.err = pr;
+      if (!pr) { it.open = false; }
+    } else if (b.hasAttribute("data-edit")) {
+      settle(false);
+      it.open = true;
+    } else if (b.hasAttribute("data-remove")) {
+      items = items.filter((x) => x !== it);
+      if (!items.length) items.push(mk({}));
+    } else return;
+    render();
+    if (b.hasAttribute("data-edit") || b.hasAttribute("data-done")) focusItem(it);
   });
+  $("another").onclick = () => {
+    const bad = settle(true);
+    if (bad) { render(); focusItem(bad); return; }
+    if (items.length >= d.maxItems) return;
+    const it = mk({});
+    items.push(it);
+    render();
+    focusItem(it);
+  };
+  $("note").addEventListener("input", save);
+
   $("book").onclick = () => {
     const msg = $("msg");
-    const problem = dateProblem();
-    if (problem) {
-      msg.hidden = true;
-      showDateError(problem);
-      $("date").scrollIntoView({ behavior: "smooth", block: "center" });
+    const bad = settle(true);
+    render();
+    if (bad) {
+      msg.hidden = false; msg.textContent = items.length > 1 ? s.fixFirst : bad.err;
+      focusItem(bad);
       return;
     }
     msg.hidden = false;
@@ -998,7 +1676,8 @@ ${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
     fetch("/b/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slug: d.slug, code: d.code, ref: d.ref, lang: d.lang, date: $("date").value, divers: n }),
+      body: JSON.stringify({ slug: d.slug, ref: d.ref, lang: d.lang, note: $("note").value.slice(0, 300),
+        items: items.map((it) => ({ code: it.code, date: it.date, slot: slotOf(it) === "AM" || slotOf(it) === "PM" ? slotOf(it) : "", divers: it.n })) }),
     })
       .then((r) => r.json())
       .then((r) => {
@@ -1010,8 +1689,7 @@ ${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
   };
   render();
 })();
-</script>`;
-}
+`;
 
 function fmtDate(iso, lang = "en") {
   return new Date(iso + "T00:00:00Z").toLocaleDateString(LOCALES[lang] || "en-GB",
@@ -1050,7 +1728,7 @@ function problem(text, lang) {
   return `<main class="empty"><h1>${esc(T[lang].problemTitle)}</h1><p>${esc(text)}</p></main>`;
 }
 
-function page(body, status = 200, lang = "en", title = "") {
+function page(body, status = 200, lang = "en", title = "", wide = false) {
   const html = `<!doctype html>
 <html lang="${lang}">
 <head>
@@ -1064,7 +1742,7 @@ function page(body, status = 200, lang = "en", title = "") {
 <style>${CSS}</style>
 <!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "d3d4dd17ea1747cbaac3011aa000a493"}'></script><!-- End Cloudflare Web Analytics -->
 </head>
-<body><div class="wrap">${body}</div></body>
+<body><div class="wrap${wide ? " wide" : ""}">${body}</div></body>
 </html>`;
   return new Response(html, {
     status,
@@ -1145,5 +1823,110 @@ a.book.chat{display:flex;align-items:center;justify-content:center;text-decorati
 .empty{padding-top:3rem}
 .empty h1{font-size:1.6rem}
 .empty p{color:var(--muted)}
+.booked{margin:0 0 1.5rem;padding-left:1.1rem;color:var(--muted)}
+.booked strong{color:var(--ink)}
+.booked li+li{margin-top:.3rem}
+.booked li::marker{color:var(--sand)}
+/* Booking page with several bookings (talay.io/b/[slug]) */
+.wrap.wide{max-width:64rem}
+.center{flex-wrap:wrap;position:relative;overflow:hidden}
+.center .hrow{display:flex;align-items:center;gap:.85rem;width:100%;position:relative}
+.center.has-photo{padding-top:7.5rem}
+.center .photo{position:absolute;inset:0 0 auto 0;height:9rem;background-size:cover;background-position:center}
+.center .photo::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(9,38,47,0) 35%,var(--deep) 100%)}
+.rating{margin:.15rem 0 0;font-size:.85rem}
+.rating a{color:var(--on-deep);text-decoration:none}
+.rating a span{color:var(--sand)}
+.rating a:hover{color:var(--shore)}
+.via{margin:.7rem 0 0;width:100%;font-size:.78rem;color:var(--on-deep);position:relative}
+.layout{display:grid;grid-template-columns:minmax(0,1fr);gap:0 2.5rem}
+@media (min-width:900px){
+  .layout{grid-template-columns:minmax(0,1fr) 22rem;grid-template-areas:"top plan" "bottom plan"}
+  .layout>.top{grid-area:top}.layout>.bottom{grid-area:bottom}
+  .layout>.plan{grid-area:plan;align-self:start;position:sticky;top:1rem;margin-top:3.2rem}
+}
+.item{border:1px solid var(--line);border-radius:16px;background:#fff;margin-bottom:.8rem}
+.item.open{padding:1rem 1.1rem 1.2rem}
+.item.bad{border-color:#B3261E}
+.ihead{display:flex;justify-content:space-between;align-items:baseline;gap:1rem}
+.ihead h2{font-size:1.05rem;margin:0 0 .4rem;letter-spacing:-.01em}
+.linkbtn{border:0;background:none;padding:.2rem 0;font:inherit;font-size:.88rem;font-weight:600;color:var(--muted);cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.linkbtn:hover{color:var(--ink);text-decoration-color:var(--sand)}
+.linkbtn.change{margin:.1rem 0 .4rem}
+.glabel{margin:.9rem 0 .4rem;font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.acts{display:grid;gap:.5rem}
+.act{border:1px solid var(--line);border-radius:12px;background:var(--shore)}
+.act.on{border-color:var(--deep);background:#fff;box-shadow:inset 0 0 0 1px var(--deep)}
+.pick{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;width:100%;border:0;background:none;padding:.75rem .9rem .3rem;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.pick:focus-visible,.day:focus-visible,.slots button:focus-visible,.another:focus-visible,.lbtn:focus-visible{outline:3px solid var(--sand);outline-offset:2px}
+.aname{font-weight:600}
+.aprice{white-space:nowrap;font-size:.88rem;color:var(--muted)}
+.info{padding:0 .9rem .6rem}
+.info summary{display:inline-block;cursor:pointer;font-size:.85rem;font-weight:600;color:var(--deep);text-decoration:underline;text-decoration-color:var(--sand);text-decoration-thickness:2px;text-underline-offset:3px;list-style:none}
+.info summary::-webkit-details-marker{display:none}
+.info summary::after{content:" +";color:var(--sand)}
+.info[open] summary::after{content:" −"}
+.info dl{margin:.5rem 0 .2rem;display:grid;gap:.3rem;font-size:.88rem}
+.info dl div{display:grid;grid-template-columns:7rem 1fr;gap:.6rem}
+.info dt{color:var(--muted)}
+.info dd{margin:0}
+.item .field{margin:1.1rem 0 0}
+.lbl{display:block;font-weight:600;margin-bottom:.4rem}
+.chosen{font-weight:400;color:var(--muted)}
+.note-orange{margin:.6rem 0 0;padding:.65rem .85rem;border-radius:10px;background:#FFF0DC;border:1px solid #F0C27A;color:#7A4A00;font-size:.92rem}
+.cal{max-width:21rem;border:1px solid var(--line);border-radius:12px;padding:.5rem;background:#fff}
+.calh{display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem}
+.calh b{font-weight:600;text-transform:capitalize}
+.calh button{width:2.2rem;height:2.2rem;border:0;border-radius:999px;background:none;font-size:1.3rem;color:var(--deep);cursor:pointer}
+.calh button:hover:not(:disabled){background:var(--sand-wash)}
+.calh button:disabled{color:var(--line);cursor:default}
+.calg{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.calg .wd{font-size:.72rem;color:var(--muted);padding:.2rem 0;text-transform:uppercase}
+.day{height:2.4rem;border:0;border-radius:8px;background:none;font:inherit;font-size:.92rem;color:var(--ink);cursor:pointer}
+.day:hover:not(:disabled){background:var(--sand-wash)}
+.day.off{color:#B9B2A5;background:repeating-linear-gradient(135deg,transparent 0 5px,#F1EDE4 5px 6px);cursor:default}
+.day.sel,.day.sel:hover:not(:disabled){background:var(--deep);color:var(--shore);font-weight:700}
+.day.in,.day.in:hover:not(:disabled){background:var(--ridge);color:var(--shore)}
+.slots{display:flex;gap:.5rem;flex-wrap:wrap}
+.slots button{min-height:2.6rem;padding:0 1.1rem;border:1px solid var(--line);border-radius:999px;background:#fff;font:inherit;font-weight:600;color:var(--ink);cursor:pointer}
+.slots button.on{background:var(--deep);border-color:var(--deep);color:var(--shore)}
+.slotfix{margin-top:.8rem}
+.done{margin-top:1.2rem;min-height:2.8rem;padding:0 1.6rem;border:0;border-radius:999px;background:var(--deep);color:var(--shore);font:inherit;font-weight:700;cursor:pointer}
+.done:hover{background:var(--ridge)}
+.item.line{display:flex;align-items:center;flex-wrap:wrap}
+.lbtn{flex:1;display:flex;justify-content:space-between;gap:1rem;align-items:center;min-height:3.2rem;border:0;background:none;padding:.6rem .4rem .6rem 1rem;font:inherit;font-size:.95rem;color:var(--ink);text-align:left;cursor:pointer}
+.lbtn .pen{font-size:.82rem;font-weight:600;color:var(--muted);white-space:nowrap}
+.lbtn:hover .pen{color:var(--ink)}
+.x{width:2.8rem;height:2.8rem;margin-right:.3rem;border:0;border-radius:999px;background:none;font-size:1.4rem;color:var(--muted);cursor:pointer}
+.x:hover{background:#FFF5F4;color:#B3261E}
+.item.line .error{width:100%;margin:0 1rem .7rem}
+.another{display:flex;align-items:center;justify-content:center;gap:.4rem;width:100%;min-height:3rem;border:1.5px dashed var(--ridge);border-radius:14px;background:none;font:inherit;font-weight:700;color:var(--deep);cursor:pointer}
+.another:hover{background:var(--sand-wash);border-style:solid}
+.another[hidden],#overlap[hidden]{display:none}
+#overlap{margin-top:.8rem}
+#overlap p{margin:0}
+#overlap p+p{margin-top:.35rem}
+.plan{margin:1.8rem 0 0;padding:1rem;border:1px solid var(--line);border-radius:16px;background:#fff}
+.plan h2{font-size:1rem;margin:0 0 .6rem}
+.plan .hint{margin:0}
+.pgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.pgrid .wd{font-size:.68rem;color:var(--muted);text-align:center;text-transform:uppercase}
+.pday{min-height:3.6rem;border-radius:6px;background:var(--shore);padding:2px;display:flex;flex-direction:column;gap:1px;font-size:.66rem;line-height:1.25;min-width:0}
+.pday b{font-weight:600;color:var(--muted);font-size:.68rem;padding:0 2px;white-space:nowrap}
+.pday.busy b{color:var(--ink)}
+.pam,.ppm,.pfull{display:flex;flex-direction:column;gap:1px;min-height:1rem}
+.pfull{min-height:0}
+.pam{border-bottom:1px dashed var(--line)}
+.pday i{display:block;font-style:normal;font-size:.66rem;font-weight:600;border-radius:3px;padding:0 2px;line-height:1.25;overflow-wrap:anywhere}
+.pday i.am,.pday i.any{background:var(--sand-wash);color:#6B4A00}
+.pday i.pm{background:#DCEBEE;color:var(--deep)}
+.pday i.day{background:var(--deep);color:var(--shore)}
+.pday i.any{opacity:.75}
+.row.sub{font-size:.88rem;color:var(--muted);padding:.1rem 0}
+textarea{display:block;width:100%;font:inherit;color:inherit;padding:.7rem .9rem;border:1px solid var(--line);border-radius:10px;background:#fff;resize:vertical}
+textarea:focus-visible{outline:3px solid var(--sand);outline-offset:2px}
+.practical.small{font-size:.85rem;gap:.5rem}
+.practical.small div{grid-template-columns:6.5rem 1fr}
+.bottom .slate{margin-top:1.6rem}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 `;
