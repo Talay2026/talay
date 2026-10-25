@@ -119,6 +119,7 @@ export async function handleZone(request, env, ctx) {
       if (p === "/zone/api/reply") return await reply(request, env, center);
       if (p === "/zone/api/handback") return await leadAction(request, env, center, "handback");
       if (p === "/zone/api/handled") return await leadAction(request, env, center, "handled");
+      if (p === "/zone/api/lead-team") return await leadTeam(request, env, center);
     }
     return json({ error: "Not found" }, 404);
   } catch (err) {
@@ -407,6 +408,7 @@ function leadInfo(r) {
     dates: s("Dates on island"), group: s("Group size"), interested: s("Interested in"), contact: s("Contact"),
     handoverAt: s("Handover at"), humanAt: s("Human took over at"),
     human: !!f["Human took over"], optedOut: !!f["Opted out"], channel: s("Channel"),
+    note: s("Team note"), assigned: s("Assigned to").toLowerCase(),
   };
 }
 
@@ -447,7 +449,7 @@ async function conversations(env, center, view) {
     const teamAt = Math.max(Date.parse(c.lastTeam || 0) || 0, Date.parse(lead.humanAt || 0) || 0);
     const handover = Date.parse(lead.handoverAt || 0) || 0;
     return {
-      id: c.id, name: lead.name || lead.contact, language: lead.language, status: lead.status,
+      id: c.id, name: lead.name || lead.contact, language: lead.language, status: lead.status, assigned: lead.assigned,
       needsYou: open && handover > teamAt && !lead.optedOut,
       teamActive: lead.human, open,
       // Mia is paused, the diver wrote last and nobody answered for 15 minutes: nobody will unless the team looks.
@@ -616,6 +618,35 @@ async function leadAction(request, env, center, action) {
   const fields = { "Human took over at": new Date().toISOString() };
   if (action === "handback") fields["Human took over"] = false;
   await atWrite(env, "Leads", "PATCH", [{ id: c._leadRec.id, fields }]);
+  await forgetConversation(env, center, id);
+  return json({ ok: true });
+}
+
+// Team-only fields on the lead: Leads → Team note (long text) and Assigned to (an e-mail of this
+// center's team, or empty). Divers never see them.
+async function leadTeam(request, env, center) {
+  const body = await readBody(request);
+  const id = String(body?.c || "");
+  if (!okId(id)) return json({ error: "Bad request" }, 400);
+  const fields = {};
+  if (typeof body.note === "string") fields["Team note"] = body.note.trim().slice(0, 2000);
+  if (typeof body.assign === "string") {
+    const who = body.assign.trim().toLowerCase();
+    if (who) {
+      const set = await settings(env, center);
+      if (![...set.staff, ...set.admins].map((e) => e.toLowerCase()).includes(who)) return json({ error: "That person is not in your team." }, 400);
+    }
+    fields["Assigned to"] = who;
+  }
+  if (!Object.keys(fields).length) return json({ error: "Bad request" }, 400);
+  const leads = await leadsFetch(env, center, [id]);
+  if (!leads[id]) return json({ error: "No lead found for this conversation." }, 404);
+  try {
+    await atWrite(env, "Leads", "PATCH", [{ id: leads[id].id, fields }]);
+  } catch (e) {
+    if (/: 422 /.test(String(e.message))) return json({ error: "Notes and assigning are not set up yet: ask Talay to add the fields Team note and Assigned to in Leads." }, 503);
+    throw e;
+  }
   await forgetConversation(env, center, id);
   return json({ ok: true });
 }
@@ -3950,6 +3981,20 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 .tag{font-size:11px;font-weight:800;border-radius:999px;padding:2px 8px;white-space:nowrap}
 .tag.need{background:var(--sand);color:#0A2029}
 .tag.wait{background:#B3261E;color:#fff}
+.tag.asg{background:#E4EEF6;color:#2E5F86}
+.teamrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 22px 12px;background:var(--card);border-bottom:1px solid var(--line);font-size:13px}
+.teamrow .asg{display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 10px;border-radius:999px;background:#E4EEF6;color:#2E5F86}
+.teamrow .asg select{border:0;background:none;font:inherit;font-weight:700;color:inherit;padding:2px 4px;cursor:pointer;max-width:180px}
+.teamrow .nbtn{display:inline-flex;align-items:center;gap:6px;max-width:100%;border:1px dashed var(--line);background:none;border-radius:999px;padding:5px 12px;font:inherit;color:var(--muted);cursor:pointer;text-align:left}
+.teamrow .nbtn.has{border-style:solid;background:#FFF6DD;border-color:#F0DDA6;color:#5A4410;font-weight:600}
+.teamrow .nbtn[hidden]{display:none}
+.teamrow .nbox{flex-basis:100%;display:grid;gap:6px}
+.teamrow .nbox[hidden]{display:none}
+.teamrow .nbox textarea{font:inherit;font-size:14px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#FFFBEF;resize:vertical}
+.teamrow .nact{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.teamrow .nmsg{margin-right:auto;color:#B3261E;font-size:12.5px}
+.teamrow .btn{font:inherit;font-weight:700;border:0;border-radius:10px;padding:7px 14px;background:var(--sand);color:#0A2029;cursor:pointer}
+@media (max-width:760px){.teamrow{padding:8px 12px 10px}}
 .tag.team{background:#FBEADF;color:#8A3F12;display:inline-flex;align-items:center;gap:4px}
 .tag.lang{background:var(--line);color:var(--deep);text-transform:uppercase}
 .tag.st{border:1px solid var(--line);color:var(--muted)}
@@ -4907,9 +4952,10 @@ function zoneClient(cfg) {
         avatar(c.name, c.cc) + '<div class="ib">' +
         '<div class="top"><span class="nm">' + esc(dname(c.name)) + "</span>" +
         '<span class="tm">' + ago(c.lastAt) + "</span></div>" +
-        ((c.needsYou || c.teamActive || /booked/i.test(c.status) || c.language) ? '<div class="tags">' +
+        ((c.needsYou || c.teamActive || c.assigned || /booked/i.test(c.status) || c.language) ? '<div class="tags">' +
         (c.needsYou ? '<span class="tag need">' + t("Needs you") + "</span>" : "") +
         (c.waitingMin ? '<span class="tag wait">' + t("Waiting {t}", { t: waitFor(c.waitingMin) }) + "</span>" : "") +
+        (c.assigned ? '<span class="tag asg">→ ' + esc(c.assigned === String(cfg.email || "").toLowerCase() ? t("You") : person(c.assigned)) + "</span>" : "") +
         (c.teamActive ? '<span class="tag team"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg> ' + t("{a} paused", { a: esc(cfg.assistant) }) + "</span>" : "") +
         (/booked/i.test(c.status) ? '<span class="tag st">' + t("Booked") + "</span>" : "") +
         (c.language ? '<span class="tag lang">' + esc(langName(c.language)) + "</span>" : "") + "</div>" : "") +
@@ -4973,7 +5019,12 @@ function zoneClient(cfg) {
         (d.needsYou ? '<span class="tag need">' + t("Needs you") + "</span>" : "") +
         ((d.bookings || []).filter(function (b) { return !/cancel|refund/i.test(b.status); }).length > 1 ? '<span class="tag ret">' + t("Returning diver") + "</span>" : "") +
         '<div class="actions">' + actions + "</div></div>" +
-        (facts ? '<div class="facts">' + facts + "</div>" : "") + bookingCard(d.bookings) +
+        (facts ? '<div class="facts">' + facts + "</div>" : "") +
+        (d.hasLead ? '<div class="teamrow"><label class="asg"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><select id="assign" aria-label="' + t("Assigned to") + '"><option value="">' + t("Not assigned") + "</option>" +
+          (L.assigned ? '<option value="' + esc(L.assigned) + '" selected>' + esc(person(L.assigned)) + "</option>" : "") + "</select></label>" +
+          '<button type="button" class="nbtn' + (L.note ? " has" : "") + '" id="nOpen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>' + (L.note ? esc(L.note.length > 70 ? L.note.slice(0, 70) + "…" : L.note) : t("Add a team note")) + "</button>" +
+          '<div class="nbox" id="nBox" hidden><textarea id="nTxt" rows="3" maxlength="2000" placeholder="' + t("Only your team sees this, never the diver. E.g. wants to be in the same group as her friend.") + '">' + esc(L.note) + '</textarea><div class="nact"><span class="nmsg" id="nMsg"></span><button type="button" class="ghost" id="nCancel">' + t("Cancel") + '</button><button type="button" class="btn primary" id="nSave">' + t("Save") + "</button></div></div></div>" : "") +
+        bookingCard(d.bookings) +
         '<div class="msgs" id="msgs">' + (function () {
           var prevDay = "";
           return d.messages.map(function (m, idx) {
@@ -5024,6 +5075,7 @@ function zoneClient(cfg) {
       place(); requestAnimationFrame(place); setTimeout(place, 250);
       if ($("#handback")) $("#handback").onclick = function () { act("handback", this); };
       if ($("#handback2")) $("#handback2").onclick = function () { act("handback", this); };
+      if (d.hasLead) teamRow(d);
       if ($("#handled")) $("#handled").onclick = function () { act("handled", this); };
       if (d.canReply) {
         var tx = $("#txt"), s = $("#sig");
@@ -5087,6 +5139,38 @@ function zoneClient(cfg) {
         });
       }
     }).catch(function () { var p = $("#prod"); if (p) p.remove(); });
+  }
+
+  // Assign and team note (Leads → Assigned to, Team note), only for the team.
+  var teamList = null;
+  function person(e) { var n = String(e || "").split("@")[0].split(/[._-]/)[0]; return n ? n.charAt(0).toUpperCase() + n.slice(1) : e; }
+  function teamRow(d) {
+    var L = d.lead, sel = $("#assign"), id = d.id;
+    var fill = function () {
+      if (!teamList || id !== current || !$("#assign")) return;
+      var me = String(cfg.email || "").toLowerCase(), all = teamList.slice();
+      if (L.assigned && all.indexOf(L.assigned) < 0) all.push(L.assigned);
+      sel.innerHTML = '<option value="">' + t("Not assigned") + "</option>" + all.map(function (e) {
+        return '<option value="' + esc(e) + '"' + (e === L.assigned ? " selected" : "") + ">" + esc(e === me ? t("Me ({n})", { n: person(e) }) : person(e)) + "</option>";
+      }).join("");
+    };
+    if (teamList) fill(); else api("settings").then(function (s) {
+      var seen = {}; teamList = (s.admins || []).concat(s.staff || []).map(function (e) { return String(e).toLowerCase(); }).filter(function (e) { return e && !seen[e] && (seen[e] = 1); });
+      fill();
+    }).catch(function () {});
+    sel.onchange = function () {
+      sel.disabled = true;
+      post("lead-team", { c: id, assign: sel.value }).then(function () { lastChat = ""; lastList = ""; freshList = true; loadChat(false); loadList(); })
+        .catch(function (e) { alert(e.message); }).finally(function () { sel.disabled = false; });
+    };
+    var box = $("#nBox"), nt = $("#nTxt");
+    $("#nOpen").onclick = function () { box.hidden = false; $("#nOpen").hidden = true; nt.focus(); };
+    $("#nCancel").onclick = function () { box.hidden = true; $("#nOpen").hidden = false; nt.value = L.note; };
+    $("#nSave").onclick = function () {
+      var b = this; b.disabled = true; $("#nMsg").textContent = "";
+      post("lead-team", { c: id, note: nt.value }).then(function () { lastChat = ""; loadChat(false); })
+        .catch(function (e) { $("#nMsg").textContent = e.message; }).finally(function () { b.disabled = false; });
+    };
   }
 
   function act(kind, btn) {
