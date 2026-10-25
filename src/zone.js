@@ -266,6 +266,23 @@ async function atMade(env, table, opts, build) {
 }
 const madeOf = (r) => String(first(r.fields["Made at"]) || r.createdTime);
 
+// Photos and PDFs the team can send from a conversation (respond.io attachment type per content type).
+const FILE_TYPES = { "image/jpeg": "image", "image/png": "image", "image/webp": "image", "application/pdf": "file" };
+const FILE_MAX = 5 * 1024 * 1024; // Airtable's upload limit per file
+
+// Airtable content API: puts a base64 file into an attachment field and returns its (temporary) URL.
+async function uploadAttachment(env, table, recordId, field, contentType, base64, filename) {
+  const res = await fetch(`https://content.airtable.com/v0/${env.AIRTABLE_BASE}/${recordId}/${encodeURIComponent(field)}/uploadAttachment`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ contentType, file: base64, filename }),
+  });
+  if (!res.ok) { console.error("Airtable upload", table, res.status, await res.text()); return ""; }
+  const body = await res.json();
+  const list = Object.values(body.fields || {}).find((v) => Array.isArray(v)) || [];
+  return (list[list.length - 1] || {}).url || "";
+}
+
 async function atWrite(env, table, method, records) {
   const res = await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/${encodeURIComponent(table)}`, {
     method,
@@ -459,16 +476,20 @@ async function productNames(env, ids) {
 
 async function chat(env, center, id) {
   if (!okId(id)) return { error: "Unknown conversation" };
-  const rows = await at(env, "Chat", {
+  const opts = (fields) => ({
     formula: `AND({Center} = '${q(center.slug)}', {Contact ID} = '${q(id)}')`,
-    fields: ["Text", "Direction", "Sent at"],
-    sort: [{ field: "Sent at", direction: "asc" }],
-    max: 300,
+    fields, sort: [{ field: "Sent at", direction: "asc" }], max: 300,
+  });
+  // Chat → Attachment (attachment field): photos and files, sent from the zone or by the diver.
+  const rows = await at(env, "Chat", opts(["Text", "Direction", "Sent at", "Attachment"])).catch((e) => {
+    if (!/: 422 /.test(String(e.message))) throw e;
+    return at(env, "Chat", opts(["Text", "Direction", "Sent at"]));
   });
   if (!rows.length) return { error: "Unknown conversation" };
   const leads = await leadsFor(env, center, [id]);
   const messages = rows.map((r) => ({
     text: r.fields["Text"] || "", dir: r.fields["Direction"] || "", at: r.fields["Sent at"] || r.createdTime,
+    files: (r.fields["Attachment"] || []).map((a) => ({ url: a.url, name: a.filename || "", type: a.type || "", thumb: a.thumbnails?.large?.url || "" })),
   }));
   const lastCustomer = [...messages].reverse().find((m) => m.dir === "Customer");
   const lastTeam = [...messages].reverse().find((m) => m.dir === "Team");
@@ -522,7 +543,12 @@ async function reply(request, env, center) {
   if (!body) return json({ error: "Bad request" }, 400);
   const id = String(body.c || "");
   const msg = String(body.text || "").trim().slice(0, 4000);
-  if (!okId(id) || !msg) return json({ error: "Type a message first." }, 400);
+  const file = body.file && typeof body.file === "object" ? body.file : null;
+  if (file) {
+    if (!FILE_TYPES[file.type] || typeof file.data !== "string") return json({ error: "Send a photo (JPG, PNG, WEBP) or a PDF." }, 400);
+    if (file.data.length > FILE_MAX * 4 / 3 + 8) return json({ error: "That file is too big (max 5 MB)." }, 400);
+  }
+  if (!okId(id) || (!msg && !file)) return json({ error: "Type a message first." }, 400);
 
   const c = await chat(env, center, id);
   if (c.error) return json({ error: c.error }, 404);
@@ -532,22 +558,39 @@ async function reply(request, env, center) {
 
   const contact = id.includes(":") ? id : `id:${id}`;
   const channel = Number(first(c._leadRec?.fields?.["Lead channel ID"])) || center.channel;
-  const res = await fetch(`https://api.respond.io/v2/contact/${encodeURIComponent(contact)}/message`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${env.RESPONDIO_TOKEN}`, "Content-Type": "application/json" },
-    // Send on the channel the diver wrote on (WhatsApp, Instagram, Messenger), else this center's number;
-    // without channelId respond.io uses the contact's last channel.
-    body: JSON.stringify({ ...(channel ? { channelId: channel } : {}), message: { type: "text", text: msg } }),
-  });
-  if (!res.ok) {
-    console.error("respond.io", res.status, await res.text());
-    return json({ error: "The message was not accepted. Try again, or answer in respond.io." }, 502);
+  // Send on the channel the diver wrote on (WhatsApp, Instagram, Messenger), else this center's number;
+  // without channelId respond.io uses the contact's last channel.
+  const sendOne = async (message) => {
+    const res = await fetch(`https://api.respond.io/v2/contact/${encodeURIComponent(contact)}/message`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${env.RESPONDIO_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ...(channel ? { channelId: channel } : {}), message }),
+    });
+    if (!res.ok) console.error("respond.io", res.status, await res.text());
+    return res.ok;
+  };
+  const notSent = () => json({ error: "The message was not accepted. Try again, or answer in respond.io." }, 502);
+
+  const writes = [];
+  if (file) {
+    // The file goes into Chat → Attachment first: Airtable hosts it and gives respond.io a link to fetch.
+    const name = String(file.name || "file").replace(/[^\w .()-]/g, "_").slice(0, 80) || "file";
+    const rec = (await atWrite(env, "Chat", "POST", [{
+      fields: { Text: msg || `📎 ${name}`, Direction: "Team", "Contact ID": id, Center: center.slug },
+    }])).records[0];
+    const url = await uploadAttachment(env, "Chat", rec.id, "Attachment", file.type, file.data, name);
+    if (!url || !(await sendOne({ type: "attachment", attachment: { type: FILE_TYPES[file.type], url } })) || (msg && !(await sendOne({ type: "text", text: msg })))) {
+      await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Chat/${rec.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` } }).catch(() => {});
+      return url ? notSent() : json({ error: "Sending files is not set up yet: ask Talay to add the field Attachment to the table Chat." }, 503);
+    }
+  } else {
+    if (!(await sendOne({ type: "text", text: msg }))) return notSent();
+    writes.push(atWrite(env, "Chat", "POST", [{
+      fields: { Text: msg, Direction: "Team", "Contact ID": id, Center: center.slug },
+    }]));
   }
 
   const now = new Date().toISOString();
-  const writes = [atWrite(env, "Chat", "POST", [{
-    fields: { Text: msg, Direction: "Team", "Contact ID": id, Center: center.slug },
-  }])];
   if (c._leadRec) {
     // Same effect as a staff message in respond.io: Mia goes quiet until the team
     // hands back, Close in respond.io, or "release handovers" gives it back to her.
@@ -4497,6 +4540,16 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .emo:hover,.emo[aria-expanded="true"]{background:rgba(10,32,41,.06);color:var(--deep)}
 .epick{display:grid;grid-template-columns:repeat(12,1fr);gap:2px;margin-top:8px;padding:6px;border-radius:14px;background:var(--card);border:1px solid var(--line);box-shadow:0 10px 30px -14px rgba(10,32,41,.3)}
 .epick[hidden]{display:none}
+.fchip{display:flex;align-items:center;gap:10px;margin-top:8px;padding:6px 8px;border-radius:12px;background:var(--paper-2);border:1px solid var(--line);font-size:13px}
+.fchip[hidden]{display:none}
+.fchip img{width:44px;height:44px;object-fit:cover;border-radius:8px}
+.fchip .fic{width:44px;height:44px;border-radius:8px;background:#B3261E;color:#fff;font-weight:700;font-size:11px;display:grid;place-items:center}
+.fchip .fn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--deep)}
+.fchip button{border:0;background:none;font-size:20px;line-height:1;color:var(--muted);cursor:pointer;padding:4px 8px}
+.m .mimg{display:block;margin:2px 0 6px}
+.m .mimg img{display:block;max-width:240px;max-height:240px;border-radius:10px;object-fit:cover}
+.m .mfile{display:table;margin:2px 0 6px;padding:8px 12px;border-radius:10px;background:rgba(10,32,41,.06);color:inherit;font-weight:600;text-decoration:none}
+.m.Team .mfile{background:rgba(255,255,255,.14)}
 .epick button{border:0;background:none;border-radius:8px;font-size:20px;line-height:1;padding:6px 0;cursor:pointer}
 .epick button:hover{background:var(--paper)}
 @media (max-width:760px){.epick{grid-template-columns:repeat(8,1fr)}}
@@ -4928,7 +4981,13 @@ function zoneClient(cfg) {
             var dt = new Date(m.at), day = dt.toLocaleDateString(LOC, { weekday: "long", day: "numeric", month: "long" });
             var sep = day !== prevDay ? '<div class="day">' + esc(day) + "</div>" : ""; prevDay = day;
             var rep = m.dir === "Mia" ? '<button class="rep" type="button" data-rep="' + idx + '" title="' + t("Report this answer to Talay") + '">' + t("Report") + "</button>" : "";
-            return sep + '<div class="m ' + esc(m.dir) + '">' + (who ? '<span class="who">' + esc(who) + "</span>" : "") + esc(m.text) +
+            var files = (m.files || []).map(function (f) {
+              return /^image\//.test(f.type)
+                ? '<a class="mimg" href="' + esc(f.url) + '" target="_blank" rel="noopener"><img src="' + esc(f.thumb || f.url) + '" alt="' + esc(f.name) + '" loading="lazy"></a>'
+                : '<a class="mfile" href="' + esc(f.url) + '" target="_blank" rel="noopener">📎 ' + esc(f.name || t("File")) + "</a>";
+            }).join("");
+            var body = files && /^📎 /.test(m.text) ? "" : esc(m.text);
+            return sep + '<div class="m ' + esc(m.dir) + '">' + (who ? '<span class="who">' + esc(who) + "</span>" : "") + files + body +
               "<small>" + esc(dt.toLocaleTimeString(LOC, { hour: "2-digit", minute: "2-digit" })) + rep + "</small></div>";
           }).join("");
         })() + "</div>" +
@@ -4936,8 +4995,10 @@ function zoneClient(cfg) {
           ? '<div class="composer">' +
             '<div class="pchips" id="pchips" hidden></div>' +
             '<div class="cbox"><textarea id="txt" placeholder="' + t("Reply on {ch}…", { ch: esc((L && L.channel) || "WhatsApp") }) + '" rows="1"></textarea>' +
+            '<button class="emo" id="att" type="button" title="' + t("Photo or file") + '" aria-label="' + t("Photo or file") + '"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9"/></svg></button><input type="file" id="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden>' +
             '<button class="emo" id="emo" type="button" title="' + t("Emoji") + '" aria-label="' + t("Emoji") + '" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/></svg></button>' +
             '<button class="send" id="send" aria-label="Send"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>' +
+            '<div class="fchip" id="fchip" hidden></div>' +
             '<div class="epick" id="epick" hidden>' + EMOJI.map(function (x) { return '<button type="button">' + x + "</button>"; }).join("") + "</div>" +
             '<div class="cmeta"><label class="sig"><input type="checkbox" id="sigon"> ' + t("Signed as") + ' <input id="sig" maxlength="30" placeholder="' + t("your name") + '"></label>' +
             '<select id="prod" aria-label="' + t("Booking link") + '" hidden><option value="">' + t("+ Booking link…") + "</option></select>" +
@@ -4976,6 +5037,14 @@ function zoneClient(cfg) {
         // Enter sends, Shift + Enter is a new line. On a phone the keyboard's return key stays a new line.
         var touch = matchMedia("(pointer:coarse)").matches;
         tx.onkeydown = function (e) { if (e.key === "Enter" && !e.isComposing && (e.metaKey || e.ctrlKey || (!touch && !e.shiftKey))) { e.preventDefault(); send(); } };
+        var fi = $("#file"), fc = $("#fchip");
+        $("#att").onclick = function () { fi.click(); };
+        fi.onchange = function () { pickFile(fi.files && fi.files[0]); fi.value = ""; };
+        tx.addEventListener("paste", function (e) {
+          var it = e.clipboardData && Array.prototype.find.call(e.clipboardData.items || [], function (x) { return x.kind === "file"; });
+          if (it) { e.preventDefault(); pickFile(it.getAsFile()); }
+        });
+        showFile();
         var eb = $("#emo"), ep = $("#epick");
         eb.onclick = function (e) { e.stopPropagation(); ep.hidden = !ep.hidden; eb.setAttribute("aria-expanded", String(!ep.hidden)); };
         ep.querySelectorAll("button").forEach(function (b) {
@@ -5025,13 +5094,46 @@ function zoneClient(cfg) {
       .catch(function (e) { btn.disabled = false; alert(e.message); });
   }
 
+  // A photo or PDF waiting to be sent with the next message ({ name, type, data (base64), url for the preview }).
+  var pending = null;
+  function showFile() {
+    var fc = $("#fchip"); if (!fc) return;
+    fc.hidden = !pending;
+    if (!pending) { fc.innerHTML = ""; return; }
+    fc.innerHTML = (/^image\//.test(pending.type) ? '<img src="' + pending.url + '" alt="">' : '<span class="fic">PDF</span>') +
+      '<span class="fn">' + esc(pending.name) + '</span><button type="button" id="fx" aria-label="' + t("Remove") + '">×</button>';
+    $("#fx").onclick = function () { pending = null; showFile(); };
+  }
+  function pickFile(f) {
+    var n = $("#note");
+    if (!f) return;
+    if (!/^(image\/(jpeg|png|webp|heic|heif)|application\/pdf)$/.test(f.type)) { n.textContent = t("Send a photo (JPG, PNG, WEBP) or a PDF."); n.className = "note err"; return; }
+    var done = function (type, dataUrl, name) {
+      var data = dataUrl.slice(dataUrl.indexOf(",") + 1);
+      if (data.length > 5 * 1024 * 1024 * 4 / 3) { n.textContent = t("That file is too big (max 5 MB)."); n.className = "note err"; return; }
+      pending = { name: name, type: type, data: data, url: dataUrl }; showFile(); $("#txt").focus();
+    };
+    if (f.type === "application/pdf") { var r = new FileReader(); r.onload = function () { done(f.type, r.result, f.name); }; r.readAsDataURL(f); return; }
+    // Photos: at most 1600 px and JPEG, so a phone photo stays well under 5 MB and loads fast on WhatsApp.
+    var img = new Image(), src = URL.createObjectURL(f);
+    img.onload = function () {
+      var k = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement("canvas");
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(src);
+      done("image/jpeg", c.toDataURL("image/jpeg", 0.85), String(f.name || "photo").replace(/\.\w+$/, "") + ".jpg");
+    };
+    img.onerror = function () { n.textContent = t("Send a photo (JPG, PNG, WEBP) or a PDF."); n.className = "note err"; };
+    img.src = src;
+  }
   function send() {
     var t = $("#txt"), b = $("#send"), n = $("#note"), v = t.value.trim();
-    if (!v || b.disabled) return;
-    var sig = ($("#sig").value || "").trim(); if (sig && $("#sigon").checked) v += "\n– " + sig;
+    if ((!v && !pending) || b.disabled) return;
+    var sig = ($("#sig").value || "").trim(); if (v && sig && $("#sigon").checked) v += "\n– " + sig;
     b.disabled = true; b.classList.add("busy");
-    post("reply", { c: current, text: v }).then(function () {
-      t.value = ""; lastChat = ""; lastList = ""; freshNext = true; freshList = true; loadChat(true); loadList();
+    var body = { c: current, text: v };
+    if (pending) body.file = { name: pending.name, type: pending.type, data: pending.data };
+    post("reply", body).then(function () {
+      t.value = ""; pending = null; lastChat = ""; lastList = ""; freshNext = true; freshList = true; loadChat(true); loadList();
     }).catch(function (e) { n.textContent = e.message; n.className = "note err"; })
       .finally(function () { b.disabled = false; b.classList.remove("busy"); });
   }
