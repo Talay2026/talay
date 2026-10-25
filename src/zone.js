@@ -1638,6 +1638,7 @@ async function handleAdmin(request, env, url, p, email, role) {
   if (get && p === "/zone/admin/api/intake") return json(await adminIntake(env));
   if (get && p === "/zone/admin/api/team") return json(await adminTeam(env));
   if (get && p === "/zone/admin/api/pipeline") return json(await adminPipeline(env));
+  if (get && p === "/zone/admin/api/outreach") return json(await adminOutreach(env, fresh));
   if (get && p === "/zone/admin/api/conversion") {
     const per = /^\d{4}-\d{2}$/.test(url.searchParams.get("period") || "") ? url.searchParams.get("period") : "";
     return json(await adminConversion(env, per, fresh));
@@ -1653,6 +1654,7 @@ async function handleAdmin(request, env, url, p, email, role) {
     if (p === "/zone/admin/api/intake") return await adminIntakeStatus(env, body);
     if (p === "/zone/admin/api/pipeline") return await adminPipelineChange(env, email, body);
     if (p === "/zone/admin/api/pipeline/ai") return await adminPipelineAi(env, body);
+    if (p === "/zone/admin/api/outreach") return await adminOutreachChange(env, email, body);
     if (p === "/zone/admin/api/alert-test") return await adminAlertTest(env);
     if (p === "/zone/admin/api/team") {
       if (role !== "owner") return json({ error: "Alleen een eigenaar kan het team aanpassen." }, 403);
@@ -2229,6 +2231,156 @@ async function adminPipelineAi(env, b) {
   return json(out);
 }
 
+// ---------- Mailcampagne: cold mail from Instantly, followed up in HQ ----------
+// Airtable table "Outreach" (made from the campaign CSV): Email, Company, Lead ID, Campaign, Wave,
+// Region, Country, Town, Status, Step, Last event, Last event at, Reply, Interest, Notes. The cron
+// copies each lead's state from the Instantly API (key INSTANTLY_API_KEY, scope all:read) into
+// Status, Interest, Last event (at) and Reply. Nothing is sent from here: Jonas answers in the
+// Instantly Unibox, and the interest label he sets there comes back as Interest.
+const OUTREACH_STATUSES = ["Interested", "Replied", "Out of office", "Wrong person", "Not interested", "Bounced", "Unsubscribed", "Sent", "No reply", "Queued", "Skipped"];
+const INTEREST = { 1: "Interested", 2: "Meeting booked", 3: "Meeting completed", 4: "Won", 0: "Out of office", "-1": "Not interested", "-2": "Wrong person", "-3": "Lost", "-4": "No show" };
+const OUTREACH_WRITES = 15; // Airtable batches of 10 per run: the cron shares its subrequests with the alerts
+
+async function instantly(env, path, body) {
+  const opt = { method: body ? "POST" : "GET", headers: { Authorization: `Bearer ${env.INSTANTLY_API_KEY}`, "Content-Type": "application/json" } };
+  if (body) opt.body = JSON.stringify(body);
+  let res = await fetch("https://api.instantly.ai/api/v2/" + path, opt);
+  if (res.status === 429) { await new Promise((r) => setTimeout(r, 3000)); res = await fetch("https://api.instantly.ai/api/v2/" + path, opt); }
+  if (!res.ok) throw new Error(`Instantly ${path.split("?")[0]}: ${res.status} ${(await res.text()).slice(0, 300)}`);
+  return res.json();
+}
+function outreachStatus(l) {
+  if (l.status === -1) return "Bounced";
+  if (l.status === -2) return "Unsubscribed";
+  const i = l.lt_interest_status;
+  if (i >= 1 && i <= 4) return "Interested";
+  if (i === 0 && l.email_reply_count > 0) return "Out of office"; // 0 can also mean "no label yet"
+  if (i === -2) return "Wrong person";
+  if (i <= -1) return "Not interested";
+  if (l.email_reply_count > 0) return "Replied";
+  if (l.status === 3) return "No reply";
+  if (l.timestamp_last_contact) return "Sent";
+  if (l.status === -3) return "Skipped";
+  return "Queued";
+}
+const outreachTime = (iso) => (iso ? thaiStamp(Date.parse(iso)) : "");
+
+export async function runOutreachSync(env) {
+  if (!env.INSTANTLY_API_KEY || !env.AIRTABLE_TOKEN) return { skipped: true };
+  const camps = ((await instantly(env, "campaigns?limit=100")).items || []).filter((c) => !/\btest\b/i.test(c.name || "")); // "Talay TEST" = own addresses
+  const leads = new Map();
+  for (const c of camps) {
+    let after = "";
+    for (let page = 0; page < 20; page++) {
+      const d = await instantly(env, "leads/list", { campaign: c.id, limit: 100, ...(after ? { starting_after: after } : {}) });
+      for (const l of d.items || []) if (l.email) leads.set(l.email.toLowerCase(), { ...l, campaignName: c.name });
+      after = d.next_starting_after || "";
+      if (!after || !(d.items || []).length) break;
+    }
+  }
+  // The latest received mail per lead (one page: replies come in slowly, the cron runs every 15 minutes).
+  const replies = new Map();
+  try {
+    const d = await instantly(env, "emails?email_type=received&limit=100&sort_order=desc");
+    for (const m of d.items || []) {
+      const k = String(m.lead || "").toLowerCase();
+      if (k && leads.has(k) && !replies.has(k)) replies.set(k, String(m.content_preview || (m.body && m.body.text) || m.subject || "").replace(/\s+/g, " ").trim().slice(0, 1000));
+    }
+  } catch (e) { console.error("outreach replies", e); }
+
+  const rows = await at(env, "Outreach", { max: 10000 });
+  const byEmail = new Map(rows.map((r) => [str(r.fields, "Email").trim().toLowerCase(), r]));
+  const patches = [], adds = [], news = [];
+  for (const [email, l] of leads) {
+    const status = outreachStatus(l), replied = !!l.timestamp_last_reply;
+    const f = {
+      "Status": status, "Campaign": l.campaignName,
+      "Interest": l.lt_interest_status != null && (l.lt_interest_status !== 0 || l.email_reply_count > 0) ? INTEREST[l.lt_interest_status] || String(l.lt_interest_status) : "",
+      "Last event": replied ? "Replied" : l.timestamp_last_contact ? "Mail sent" : "",
+      "Last event at": outreachTime(l.timestamp_last_reply || l.timestamp_last_contact),
+    };
+    if (replies.has(email)) f["Reply"] = replies.get(email);
+    const r = byEmail.get(email);
+    if (!r) { adds.push({ fields: { "Email": l.email, "Company": l.company_name || "", ...f } }); continue; }
+    const ch = {};
+    for (const [k, v] of Object.entries(f)) if (str(r.fields, k) !== v) ch[k] = v;
+    if (!Object.keys(ch).length) continue;
+    if (ch["Status"] && ["Interested", "Replied"].includes(status) && !["Interested", "Replied"].includes(str(r.fields, "Status")))
+      news.push({ company: str(r.fields, "Company") || email, status, reply: f["Reply"] || "" });
+    patches.push({ id: r.id, fields: ch });
+  }
+  let batches = 0;
+  for (let i = 0; i < patches.length && batches < OUTREACH_WRITES; i += 10, batches++) await atWrite(env, "Outreach", "PATCH", patches.slice(i, i + 10));
+  for (let i = 0; i < adds.length && batches < OUTREACH_WRITES; i += 10, batches++) await atWrite(env, "Outreach", "POST", adds.slice(i, i + 10));
+  if (news.length && env.ALERT_WEBHOOK) {
+    const subject = news.length === 1 ? `Talay HQ: antwoord van ${news[0].company}` : `Talay HQ: ${news.length} nieuwe antwoorden op de mailcampagne`;
+    const text = news.map((n) => `- ${n.company} (${n.status}): ${n.reply.slice(0, 300)}`).join("\n") + "\n\nAntwoorden in de Instantly Unibox, opvolgen in https://talay.io/zone/admin#/mail";
+    const html = `<div style="font-family:system-ui,sans-serif;font-size:15px;color:#09262F">` + news.map((n) => `<p style="margin:0 0 14px"><b>${esc(n.company)}</b> · ${esc(n.status)}<br>${esc(n.reply.slice(0, 300))}</p>`).join("") +
+      `<p>Antwoorden doe je in de Instantly Unibox. Opvolgen: <a href="https://talay.io/zone/admin#/mail">Talay HQ → Mailcampagne</a></p></div>`;
+    await sendAlerts(env, { subject, text, html, count: news.length, alerts: [] }).catch((e) => console.error("outreach alert", e));
+  }
+  await forget(env, ["admin/outreach"]);
+  return { leads: leads.size, patched: Math.min(patches.length, OUTREACH_WRITES * 10), added: adds.length, left: Math.max(0, patches.length + adds.length - batches * 10), news: news.length };
+}
+
+function outreachOut(r) {
+  const f = r.fields, out = { id: r.id };
+  for (const [k, field] of Object.entries({ email: "Email", company: "Company", lead: "Lead ID", campaign: "Campaign", wave: "Wave", region: "Region", country: "Country", town: "Town", status: "Status", interest: "Interest", event: "Last event", eventAt: "Last event at", reply: "Reply", notes: "Notes" }))
+    out[k] = str(f, field);
+  if (!OUTREACH_STATUSES.includes(out.status)) out.status = "Queued";
+  out.inPipeline = /\[pijplijn\]/.test(out.notes);
+  return out;
+}
+async function adminOutreach(env, fresh) {
+  try {
+    return await cached(env, "admin/outreach", 120, async () => {
+      const recs = await at(env, "Outreach", { max: 10000 });
+      return { items: recs.map(outreachOut).filter((o) => o.email), synced: !!env.INSTANTLY_API_KEY };
+    }, fresh);
+  } catch (e) {
+    if (missingTable(e)) return { missing: true, items: [], synced: !!env.INSTANTLY_API_KEY };
+    throw e;
+  }
+}
+// sync: run the Instantly sync now. pipeline: put this center in Pijplijn (Prospects, stage Talking)
+// with the reply in its notes, and mark the Outreach row with [pijplijn]. note: add a dated line.
+async function adminOutreachChange(env, email, b) {
+  const now = Date.now(), who = email.split("@")[0];
+  try {
+    if (b.action === "sync") {
+      if (!env.INSTANTLY_API_KEY) return json({ error: "De Instantly-sleutel (INSTANTLY_API_KEY) staat nog niet in Cloudflare." }, 400);
+      return json({ ok: true, ...(await runOutreachSync(env)) });
+    }
+    if (!okRec(b.id)) return json({ error: "Onbekende rij." }, 400);
+    const cur = await at(env, "Outreach", { formula: `RECORD_ID() = '${b.id}'`, max: 1 });
+    if (!cur.length) return json({ error: "Deze rij bestaat niet meer." }, 404);
+    const o = outreachOut(cur[0]);
+    const line = (t) => `${thaiStamp(now)} ${who}: ${t}`;
+    if (b.action === "note") {
+      const note = String(b.note || "").trim().slice(0, 2000);
+      if (!note) return json({ error: "Schrijf eerst een notitie." }, 400);
+      await atPatch(env, "Outreach", b.id, { "Notes": (line(note) + (o.notes ? "\n" + o.notes : "")).slice(0, 90000) });
+    } else if (b.action === "pipeline") {
+      if (o.inPipeline) return json({ error: "Dit center staat al in de pijplijn." }, 400);
+      const name = o.company || o.email;
+      const { items } = await adminPipeline(env);
+      const old = items.find((p) => p.name.toLowerCase() === name.toLowerCase());
+      const note = line(`[antwoord] via mailcampagne (${o.campaign}): ${(o.reply || o.status).slice(0, 600)}`);
+      if (old) await atPatch(env, "Prospects", old.id, { "Stage": "Talking", "Email": old.email || o.email, "Last contact": thaiDay(now), "Notes": (note + (old.notes ? "\n" + old.notes : "")).slice(0, 90000) });
+      else await atWrite(env, "Prospects", "POST", [{ fields: { "Name": name, "Stage": "Talking", "Email": o.email, "Area": [o.town, o.country].filter(Boolean).join(", "), "Next step": "Antwoord opvolgen", "Next date": thaiDay(now), "Last contact": thaiDay(now), "Notes": note } }]);
+      await atPatch(env, "Outreach", b.id, { "Notes": (line("[pijplijn] naar Pijplijn gezet") + (o.notes ? "\n" + o.notes : "")).slice(0, 90000) });
+    } else {
+      return json({ error: "Onbekende actie." }, 400);
+    }
+  } catch (e) {
+    console.error("outreach", e);
+    if (missingTable(e)) return json({ error: "De tabel Outreach (of Prospects) bestaat nog niet in Airtable." }, 500);
+    return json({ error: "Dat lukte niet: " + String(e.message).slice(0, 200) }, 502);
+  }
+  await forget(env, ["admin/outreach"]);
+  return json({ ok: true });
+}
+
 // ---------- Conversie: from question to booking, per center ----------
 // The same numbers as the dashboard in each center's zone (and the same cache).
 async function hqCenters(env) {
@@ -2504,6 +2656,7 @@ const HQ_ICONS = {
   refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
   pipeline: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/>',
   funnel: '<path d="M3 4h18l-7 8v6l-4 2v-8z"/>',
+  mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
   cost: '<circle cx="12" cy="12" r="9"/><path d="M15 9.2a3 3 0 0 0-3-1.7c-1.7 0-3 .9-3 2.2 0 3 6 1.6 6 4.6 0 1.3-1.3 2.2-3 2.2a3.2 3.2 0 0 1-3.2-1.8M12 6v1.5M12 16.5V18"/>',
 };
 const hqIcon = (k) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${HQ_ICONS[k]}</svg>`;
@@ -2511,7 +2664,7 @@ const hqIcon = (k) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="non
 function adminApp(email, role) {
   const nav = [
     ["overzicht", "Overzicht", "home"], ["inbox", "Inbox", "inbox"], ["zoeken", "Zoeken", "search"],
-    ["pijplijn", "Pijplijn", "pipeline"], ["centra", "Centra", "centers"], ["conversie", "Conversie", "funnel"],
+    ["pijplijn", "Pijplijn", "pipeline"], ["mail", "Mailcampagne", "mail"], ["centra", "Centra", "centers"], ["conversie", "Conversie", "funnel"],
     ["boekingen", "Boekingen", "bookings"], ["commissie", "Commissie", "money"], ["kosten", "Claude-kosten", "cost"],
     ["aanmeldingen", "Aanmeldingen", "intake"], ["systeem", "Systeem", "system"],
   ];
@@ -3333,6 +3486,81 @@ function hqClient(cfg) {
     };
   }
 
+  // ---------- Mailcampagne ----------
+  // Table Outreach, kept up to date from Instantly by the cron. Replies are answered in the
+  // Instantly Unibox; here you see who answered and put interested centers in Pijplijn.
+  var OST = ["Interested", "Replied", "Out of office", "Wrong person", "Not interested", "Bounced", "Unsubscribed", "Sent", "No reply", "Queued", "Skipped"];
+  var OST_NL = { Interested: "Interesse", Replied: "Antwoord", "Out of office": "Afwezig", "Wrong person": "Verkeerde persoon", "Not interested": "Geen interesse", Bounced: "Bounce", Unsubscribed: "Uitgeschreven", Sent: "Gemaild", "No reply": "Geen antwoord", Queued: "Nog niet gemaild", Skipped: "Overgeslagen" };
+  var OST_PILL = { Interested: "ok", Replied: "sand", "Not interested": "bad", Bounced: "bad", Unsubscribed: "bad", "Out of office": "warn", "Wrong person": "warn" };
+  var ANSWERED = { Interested: 1, Replied: 1, "Out of office": 1, "Wrong person": 1, "Not interested": 1 };
+  var mailSt = store.get("mail", "all"), mailQ = "";
+  function oPill(s) { return '<span class="pill ' + (OST_PILL[s] || "") + '">' + esc(OST_NL[s] || s) + "</span>"; }
+  function mailed(o) { return o.status !== "Queued" && o.status !== "Skipped"; }
+  function pOutreach(fresh) {
+    if (!state.cache.mail) setPage("Mailcampagne", '<div class="skel"></div>');
+    load("mail", "outreach", fresh).then(function (d) {
+      if (route().k !== "mail") return;
+      if (d.missing) { setPage("Mailcampagne", '<div class="alert warn"><div class="x"><b>Nog niet ingesteld</b>Maak in Airtable de tabel <b>Outreach</b> door de campagne-CSV te importeren (zie de stappen in de PR).</div></div>'); return; }
+      var all = d.items, count = function (f) { return all.filter(f).length; };
+      var sent = count(mailed), ans = count(function (o) { return ANSWERED[o.status]; });
+      var h = d.synced ? "" : '<div class="alert warn"><div class="x"><b>Nog geen koppeling met Instantly</b>Zet de sleutel INSTANTLY_API_KEY als Secret in Cloudflare. Tot dan blijven de statussen staan zoals in de CSV.</div></div>';
+      h += '<div class="kpis">' +
+        kpi("Gemaild", nf.format(sent) + " <small>van " + nf.format(all.length) + "</small>") +
+        kpi("Antwoorden", nf.format(ans), '<span class="d">' + (sent ? Math.round(ans / sent * 1000) / 10 + "% van gemaild" : "nog niets gemaild") + "</span>") +
+        kpi("Interesse", nf.format(count(function (o) { return o.status === "Interested"; }))) +
+        kpi("Geen interesse", nf.format(count(function (o) { return o.status === "Not interested" || o.status === "Wrong person"; }))) +
+        kpi("Bounces", nf.format(count(function (o) { return o.status === "Bounced"; })), '<span class="d' + (sent && count(function (o) { return o.status === "Bounced"; }) / sent > 0.03 ? " down" : "") + '">houd onder 3%</span>') +
+        kpi("Uitgeschreven", nf.format(count(function (o) { return o.status === "Unsubscribed"; }))) + "</div>";
+      var todo = all.filter(function (o) { return (o.status === "Interested" || o.status === "Replied") && !o.inPipeline; })
+        .sort(function (a, b) { return b.eventAt.localeCompare(a.eventAt); });
+      h += '<div class="sec"><div class="ait"><h2>Op te volgen</h2><a class="btn" target="_blank" rel="noopener" href="https://app.instantly.ai/app/unibox">Open Unibox</a></div>';
+      h += todo.length ? '<div class="card rows fol">' + todo.map(function (o) {
+        return '<div class="fit"><div class="row"><div class="x"><div class="l1"><b>' + esc(o.company || o.email) + "</b>" + oPill(o.status) + '<span class="muted">' + esc([o.town, o.country].filter(Boolean).join(", ")) + "</span></div>" +
+          '<div class="pv">' + esc(o.reply || "Geen tekst opgehaald, kijk in de Unibox.") + '</div></div><span class="muted">' + esc(o.eventAt) + '</span><button class="btn primary" data-pipe="' + esc(o.id) + '">Naar Pijplijn</button><button class="btn" data-note="' + esc(o.id) + '">Notitie</button></div></div>';
+      }).join("") + "</div>" : '<div class="card pad muted">Nog geen antwoorden die opvolging vragen.</div>';
+      h += "</div>";
+      var camps = {};
+      all.forEach(function (o) {
+        var c = camps[o.campaign || "–"] = camps[o.campaign || "–"] || { n: 0, sent: 0, ans: 0, int: 0, bounce: 0 };
+        c.n++; if (mailed(o)) c.sent++; if (ANSWERED[o.status]) c.ans++; if (o.status === "Interested") c.int++; if (o.status === "Bounced") c.bounce++;
+      });
+      h += '<div class="sec card tw"><table class="t"><thead><tr><th>Campagne</th><th class="n">Centra</th><th class="n">Gemaild</th><th class="n">Antwoorden</th><th class="n">Interesse</th><th class="n">Bounces</th></tr></thead><tbody>' +
+        Object.keys(camps).sort().map(function (k) { var c = camps[k]; return "<tr><td><b>" + esc(k) + '</b></td><td class="n">' + c.n + '</td><td class="n">' + c.sent + '</td><td class="n">' + c.ans + (c.sent ? ' <small class="muted">' + Math.round(c.ans / c.sent * 100) + "%</small>" : "") + '</td><td class="n">' + c.int + '</td><td class="n">' + c.bounce + "</td></tr>"; }).join("") + "</tbody></table></div>";
+      var chips = [["all", "Alle", all.length], ["answered", "Geantwoord", ans]].concat(OST.map(function (s) { return [s, OST_NL[s], count(function (o) { return o.status === s; })]; }).filter(function (c) { return c[2]; }));
+      h += '<div class="sec bar"><div class="chips">' + chips.map(function (c) {
+        return '<button class="chip' + (mailSt === c[0] ? " on" : "") + '" data-ms="' + esc(c[0]) + '">' + esc(c[1]) + '<span class="c">' + c[2] + "</span></button>";
+      }).join("") + '</div></div><div class="bar"><input class="in" id="mq" type="search" placeholder="Zoek center, e-mail of plaats" value="' + esc(mailQ) + '"><span class="sp"></span><button class="btn" id="mx">CSV</button><button class="btn primary" id="msync"' + (d.synced ? "" : " disabled") + ">Nu synchroniseren</button></div>";
+      var list = all.filter(function (o) { return mailSt === "all" ? true : mailSt === "answered" ? ANSWERED[o.status] : o.status === mailSt; });
+      if (mailQ) list = list.filter(function (o) { return (o.company + " " + o.email + " " + o.town + " " + o.country).toLowerCase().indexOf(mailQ.toLowerCase()) > -1; });
+      list.sort(function (a, b) { return (OST.indexOf(a.status) - OST.indexOf(b.status)) || b.eventAt.localeCompare(a.eventAt) || a.company.localeCompare(b.company); });
+      h += '<div class="card tw"><table class="t"><thead><tr><th>Center</th><th>Campagne</th><th>Status</th><th>Laatste</th><th>Antwoord</th></tr></thead><tbody>' +
+        (list.slice(0, 500).map(function (o) {
+          return '<tr><td class="nm"><b>' + esc(o.company || o.email) + "</b><small>" + esc([o.email, o.town, o.country].filter(Boolean).join(" · ")) + "</small></td><td>" + esc(o.campaign) + "</td><td>" + oPill(o.status) + (o.inPipeline ? ' <span class="pill st-Talking">Pijplijn</span>' : "") +
+            "</td><td>" + esc(o.eventAt) + '</td><td class="muted">' + esc(o.reply.slice(0, 140)) + "</td></tr>";
+        }).join("") || '<tr><td colspan="5" class="empty">Geen centra in deze selectie.</td></tr>') + "</tbody></table></div>";
+      h += '<p class="muted" style="font-size:13.5px">Statussen komen elke 15 minuten uit Instantly. Antwoorden doe je zelf in de Unibox; zet daar ook het label (Interested, Not interested…), dat komt hier terug. Alles staat in de Airtable-tabel Outreach.</p>';
+      setPage("Mailcampagne", h);
+      $$(".chip[data-ms]").forEach(function (b) { b.onclick = function () { mailSt = b.getAttribute("data-ms"); store.set("mail", mailSt); pOutreach(); }; });
+      $("#mq").oninput = function () { var pos = this.selectionStart; mailQ = this.value; pOutreach(); var i = $("#mq"); i.focus(); try { i.setSelectionRange(pos, pos); } catch (e) {} };
+      var again = function () { delete state.cache.mail; delete state.cache.pipe; pOutreach(true); };
+      $$("[data-pipe]").forEach(function (b) {
+        b.onclick = function () { b.disabled = true; post("outreach", { action: "pipeline", id: b.getAttribute("data-pipe") }).then(again).catch(function (x) { b.disabled = false; alert(x.message); }); };
+      });
+      $$("[data-note]").forEach(function (b) {
+        b.onclick = function () { var t = prompt("Notitie (komt met datum en je naam in Outreach → Notes):"); if (!t) return; post("outreach", { action: "note", id: b.getAttribute("data-note"), note: t }).then(again).catch(function (x) { alert(x.message); }); };
+      });
+      $("#msync").onclick = function () {
+        var b = this; b.disabled = true; b.textContent = "Bezig…";
+        post("outreach", { action: "sync" }).then(function (r) { if (r.left) alert("Nog " + r.left + " rijen te verwerken: die volgen bij de volgende sync."); again(); })
+          .catch(function (x) { b.disabled = false; b.textContent = "Nu synchroniseren"; alert(x.message); });
+      };
+      $("#mx").onclick = function () {
+        csv("talay-mailcampagne-" + new Date().toISOString().slice(0, 10) + ".csv", [["Center", "E-mail", "Lead ID", "Campagne", "Plaats", "Land", "Status", "Interesse", "Laatste", "Antwoord", "Notities"]].concat(
+          all.map(function (o) { return [o.company, o.email, o.lead, o.campaign, o.town, o.country, OST_NL[o.status] || o.status, o.interest, o.eventAt, o.reply, o.notes]; })));
+      };
+    }).catch(fail);
+  }
+
   // ---------- Conversie ----------
   var convPer = "";
   function pConversion(fresh) {
@@ -3509,7 +3737,7 @@ function hqClient(cfg) {
     var h = (location.hash || "#/overzicht").slice(2).split("?")[0].split("/");
     return { k: h[0] || "overzicht", id: h[1] ? decodeURIComponent(h[1]) : "" };
   }
-  var PAGES = { overzicht: pOverview, inbox: pInbox, zoeken: pSearch, pijplijn: pPipeline, centra: pCenters, conversie: pConversion, boekingen: pBookings, commissie: pCommission, kosten: pCosts, aanmeldingen: pIntake, systeem: pSystem, team: pTeam };
+  var PAGES = { overzicht: pOverview, inbox: pInbox, zoeken: pSearch, pijplijn: pPipeline, mail: pOutreach, centra: pCenters, conversie: pConversion, boekingen: pBookings, commissie: pCommission, kosten: pCosts, aanmeldingen: pIntake, systeem: pSystem, team: pTeam };
   function render(fresh) {
     var r = route();
     $$("#nav a").forEach(function (a) { a.classList.toggle("on", a.getAttribute("data-k") === r.k); });
