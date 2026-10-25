@@ -452,6 +452,7 @@ export const ZONE_ROWS = [
   ["Undo translation", "Deshacer traducción", "Annuler la traduction", "Übersetzung rückgängig", "Vertaling ongedaan maken"],
   ["Translating didn't work. Try again.", "La traducción no funcionó. Inténtalo de nuevo.", "La traduction n’a pas fonctionné. Réessayez.", "Die Übersetzung hat nicht geklappt. Versuch es noch einmal.", "Vertalen lukte niet. Probeer opnieuw."],
   ["Translation isn't switched on yet.", "La traducción aún no está activada.", "La traduction n’est pas encore activée.", "Die Übersetzung ist noch nicht eingeschaltet.", "Vertalen staat nog niet aan."],
+  ["Weekly summary (Mondays)", "Resumen semanal (los lunes)", "Résumé de la semaine (le lundi)", "Wochenübersicht (montags)", "Weekoverzicht (op maandag)"],
 ];
 
 // { es: { English: Spanish, … }, fr: …, de: …, nl: …, th: … }
@@ -898,5 +899,6 @@ export const ZONE_TH = {
   "Undo translation": "ยกเลิกการแปล",
   "Translating didn't work. Try again.": "แปลไม่สำเร็จ ลองอีกครั้ง",
   "Translation isn't switched on yet.": "ยังไม่ได้เปิดการแปล",
+  "Weekly summary (Mondays)": "สรุปรายสัปดาห์ (ทุกวันจันทร์)",
 };
 ZONE_TEXT.th = ZONE_TH;
