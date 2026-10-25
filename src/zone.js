@@ -5144,11 +5144,30 @@ function zoneClient(cfg) {
       });
     } catch (e) {}
   }
+  var iconOn = null, iconImg = null;
+  function tabIcon(on) {
+    if (on === iconOn) return; iconOn = on;
+    var link = document.querySelector('link[rel="icon"]'); if (!link) return;
+    if (!on) { link.href = "/zone/icon-192.png"; return; }
+    var draw = function () {
+      try {
+        var c = document.createElement("canvas"); c.width = c.height = 64; var x = c.getContext("2d");
+        x.drawImage(iconImg, 0, 0, 64, 64);
+        x.beginPath(); x.arc(50, 14, 13, 0, 2 * Math.PI); x.fillStyle = "#E8B04B"; x.fill(); x.lineWidth = 4; x.strokeStyle = "#0A2029"; x.stroke();
+        if (iconOn) link.href = c.toDataURL("image/png");
+      } catch (e) {}
+    };
+    if (iconImg && iconImg.complete) return draw();
+    iconImg = new Image(); iconImg.onload = draw; iconImg.src = "/zone/icon-192.png";
+  }
   function badge(list) {
     var need = list.filter(function (c) { return c.needsYou || c.waitingMin > 0; });
     var n = need.length, el = $("#count");
     el.hidden = !n; el.textContent = n;
-    document.title = (n ? "(" + n + ") " : "") + cfg.center + " · Talay";
+    // Browser tab: chats that need the team plus chats with a new diver message, and a dot on the icon.
+    var tabN = list.filter(function (c) { return c.needsYou || c.waitingMin > 0 || unread(c); }).length;
+    document.title = (tabN ? "(" + tabN + ") " : "") + cfg.center + " · Talay";
+    tabIcon(tabN > 0);
     var ids = need.map(function (c) { return c.id; });
     if (needSeen && ids.some(function (id) { return needSeen.indexOf(id) < 0; })) beep();
     needSeen = ids;
@@ -5278,6 +5297,7 @@ function zoneClient(cfg) {
     current = id; lastChat = ""; chatSeenAt = null;
     var it = items.filter(function (c) { return c.id === id; })[0]; if (it) markSeen(id, it.lastAt);
     var row = document.querySelector('.item[data-id="' + id + '"]'); if (row) { row.classList.remove("unread"); var u = row.querySelector(".udot"); if (u) u.remove(); }
+    if (filter === "open" || filter === "need") badge(items);
     document.querySelectorAll(".item").forEach(function (b) { b.classList.toggle("on", b.dataset.id === id); });
     $("#convos").classList.add("open"); document.body.classList.add("inchat");
     $("#pane").innerHTML = '<div class="skel pad"><i></i><i></i><i></i></div>';
@@ -6514,7 +6534,9 @@ function zoneClient(cfg) {
   (function () { var m = location.search.match(/[?&]c=([A-Za-z0-9:_-]{1,64})/); if (m) openChat(m[1]); })();
   // Polling is kept light on purpose (Airtable limits): the list every 30 s while the page
   // is visible; the open conversation only when the list shows something new in it.
-  setInterval(function () { if (!document.hidden) loadList(); }, 30000);
-  setInterval(function () { if (!document.hidden && filter !== "open" && filter !== "need") api("conversations?view=open").then(function (d) { badge(d.conversations); }).catch(function () {}); }, 60000);
+  // In a background tab the list still refreshes, every minute, so the tab title and icon stay right.
+  var listTick = 0;
+  setInterval(function () { listTick++; if (!document.hidden || listTick % 2 === 0) loadList(); }, 30000);
+  setInterval(function () { if (filter !== "open" && filter !== "need") api("conversations?view=open").then(function (d) { badge(d.conversations); }).catch(function () {}); }, 60000);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) { lastList = ""; loadList(); } });
 }
