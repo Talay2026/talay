@@ -1,7 +1,7 @@
 // Notifications for dive center staff: talay.io/api/notify (called by Make, one call per event).
 // Who gets what is in the Airtable table "Notify", one row per person per center:
 //   Name, Center (link to Centers), Role (Owner | Office | Instructor),
-//   WhatsApp, Email, Language (EN | FR | ES | DE | NL | TH), Topics (Needs you | Bookings | Morning summary | Escalation),
+//   WhatsApp, Email, Language (EN | FR | ES | DE | NL | TH), Topics (Needs you | Bookings | Morning summary | Escalation | Weekly summary),
 //   Channels (WhatsApp | Push | Email), Evenings (checkbox), Active (checkbox).
 // WhatsApp goes out as an approved template from Talay's own number (respond.io channel
 // NOTIFY_CHANNEL); push goes to the zone on that person's phone. E-mail stays with Make for now
@@ -12,7 +12,8 @@
 //   type=urgent     same as needs_you, but also outside office hours for everyone
 //   type=booking    name, product, date, amount             → template talay_new_booking
 // The 15-minute cron (src/zone.js → runHqAlerts) also uses this file for the escalation
-// (talay_still_waiting, topic Escalation) and the morning summary (talay_morning).
+// (talay_still_waiting, topic Escalation), the morning summary (talay_morning) and, every Monday,
+// the weekly summary (talay_weekly, topic Weekly summary).
 // Outside the center's office hours (Centers → Office from / Office to, HHMM) only people with
 // Evenings get "needs you"; the morning summary picks up the rest. Add dry=1 to see what would
 // be sent without sending anything.
@@ -79,6 +80,15 @@ const TEMPLATES = {
     de: { body: "Guten Morgen, Team {{1}}. Das ist passiert, seit euer Team offline ist:\n\nGespräche von Mia: {{2}}\nNeue Buchungen: {{3}}\nWartet auf euer Team: {{4}}\nHeute auf dem Boot: {{5}}\n\nEinen schönen Tauchtag!", button: "Talay öffnen" },
     nl: { body: "Goedemorgen, team {{1}}. Dit gebeurde er sinds je team offline ging:\n\nGesprekken door Mia: {{2}}\nNieuwe boekingen: {{3}}\nWacht op je team: {{4}}\nVandaag op de boot: {{5}}\n\nEen fijne duikdag!", button: "Open Talay" },
     th: { body: "สวัสดีตอนเช้า ทีม {{1}} นี่คือสิ่งที่เกิดขึ้นระหว่างที่ทีมของคุณออฟไลน์:\n\nบทสนทนาที่ Mia ดูแล: {{2}}\nการจองใหม่: {{3}}\nรอทีมของคุณ: {{4}}\nบนเรือวันนี้: {{5}}\n\nขอให้เป็นวันดำน้ำที่ดี", button: "เปิด Talay" },
+  },
+  talay_weekly: {
+    url: null,
+    en: { body: "Your week at {{1}} with Talay ({{2}}):\n\nConversations handled by Mia: {{3}}\nOutside office hours: {{4}}\nNew bookings: {{5}}\n\nThe full overview is in your dashboard.", button: "Open dashboard" },
+    fr: { body: "Votre semaine chez {{1}} avec Talay ({{2}}) :\n\nConversations gérées par Mia : {{3}}\nEn dehors des heures d'ouverture : {{4}}\nNouvelles réservations : {{5}}\n\nLe détail complet est dans votre tableau de bord.", button: "Tableau de bord" },
+    es: { body: "Tu semana en {{1}} con Talay ({{2}}):\n\nConversaciones atendidas por Mia: {{3}}\nFuera del horario de oficina: {{4}}\nNuevas reservas: {{5}}\n\nEl resumen completo está en tu panel.", button: "Abrir panel" },
+    de: { body: "Eure Woche bei {{1}} mit Talay ({{2}}):\n\nGespräche von Mia: {{3}}\nAußerhalb der Öffnungszeiten: {{4}}\nNeue Buchungen: {{5}}\n\nDie ganze Übersicht findest du im Dashboard.", button: "Dashboard öffnen" },
+    nl: { body: "Je week bij {{1}} met Talay ({{2}}):\n\nGesprekken door Mia: {{3}}\nBuiten de openingsuren: {{4}}\nNieuwe boekingen: {{5}}\n\nHet volledige overzicht staat in je dashboard.", button: "Open dashboard" },
+    th: { body: "สัปดาห์ของ {{1}} กับ Talay ({{2}}):\n\nบทสนทนาที่ Mia ดูแล: {{3}}\nนอกเวลาทำการ: {{4}}\nการจองใหม่: {{5}}\n\nดูภาพรวมทั้งหมดได้ในแดชบอร์ดของคุณ", button: "เปิดแดชบอร์ด" },
   },
 };
 

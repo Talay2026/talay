@@ -1173,8 +1173,11 @@ export async function handlePush(request, env, ctx) {
 // ---------- Weekly summary e-mail ----------
 // GET talay.io/api/weekly?key=WEEKLY_KEY  (called by Make every Monday morning)
 // Returns one ready-made e-mail per center: { week, emails: [{ center, to, subject, html }] }.
-// Recipients: Centers → Admin emails, else Alert Email. A center with the checkbox
-// "No weekly summary" is skipped. Add &only=you@example.com to send every e-mail to one address (test).
+// Recipients: Notify rows with the topic Weekly summary and the channel Email, else Centers →
+// Admin emails, else Alert Email. A center with the checkbox "No weekly summary", or without any
+// conversation or booking last week, is skipped. Add &only=you@example.com to send every e-mail to
+// one address (test), or &preview=<slug> to see one center's e-mail in the browser (nothing is sent).
+// The WhatsApp version (talay_weekly) goes out from the 15-minute cron, see weeklySummaries.
 export async function handleWeekly(request, env, ctx) {
   const url = new URL(request.url);
   const reply = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
@@ -1182,34 +1185,51 @@ export async function handleWeekly(request, env, ctx) {
   const only = String(url.searchParams.get("only") || "").trim();
   if (only && !EMAIL.test(only)) return reply({ error: "only must be an e-mail address" }, 400);
 
-  const TZ = 7 * 3600 * 1000;
-  const t = new Date(Date.now() + TZ);
-  const todayMid = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) - TZ;
-  const dow = (t.getUTCDay() + 6) % 7; // Monday = 0
-  const end = todayMid - dow * DAY;    // this Monday 00:00 Koh Tao time
-  const start = end - 7 * DAY;         // last Monday
-  const fmt = (ms, o) => new Date(ms + TZ).toLocaleDateString("en-GB", { timeZone: "UTC", ...o });
-  const week = fmt(start, { day: "numeric", month: "short" }) + " – " + fmt(end - 1, { day: "numeric", month: "short" });
+  const preview = String(url.searchParams.get("preview") || "").toLowerCase();
+  const { start, end, week } = weekRange(Date.now());
 
-  const recs = await at(env, "Centers", { formula: "{Slug} != ''" });
+  const recs = await at(env, "Centers", { formula: preview ? `{Slug} = '${q(preview)}'` : "{Slug} != ''" });
   const emails = [];
   for (const r of recs) {
     const f = r.fields;
-    if (f["No weekly summary"]) continue;
+    if (f["No weekly summary"] && !preview) continue;
     const center = {
       id: r.id, slug: String(first(f["Slug"]) || "").toLowerCase(), name: first(f["Name"]) || "Dive center",
       assistant: first(f["Assistant name"]) || "Mia",
     };
     if (!/^[a-z0-9-]{1,60}$/.test(center.slug)) continue;
-    let to = splitEmails(f["Admin emails"]);
+    // Notify rows with the topic Weekly summary and the channel Email; else Admin emails, else Alert Email.
+    let to = (await teamFor(env, center.name, "Weekly summary").catch(() => []))
+      .filter((p) => (p["Channels"] || []).includes("Email")).map((p) => String(p["Email"] || "").trim().toLowerCase()).filter((e) => EMAIL.test(e));
+    if (!to.length) to = splitEmails(f["Admin emails"]);
     if (!to.length && first(f["Alert Email"])) to = splitEmails(f["Alert Email"]);
     if (only) to = [only];
-    if (!to.length) continue;
-    const s = await weekStats(env, center, start, end).catch((e) => ({ error: String(e.message || e) }));
+    if (!to.length && !preview) continue;
+    const [s, prev] = await Promise.all([
+      weekStats(env, center, start, end).catch((e) => ({ error: String(e.message || e) })),
+      weekStats(env, center, start - 7 * DAY, start).catch(() => null),
+    ]);
     if (s.error) continue;
-    emails.push({ center: center.name, to: to.join(", "), subject: weeklySubject(center, s), html: weeklyHtml(center, s, week) });
+    s.prev = prev;
+    // &preview=<slug>: the e-mail itself in the browser, nothing is sent.
+    if (preview) return new Response(weeklyHtml(center, s, week), { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+    if (!s.conversations && !s.bookings) continue;
+    emails.push({ center: center.name, to: [...new Set(to)].join(", "), subject: weeklySubject(center, s), html: weeklyHtml(center, s, week) });
   }
+  if (preview) return reply({ error: "center not found" }, 404);
   return reply({ week, emails });
+}
+
+// Last week, Monday to Sunday (Koh Tao time), as seen at the moment ms.
+function weekRange(ms) {
+  const TZ = 7 * 3600 * 1000;
+  const t = new Date(ms + TZ);
+  const todayMid = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) - TZ;
+  const dow = (t.getUTCDay() + 6) % 7; // Monday = 0
+  const end = todayMid - dow * DAY;    // this Monday 00:00 Koh Tao time
+  const start = end - 7 * DAY;         // last Monday
+  const fmt = (x, o) => new Date(x + TZ).toLocaleDateString("en-GB", { timeZone: "UTC", ...o });
+  return { start, end, week: fmt(start, { day: "numeric", month: "short" }) + " – " + fmt(end - 1, { day: "numeric", month: "short" }) };
 }
 
 async function weekStats(env, center, start, end) {
@@ -1264,6 +1284,7 @@ function weeklyHtml(center, s, week) {
 <div style="font-size:13px;color:#DCA44A;font-weight:bold">Your week with Talay</div>
 <div style="font-size:22px;line-height:28px;font-weight:bold;color:#F7F3EA;padding-top:6px">${s.bookings ? `${s.bookings} new ${s.bookings === 1 ? "booking" : "bookings"} through ${e(center.assistant)}` : `${e(center.assistant)} answered ${s.conversations} ${s.conversations === 1 ? "diver" : "divers"}`}</div>
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px"><tr>${cell(s.conversations, "conversations")}${cell(s.bookings, s.bookings === 1 ? "booking" : "bookings")}${cell(num(s.revenue), "THB booked", true)}</tr></table>
+${s.prev ? `<div style="font-size:12px;line-height:18px;color:#A9BDC1;padding:0 8px 8px">Week before: ${s.prev.conversations} conversations · ${s.prev.bookings} ${s.prev.bookings === 1 ? "booking" : "bookings"} · ${num(s.prev.revenue)} THB</div>` : ""}
 </td></tr>
 <tr><td style="padding:20px 4px 0">
 <table width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -1620,7 +1641,7 @@ function quickReplies(f) {
 // Team details live in the Airtable table "Notify" (one row per person per center, also used by
 // /api/notify for WhatsApp and push). Staff emails on Centers stays the list of who may sign in.
 const ROLES = ["Owner", "Office", "Instructor"];
-const TOPICS = ["Needs you", "Bookings", "Morning summary", "Escalation"];
+const TOPICS = ["Needs you", "Bookings", "Morning summary", "Escalation", "Weekly summary"];
 const CHANNELS = ["WhatsApp", "Push", "Email"];
 const NLANGS = ["EN", "FR", "ES", "DE", "NL", "TH"];
 async function notifyRows(env, center) {
@@ -2785,6 +2806,7 @@ export async function runHqAlerts(env, scheduledTime) {
   if (env.ALERT_WEBHOOK && hq.length) await sendAlerts(env, alertMessage(hq, false));
   await teamEscalations(env, alerts, at0).catch((e) => console.error("escalation", e));
   await morningSummaries(env, at0).catch((e) => console.error("morning", e));
+  await weeklySummaries(env, at0).catch((e) => console.error("weekly", e));
   await pausedWaitPush(env, at0).catch((e) => console.error("paused wait push", e));
 }
 
@@ -2868,6 +2890,28 @@ async function morningSummaries(env, at0) {
     });
   }
 }
+// Every Monday, in the run that starts at opening time (just after the morning summary): last week
+// in numbers (template talay_weekly, topic Weekly summary). Skipped when there were no conversations.
+async function weeklySummaries(env, at0) {
+  const now = thaiMinutes(at0);
+  if (new Date(at0 + TZ_MS).getUTCDay() !== 1 || now < 4 * 60 || now >= 13 * 60) return;
+  const recs = await at(env, "Centers", { formula: "{Slug} != ''" });
+  const { start, end, week } = weekRange(at0);
+  for (const r of recs) {
+    const { open } = officeHours(r.fields);
+    if (now < open || now >= open + 15) continue;
+    const center = centerOut(r, true);
+    const people = await teamFor(env, center.name, "Weekly summary");
+    if (!people.length) continue;
+    const s = await weekStats(env, center, start, end);
+    if (!s.conversations) continue;
+    await whatsappTeam(env, people, (l) => template("talay_weekly", [
+      center.name, week, s.conversations, s.outsideHours,
+      s.bookings ? `${s.bookings} (${Math.round(s.revenue).toLocaleString("en-US")} THB)` : WORDS[l].none,
+    ], "", l));
+  }
+}
+
 // "Stuur een testmelding" on the Systeem page: the last 24 hours, demo and test included.
 async function adminAlertTest(env) {
   if (!env.ALERT_WEBHOOK) return json({ error: "ALERT_WEBHOOK is nog niet ingesteld in Cloudflare." }, 400);
@@ -5887,7 +5931,7 @@ function zoneClient(cfg) {
       .finally(function () { if (btn) btn.disabled = false; });
   }
   var ROLE_T = { Owner: t("Owner"), Office: t("Office"), Instructor: t("Instructor") };
-  var TOPIC_T = [["Needs you", t("A conversation needs the team")], ["Bookings", t("New bookings")], ["Morning summary", t("Morning summary")], ["Escalation", t("Still waiting after 30 minutes")]];
+  var TOPIC_T = [["Needs you", t("A conversation needs the team")], ["Bookings", t("New bookings")], ["Morning summary", t("Morning summary")], ["Escalation", t("Still waiting after 30 minutes")], ["Weekly summary", t("Weekly summary (Mondays)")]];
   var CHAN_T = [["WhatsApp", "WhatsApp"], ["Push", t("Push on the phone")], ["Email", t("Email")]];
   var NLANG = ["EN", "FR", "ES", "DE", "NL", "TH"];
   function removeMember(e) {
