@@ -4694,6 +4694,15 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .csw:hover{border-color:rgba(247,243,234,.25)}
 .csw .chev{flex:none;opacity:.6;transition:transform .15s}
 .csw[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.btable.bday tr.grp td{background:var(--paper-2);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:8px 12px}
+.btable.bday tr.grp span{margin-left:10px;font-weight:500;text-transform:none;letter-spacing:0}
+.btable.bday tbody tr.grp:hover td{background:var(--paper-2)}
+.btable.bday .tname small.ref{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.btable.bday a.tel{font-weight:500;text-decoration:none}
+.btable.bday a.tel:hover{text-decoration:underline}
+.btable.bday .tlinks a{color:var(--bar);font-weight:600;text-decoration:none;white-space:nowrap}
+.btable.bday .tlinks a:hover{text-decoration:underline}
+@media (max-width:760px){#books .btable.bday tr.grp{background:none;border:0;padding:12px 2px 4px;margin:0}#books .btable.bday tr.grp td{background:none;padding:0;justify-content:flex-start;text-align:left}#books .btable.bday .tname{flex-direction:column;align-items:flex-start;gap:0}}
 /* Calm chat (25 Oct): one quiet info block above the messages, everything on the same left edge */
 .pane .head{border-bottom:0;padding:16px 22px 6px}
 .cinfo{background:var(--card);border-bottom:1px solid var(--line);padding:0 22px 14px 70px;display:grid;gap:10px}
@@ -5363,19 +5372,23 @@ function zoneClient(cfg) {
         tn(dl.length, "1 booking", "{n} bookings") + "</span></div>";
       var prods = {};
       rows.forEach(function (b) { var pk = b.product || t("Other"); (prods[pk] = prods[pk] || []).push(b); });
+      // One table per day with the products as group rows, so the columns line up.
+      html += '<div class="bscroll"><table class="btable bday"><thead><tr>' +
+        "<th>" + t("Name") + "</th><th>" + t("Phone") + '</th><th class="num">' + t("Divers") + '</th><th class="num">' + t("Paid online") + '</th><th class="num">' + t("At the shop") + "</th><th>" + t("Status") + '</th><th class="noprint"></th></tr></thead><tbody>';
       Object.keys(prods).forEach(function (p) {
-        html += '<div class="prodh">' + esc(p) + '</div><div class="bscroll"><table class="btable"><thead><tr>' +
-          "<th>" + t("Ref") + "</th><th>" + t("Name") + "</th><th>" + t("Phone") + '</th><th class="num">' + t("Divers") + '</th><th class="num">' + t("Paid online") + '</th><th class="num">' + t("At the shop") + "</th><th>" + t("Status") + '</th><th class="noprint"></th></tr></thead><tbody>' +
+        var pd = prods[p].filter(function (b) { return !isCx(b); }).reduce(function (a, b) { return a + b.divers; }, 0);
+        html += '<tr class="grp"><td colspan="7">' + esc(p) + "<span>" + tn(pd, "1 diver", "{n} divers") + "</span></td></tr>" +
           prods[p].map(function (b) {
             var links = [];
             if (b.chat) links.push('<a href="#" data-chat="' + esc(b.chat) + '">' + tr("Chat") + "</a>");
             if (b.manage && !isCx(b) && b.date >= td) links.push('<a href="' + esc(b.manage) + '" target="_blank" rel="noopener">' + tr("Move / cancel") + "</a>");
-            var wa = b.phone ? '<a href="https://wa.me/' + esc(b.phone.replace(/[^0-9]/g, "")) + '" target="_blank" rel="noopener">' + esc(b.phone) + "</a>" : "";
-            return '<tr class="' + (isCx(b) ? "cx" : "") + '"><td data-l="' + tr("Ref") + '">' + esc(b.ref) + '</td><td data-l="' + tr("Name") + '" class="tname">' + esc(b.name) + '</td><td data-l="' + tr("Phone") + '">' + wa + '</td><td class="num" data-l="' + tr("Divers") + '">' + b.divers +
+            var wa = b.phone ? '<a class="tel" href="https://wa.me/' + esc(b.phone.replace(/[^0-9]/g, "")) + '" target="_blank" rel="noopener">' + esc(b.phone) + "</a>" : "";
+            return '<tr class="' + (isCx(b) ? "cx" : "") + '"><td data-l="' + tr("Name") + '" class="tname">' + esc(b.name) + '<small class="ref">' + esc(b.ref) + '</small></td><td data-l="' + tr("Phone") + '">' + wa + '</td><td class="num" data-l="' + tr("Divers") + '">' + b.divers +
               '</td><td class="num" data-l="' + tr("Paid online") + '">' + thb(b.deposit) + '</td><td class="num" data-l="' + tr("At the shop") + '">' + (isCx(b) ? "–" : thb(b.balance)) + '</td><td class="keep" data-l="' + tr("Status") + '">' + stTag(b) +
               (b.refunded ? "<br><small>" + tr("Refunded {x}", { x: thb(b.refunded) }) + "</small>" : "") + '</td><td class="keep noprint tlinks">' + links.join(" · ") + "</td></tr>";
-          }).join("") + "</tbody></table></div>";
+          }).join("");
       });
+      html += "</tbody></table></div>";
     });
     $("#blist").innerHTML = html;
     $("#blist").querySelectorAll("[data-chat]").forEach(function (a) {
