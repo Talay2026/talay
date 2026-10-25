@@ -893,12 +893,12 @@ async function dashboard(env, center, period) {
     funnel: (() => {
       const mine = sessions.filter((s) => (s.metadata || {}).center_slug === center.slug);
       const opened = new Set(mine.map((s) => (s.metadata || {}).lead_ref || s.id)).size;
-      return {
-        conversations: leads.length,
-        linkSent: new Set(linkMsgs.map((m) => String(m.fields["Contact ID"] || "")).filter(Boolean)).size,
-        opened: Math.max(opened, live.length),
-        booked: live.length,
-      };
+      const links = new Set(linkMsgs.map((m) => String(m.fields["Contact ID"] || "")).filter(Boolean)).size;
+      // Links and payment pages in this period can belong to divers who first wrote earlier, so keep
+      // every step a subset of the one before: the funnel never goes above 100%.
+      const booked = live.length, open = Math.max(opened, booked);
+      const link = Math.max(Math.min(links, leads.length), open);
+      return { conversations: Math.max(leads.length, link), linkSent: link, opened: open, booked };
     })(),
     languages: Object.entries(langs).sort((a, b) => b[1] - a[1]),
     heat: (() => {
@@ -4703,6 +4703,14 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .btable.bday .tlinks a{color:var(--bar);font-weight:600;text-decoration:none;white-space:nowrap}
 .btable.bday .tlinks a:hover{text-decoration:underline}
 @media (max-width:760px){#books .btable.bday tr.grp{background:none;border:0;padding:12px 2px 4px;margin:0}#books .btable.bday tr.grp td{background:none;padding:0;justify-content:flex-start;text-align:left}#books .btable.bday .tname{flex-direction:column;align-items:flex-start;gap:0}}
+.minis.strip{gap:0;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+.minis.strip .mini{background:none;border:0;border-radius:0;box-shadow:none;padding:14px 20px}
+.minis.strip .mini+.mini{border-left:1px solid var(--line)}
+@media (max-width:760px){.minis.strip{grid-template-columns:1fr}.minis.strip .mini+.mini{border-left:0;border-top:1px solid var(--line)}}
+#msSlot{display:contents}
+.pbtn{display:inline-flex;align-items:center;gap:10px;cursor:pointer;text-align:left}
+.pbtn .chev{opacity:.6;transition:transform .15s}
+.pbtn[aria-expanded="true"] .chev{transform:rotate(180deg)}
 /* Calm chat (25 Oct): one quiet info block above the messages, everything on the same left edge */
 .pane .head{border-bottom:0;padding:16px 22px 6px}
 .cinfo{background:var(--card);border-bottom:1px solid var(--line);padding:0 22px 14px 70px;display:grid;gap:10px}
@@ -4848,7 +4856,7 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 <section id="dash" class="view">
   <div class="bwrap">
     <div class="btools">
-      <select id="period" aria-label="${T("Period")}" class="psel"></select>
+      <select id="period" aria-label="${T("Period")}" class="psel" hidden></select><button type="button" class="psel pbtn" id="pbtn" aria-haspopup="menu" aria-expanded="false" title="${T("Period")}"><span id="pname">${T("Last 30 days")}</span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><div class="amenu" id="pmenu" role="menu" hidden></div>
       <span class="sp"></span>
       <button class="ghost" id="stPrint" type="button">${T("Print statement")}</button>
       <button class="ghost" id="stCsv" type="button">${T("Download CSV")}</button>
@@ -5862,7 +5870,7 @@ function zoneClient(cfg) {
       if (done === items.length) { el.hidden = true; return; }
       el.innerHTML = '<div class="sh"><b>' + t("Get started with Talay") + "</b><small>" + t("{done} of {n} done", { done: done, n: items.length }) + '</small><button type="button" class="lnk3" id="startHide">' + t("Hide") + "</button></div>" +
         '<div class="sprog"><span style="width:' + Math.round(done / items.length * 100) + '%"></span></div>' +
-        '<ul class="slist">' + items.map(function (i) {
+        '<ul class="slist">' + items.filter(function (i) { return !i[1]; }).map(function (i) {
           return '<li class="' + (i[1] ? "ok" : "") + '"><span class="ck">' + (i[1] ? '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8.5 3.2 3L13 4.5"/></svg>' : "") + "</span>" +
             (i[1] ? esc(i[0]) : '<a href="#" data-go="' + i[2] + '">' + esc(i[0]) + "</a>") + "</li>";
         }).join("") + "</ul>";
@@ -5880,6 +5888,17 @@ function zoneClient(cfg) {
       var sel = $("#period");
       if (!sel.options.length) {
         sel.innerHTML = '<option value="">' + t("Last 30 days") + "</option>" + d.months.map(function (m) { return '<option value="' + m.value + '">' + esc(monthLabel(m.value)) + "</option>"; }).join("");
+        // The period picker in Talay style; the hidden select keeps the value.
+        var ck = '<svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7"/></svg>';
+        $("#pmenu").innerHTML = Array.prototype.map.call(sel.options, function (o) {
+          return '<button type="button" role="menuitemradio" data-p="' + esc(o.value) + '"' + (o.value === sel.value ? ' class="on"' : "") + ">" + esc(o.text) + ck + "</button>";
+        }).join("");
+        dropMenu($("#pbtn"), $("#pmenu"), function (b) {
+          if (b.dataset.p === sel.value) return;
+          sel.value = b.dataset.p; $("#pname").textContent = b.textContent;
+          $("#pmenu").querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); });
+          loadDash();
+        });
       }
       renderDash();
     }).catch(function (e) { $("#dbody").style.opacity = ""; if (e.message !== "auth") $("#dbody").innerHTML = '<div class="bempty">' + esc(e.message) + "</div>"; });
@@ -5898,7 +5917,7 @@ function zoneClient(cfg) {
     var html = steps.map(function (s, i) {
       var w = Math.max(4, Math.round(s[1] / top * 100));
       var prev = i ? steps[i - 1][1] : 0;
-      var conv = i ? '<span class="fpct" title="' + t("of the step before") + '">' + (prev ? t("{n}% of previous", { n: Math.round(s[1] / prev * 100) }) : "–") + "</span>" : "";
+      var conv = i ? '<span class="fpct" title="' + t("of the step before") + '">' + (prev ? Math.round(s[1] / prev * 100) + "%" : "–") + "</span>" : "";
       return '<div class="fstep">' + conv + '<div class="fbar"><span style="width:' + w + '%"></span></div>' +
         '<b>' + s[1] + '</b><small>' + s[0] + '</small><em>' + s[2] + "</em></div>";
     }).join("");
@@ -5986,7 +6005,7 @@ function zoneClient(cfg) {
         kp(t("Conversations"), k.conversations, t("{n} outside office hours ({p})", { n: k.outsideHours, p: pct(k.outsideHours, k.conversations) }), false, "conversations") +
         kp(t("Booking conversion"), k.conversion + "%", t("of conversations booked"), false, "conversion") +
       "</div>" +
-      '<div class="minis">' +
+      '<div class="minis strip">' +
         mini(t("{a}'s first reply", { a: esc(cfg.assistant) }), fmtSec(k.avgResponse), t("on average"), "avgResponse", true) +
         mini(t("Handed to your team"), k.handedOver, t("{p} of conversations", { p: pct(k.handedOver, k.conversations) })) +
         mini(t("Collected at your shop"), thb(k.atShop), t("balance paid on arrival"), "atShop") +
