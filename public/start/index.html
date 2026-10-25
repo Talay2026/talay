@@ -16,7 +16,9 @@ body{margin:0;background:var(--paper);color:var(--deep);font-family:system-ui,-a
 a{color:inherit}
 [hidden]{display:none!important}
 header{background:radial-gradient(700px 320px at 90% -10%,#1C5262 0%,transparent 62%),var(--deep);color:var(--paper);padding:24px 0 30px}
-.brand{font-weight:800;font-size:17px;margin-bottom:18px}
+.brand{font-weight:800;font-size:17px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.langsel{font:inherit;font-size:14px;font-weight:600;color:var(--paper);background:rgba(244,240,230,.08);border:1px solid rgba(244,240,230,.22);border-radius:999px;padding:6px 12px;cursor:pointer}
+.langsel option{color:var(--deep);background:#fff}
 h1{font-size:clamp(28px,4.6vw,40px);line-height:1.1;letter-spacing:-.02em;margin:0 0 10px;font-weight:800}
 h1 em{font-style:normal;color:var(--sand)}
 .lead{color:#C9D4D7;margin:0 0 16px;max-width:640px}
@@ -113,11 +115,11 @@ footer{color:var(--muted);font-size:14px;padding:16px 0 40px;display:flex;justif
 <body>
 <header>
   <div class="wrap">
-    <div class="brand">Talay</div>
-    <h1>Set up Talay for <em>your</em> dive centre</h1>
-    <p class="lead">Tell us how your centre works. Your assistant then answers divers with your own prices, times and rules, day and night, under your name. It takes about 20 minutes, in 10 short steps. Everything is saved on this device, so you can stop and come back later.</p>
+    <div class="brand"><span>Talay</span><select class="langsel" id="lang" aria-label="Language"></select></div>
+    <h1 data-t>Set up Talay for <em>your</em> dive centre</h1>
+    <p class="lead" data-t>Tell us how your centre works. Your assistant then answers divers with your own prices, times and rules, day and night, under your name. It takes about 20 minutes, in 10 short steps. Everything is saved on this device, so you can stop and come back later.</p>
     <ul class="promise">
-      <li>Free to use</li><li>Nothing changes in your system</li><li>Switch it on or off anytime</li><li>Keep taking bookings as before</li>
+      <li data-t>Free to use</li><li data-t>Nothing changes in your system</li><li data-t>Switch it on or off anytime</li><li data-t>Keep taking bookings as before</li>
     </ul>
   </div>
 </header>
@@ -138,22 +140,23 @@ footer{color:var(--muted);font-size:14px;padding:16px 0 40px;display:flex;justif
     </div>
   </form>
   <section class="step done" id="done" hidden>
-    <h2>Thank you! 🎉</h2>
-    <p>We've received everything. This is what happens now:</p>
+    <h2 data-t>Thank you! 🎉</h2>
+    <p data-t>We've received everything. This is what happens now:</p>
     <ol class="next">
-      <li>We contact you on WhatsApp or by email, with any questions about your answers.</li>
-      <li>We set up your assistant with your own prices, times and texts, and send you a test number. You and your team try it with your own tricky questions.</li>
-      <li>We connect your WhatsApp, Instagram or Messenger together with you.</li>
-      <li>Your assistant only goes live when you say go. You follow everything in your zone and can switch it off at any time.</li>
+      <li data-t>We contact you on WhatsApp or by email, with any questions about your answers.</li>
+      <li data-t>We set up your assistant with your own prices, times and texts, and send you a test number. You and your team try it with your own tricky questions.</li>
+      <li data-t>We connect your WhatsApp, Instagram or Messenger together with you.</li>
+      <li data-t>Your assistant only goes live when you say go. You follow everything in your zone and can switch it off at any time.</li>
     </ol>
-    <p class="why">Questions? WhatsApp Jonas on <a href="https://wa.me/32456953907">+32 456 95 39 07</a> or email <a href="mailto:info@talay.io">info@talay.io</a>.</p>
+    <p class="why" data-t>Questions? WhatsApp Jonas on <a href="https://wa.me/32456953907">+32 456 95 39 07</a> or email <a href="mailto:info@talay.io">info@talay.io</a>.</p>
   </section>
 </main>
 <footer class="wrap">
-  <span>Questions? <a href="https://wa.me/32456953907" target="_blank" rel="noopener">WhatsApp Jonas</a> · <a href="mailto:info@talay.io">info@talay.io</a></span>
+  <span data-t>Questions? <a href="https://wa.me/32456953907" target="_blank" rel="noopener">WhatsApp Jonas</a> · <a href="mailto:info@talay.io">info@talay.io</a></span>
   <span><a href="/privacy/">Privacy</a> · <a href="https://talay.io">talay.io</a></span>
 </footer>
 
+<script src="/start/i18n.js"></script>
 <script>
 const TURNSTILE_SITEKEY = "0x4AAAAAAFXZnn0VWocS_nWR";  // Cloudflare Turnstile site key (public, same as the homepage)
 const STORE = "talay-intake-v1";
@@ -319,37 +322,61 @@ const PRODUCTS = [
   { code: "DDS", name: "Deep Diving Specialty", dur: "2 days", age: "15", pre: "Advanced Open Water" },
 ];
 
+// Language of the form: ?l=xx, then the choice saved on the homepage (talay-lang), then the browser.
+// Only the text people see is translated: the answers keep their English values, so Airtable gets the same data.
+const LANGS = [["en", "English"], ["es", "Español"], ["fr", "Français"], ["de", "Deutsch"], ["nl", "Nederlands"], ["th", "ไทย"]];
+const I18N = window.TALAY_START_I18N || {};
+const LANG = (() => {
+  const ok = l => LANGS.some(x => x[0] === l);
+  const q = (location.search.match(/[?&]l=([a-z]{2})/) || [])[1];
+  if (ok(q)) { try { localStorage.setItem("talay-lang", q); } catch {} return q; }
+  try { const s = localStorage.getItem("talay-lang"); if (ok(s)) return s; } catch {}
+  return (navigator.languages || [navigator.language]).map(x => String(x).slice(0, 2).toLowerCase()).find(ok) || "en";
+})();
+const TR = I18N[LANG] || {};
+const L = (s, v) => { let x = TR[s] || s; if (v) x = x.replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m); return x; };
+document.documentElement.lang = LANG;
+document.title = L(document.title);
+document.querySelectorAll("[data-t]").forEach(el => { const k = el.innerHTML.trim(); if (TR[k]) el.innerHTML = TR[k]; });
+{ const m = document.querySelector('meta[name="description"]'); if (m) m.content = L(m.content); }
+{
+  const sel = document.getElementById("lang");
+  sel.innerHTML = LANGS.map(([c, n]) => `<option value="${c}"${c === LANG ? " selected" : ""}>${n}</option>`).join("");
+  sel.setAttribute("aria-label", L("Language"));
+  sel.onchange = () => { try { localStorage.setItem("talay-lang", sel.value); } catch {} location.search = "?l=" + sel.value; };
+}
+
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const showAttr = f => f.show ? ` data-show="${esc(f.show[0])}" data-show-v="${esc(f.show[1])}"` : "";
 
 function fieldHtml(f, prefix = "") {
-  if (f.sub) return `<h3 class="sub"${showAttr(f)}>${esc(f.sub)}</h3>`;
+  if (f.sub) return `<h3 class="sub"${showAttr(f)}>${esc(L(f.sub))}</h3>`;
   const name = prefix + f.k, id = "q-" + name, t = f.type || "text";
   const req = f.req ? ' <span class="req">*</span>' : "";
-  const help = f.help ? `<span class="help">${esc(f.help)}</span>` : "";
-  const ph = f.ph ? ` placeholder="${esc(f.ph)}"` : "";
+  const help = f.help ? `<span class="help">${esc(L(f.help))}</span>` : "";
+  const ph = f.ph ? ` placeholder="${esc(L(f.ph))}"` : "";
   if (t === "one" || t === "many") {
     const it = t === "one" ? "radio" : "checkbox";
-    const opts = f.opts.map(o => `<label><input type="${it}" name="${name}" value="${esc(o)}"${f.req ? " data-req" : ""}> ${esc(o)}</label>`).join("");
-    return `<div class="f" data-group="${name}"${showAttr(f)}><span class="lbl">${esc(f.label)}${req}${help}</span><div class="opts">${opts}</div></div>`;
+    const opts = f.opts.map(o => `<label><input type="${it}" name="${name}" value="${esc(o)}"${f.req ? " data-req" : ""}> ${esc(L(o))}</label>`).join("");
+    return `<div class="f" data-group="${name}"${showAttr(f)}><span class="lbl">${esc(L(f.label))}${req}${help}</span><div class="opts">${opts}</div></div>`;
   }
-  if (t === "area") return `<div class="f"${showAttr(f)}><label for="${id}">${esc(f.label)}${req}${help}</label><textarea id="${id}" name="${name}"${ph}${f.req ? " required" : ""}></textarea></div>`;
-  return `<div class="f"${showAttr(f)}><label for="${id}">${esc(f.label)}${req}${help}</label><input id="${id}" name="${name}" type="${t}"${ph}${f.req ? " required" : ""}${t === "number" ? ' inputmode="decimal" min="0"' : ""}></div>`;
+  if (t === "area") return `<div class="f"${showAttr(f)}><label for="${id}">${esc(L(f.label))}${req}${help}</label><textarea id="${id}" name="${name}"${ph}${f.req ? " required" : ""}></textarea></div>`;
+  return `<div class="f"${showAttr(f)}><label for="${id}">${esc(L(f.label))}${req}${help}</label><input id="${id}" name="${name}" type="${t}"${ph}${f.req ? " required" : ""}${t === "number" ? ' inputmode="decimal" min="0"' : ""}></div>`;
 }
 
 function productHtml(p) {
   const pre = "p_" + p.code + "_";
   return `<div class="prod" data-code="${p.code}">
-    <div class="top"><b>${esc(p.name)}</b>
-      <div class="opts"><label><input type="checkbox" name="${pre}offer" value="yes" checked> We offer this</label><label><input type="checkbox" name="${pre}online" value="yes" checked> Bookable online</label></div></div>
+    <div class="top"><b>${esc(L(p.name))}</b>
+      <div class="opts"><label><input type="checkbox" name="${pre}offer" value="yes" checked> ${esc(L("We offer this"))}</label><label><input type="checkbox" name="${pre}online" value="yes" checked> ${esc(L("Bookable online"))}</label></div></div>
     <div class="body"><div class="grid2">
       ${fieldHtml({ k: "price", label: "Price (THB)", type: "number", ph: "e.g. 11000" }, pre)}
-      ${fieldHtml({ k: "name", label: "Name you use", ph: p.name }, pre)}
-      ${fieldHtml({ k: "duration", label: "Duration", ph: p.dur }, pre)}
+      ${fieldHtml({ k: "name", label: "Name you use", ph: L(p.name) }, pre)}
+      ${fieldHtml({ k: "duration", label: "Duration", ph: L(p.dur) }, pre)}
       ${fieldHtml({ k: "checkin", label: "Check-in time", ph: "e.g. 8:00" }, pre)}
       ${fieldHtml({ k: "min_age", label: "Minimum age", type: "number", ph: p.age }, pre)}
-      ${fieldHtml({ k: "requirements", label: "Who can join?", ph: p.pre || "no experience needed" }, pre)}
+      ${fieldHtml({ k: "requirements", label: "Who can join?", ph: L(p.pre || "no experience needed") }, pre)}
     </div>
     ${fieldHtml({ k: "included", label: "What's included", ph: "e.g. all gear, dive computer, certification, learning materials" }, pre)}
     ${fieldHtml({ k: "not_included", label: "Not included", ph: "e.g. meals, marine park fee 200 THB" }, pre)}</div>
@@ -358,18 +385,18 @@ function productHtml(p) {
 
 const STEPS = SECTIONS.length;
 $("#sections").innerHTML = SECTIONS.map((s, i) => `<section class="step" id="s-${s.id}" data-step="${i}" hidden>
-  <p class="kicker">Step ${i + 1} of ${STEPS}</p><h2>${esc(s.title)}</h2><p class="why">${esc(s.why)}</p>
+  <p class="kicker">${esc(L("Step {n} of {total}", { n: i + 1, total: STEPS }))}</p><h2>${esc(L(s.title))}</h2><p class="why">${esc(L(s.why))}</p>
   ${s.products ? PRODUCTS.map(productHtml).join("") + fieldHtml({ k: "price_notes", label: "Anything else about prices?", type: "area", ph: "e.g. prices go up 10% from 1 December" }) : ""}
-  ${s.review ? `<h3 class="sub">Your answers</h3><ul class="review" id="review"></ul>` : ""}
+  ${s.review ? `<h3 class="sub">${esc(L("Your answers"))}</h3><ul class="review" id="review"></ul>` : ""}
   ${(s.fields || []).map(f => fieldHtml(f)).join("")}
-  ${s.review ? `<div class="f" id="ts"></div><p class="why">After sending, we set everything up and you test it first. Nothing goes live until you say go.</p>` : ""}
+  ${s.review ? `<div class="f" id="ts"></div><p class="why">${esc(L("After sending, we set everything up and you test it first. Nothing goes live until you say go."))}</p>` : ""}
   <div class="navbtns">
-    ${i > 0 ? `<button type="button" class="btn ghost" data-go="${i - 1}">← Back</button>` : "<span></span>"}
-    ${s.review ? `<button class="btn" id="submit" type="submit">Send to Talay</button>` : `<button type="button" class="btn" data-go="${i + 1}">Next: ${esc(SECTIONS[i + 1].title)} →</button>`}
+    ${i > 0 ? `<button type="button" class="btn ghost" data-go="${i - 1}">← ${esc(L("Back"))}</button>` : "<span></span>"}
+    ${s.review ? `<button class="btn" id="submit" type="submit">${esc(L("Send to Talay"))}</button>` : `<button type="button" class="btn" data-go="${i + 1}">${esc(L("Next: {step}", { step: L(SECTIONS[i + 1].title) }))} →</button>`}
   </div>
 </section>`).join("");
 
-$("#stepnav").innerHTML = SECTIONS.map((s, i) => `<li><button type="button" data-go="${i}"><span class="dot">${i + 1}</span><span class="label">${esc(s.title)}<span class="meta" id="meta-${i}"></span></span></button></li>`).join("");
+$("#stepnav").innerHTML = SECTIONS.map((s, i) => `<li><button type="button" data-go="${i}"><span class="dot">${i + 1}</span><span class="label">${esc(L(s.title))}<span class="meta" id="meta-${i}"></span></span></button></li>`).join("");
 
 const form = $("#intake");
 
@@ -437,11 +464,11 @@ function refresh(d = collect()) {
     btn.classList.toggle("miss", !!st.missing.length && touched.has(i) && i !== current);
     const dot = btn.querySelector(".dot");
     dot.textContent = complete && i !== current ? "✓" : String(i + 1);
-    $("#meta-" + i).textContent = s.products ? "" : st.missing.length && touched.has(i) ? st.missing.length + " required left" : st.total ? st.answered + " of " + st.total + " answered" : "";
+    $("#meta-" + i).textContent = s.products ? "" : st.missing.length && touched.has(i) ? L("{n} required left", { n: st.missing.length }) : st.total ? L("{a} of {t} answered", { a: st.answered, t: st.total }) : "";
   });
   const pct = Math.round(done / all * 100);
   $("#fill").style.width = pct + "%";
-  $("#progress").textContent = pct + "% done";
+  $("#progress").textContent = L("{n}% done", { n: pct });
   if (SECTIONS[current].review) renderReview(d);
 }
 
@@ -450,10 +477,10 @@ function renderReview(d) {
     if (s.review) return "";
     const st = stepState(i, d);
     const priced = PRODUCTS.filter(p => (d["p_" + p.code + "_offer"] || []).length && d["p_" + p.code + "_price"]).length;
-    const txt = st.missing.length ? `<span class="st bad">${st.missing.length} required missing</span>`
-      : s.products ? `<span class="st${priced ? " ok" : ""}">${priced ? priced + " with a price" : "no prices yet"}</span>`
-      : `<span class="st${st.answered ? " ok" : ""}">${st.answered} of ${st.total} answered</span>`;
-    return `<li><span>${i + 1}. ${esc(s.title)}</span><span>${txt} · <button type="button" data-go="${i}">Edit</button></span></li>`;
+    const txt = st.missing.length ? `<span class="st bad">${esc(L("{n} required missing", { n: st.missing.length }))}</span>`
+      : s.products ? `<span class="st${priced ? " ok" : ""}">${esc(priced ? L("{n} with a price", { n: priced }) : L("no prices yet"))}</span>`
+      : `<span class="st${st.answered ? " ok" : ""}">${esc(L("{a} of {t} answered", { a: st.answered, t: st.total }))}</span>`;
+    return `<li><span>${i + 1}. ${esc(L(s.title))}</span><span>${txt} · <button type="button" data-go="${i}">${esc(L("Edit"))}</button></span></li>`;
   }).join("");
 }
 
@@ -485,14 +512,14 @@ form.addEventListener("input", () => {
       const ok = el.classList.contains("opts") ? !!el.querySelector("input:checked") : !!el.value.trim();
       if (ok) el.setAttribute("aria-invalid", "false");
     });
-    try { localStorage.setItem(STORE, JSON.stringify(d)); $("#saved").textContent = "Saved on this device at " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + "."; } catch {}
+    try { localStorage.setItem(STORE, JSON.stringify(d)); $("#saved").textContent = L("Saved on this device at {t}.", { t: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }); } catch {}
   }, 300);
 });
 form.addEventListener("change", () => applyShow(collect()));
 let startStep = 0;
 try {
   const old = JSON.parse(localStorage.getItem(STORE) || "null");
-  if (old) { restore(old); $("#saved").textContent = "We restored the answers you saved on this device."; }
+  if (old) { restore(old); $("#saved").textContent = L("We restored the answers you saved on this device."); }
   startStep = Math.min(STEPS - 1, Math.max(0, parseInt(localStorage.getItem(STORE + "-step") || "0", 10) || 0));
 } catch {}
 go(startStep, false);
@@ -546,17 +573,18 @@ form.addEventListener("submit", async e => {
   if (bad) {
     const step = Number(bad.closest("section.step").dataset.step);
     if (step !== current) go(step);
-    status.textContent = "A few required answers are missing or not valid (marked in red).";
+    status.textContent = L("A few required answers are missing or not valid (marked in red).");
     refresh();
     setTimeout(() => { bad.scrollIntoView({ behavior: "smooth", block: "center" }); bad.focus({ preventScroll: true }); }, 50);
     return;
   }
-  button.disabled = true; button.textContent = "Sending…";
+  button.disabled = true; button.textContent = L("Sending…");
   const answers = collect();
+  answers.form_language = LANG; // the language the centre filled the form in (answers stay English)
   const body = { answers, website: form.website_hp.value, form_version: FORM_VERSION };
   if (TURNSTILE_SITEKEY) {
     body.turnstile = await getToken();
-    if (!body.turnstile) { status.textContent = "Complete the security check above the button, then send again."; button.disabled = false; button.textContent = "Send to Talay"; return; }
+    if (!body.turnstile) { status.textContent = L("Complete the security check above the button, then send again."); button.disabled = false; button.textContent = L("Send to Talay"); return; }
   }
   try {
     const res = await fetch("/api/intake", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -565,10 +593,10 @@ form.addEventListener("submit", async e => {
     try { localStorage.removeItem(STORE); localStorage.removeItem(STORE + "-step"); } catch {}
     form.hidden = true; $("#done").hidden = false; window.scrollTo({ top: 0, behavior: "smooth" });
   } catch (err) {
-    status.textContent = String(err.message) === "rate" ? "Too many attempts from this connection. Try again in an hour, or WhatsApp us."
-      : "Your answers did not go through. They're still saved here: send again, or WhatsApp us.";
+    status.textContent = String(err.message) === "rate" ? L("Too many attempts from this connection. Try again in an hour, or WhatsApp us.")
+      : L("Your answers did not go through. They're still saved here: send again, or WhatsApp us.");
     if (TURNSTILE_SITEKEY && window.turnstile && tsWidget !== null) window.turnstile.reset(tsWidget);
-    button.disabled = false; button.textContent = "Send to Talay";
+    button.disabled = false; button.textContent = L("Send to Talay");
   }
 });
 </script>
