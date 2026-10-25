@@ -20,7 +20,7 @@
 //            Handover at, Human took over, Human took over at, Opted out
 //   Centers: Slug, Name, Assistant name, Staff emails, Logo
 
-import { teamFor, whatsappTeam, template } from "./notify.js";
+import { teamFor, whatsappTeam, template, WORDS } from "./notify.js";
 
 const WINDOW_H = 24; // WhatsApp customer service window
 const splitEmails = (v) => String(v || "").toLowerCase().split(/[\s,;]+/).filter(Boolean);
@@ -2591,7 +2591,9 @@ async function teamEscalations(env, alerts, at0) {
     const name = String(first(r.fields["Name"]) || a.center);
     const people = await teamFor(env, name, "Escalation");
     const link = `?center=${encodeURIComponent(a.slug)}&c=${encodeURIComponent(a.id)}`;
-    await whatsappTeam(env, people, template("talay_still_waiting", [name, a.name, ALERT_HANDOVER_MIN, a.question || "(see the chat)"], link));
+    const who = a.name === "Een duiker" ? "" : a.name;
+    await whatsappTeam(env, people, (l) => template("talay_still_waiting",
+      [name, who || WORDS[l].diver, ALERT_HANDOVER_MIN, a.question || WORDS[l].seeChat], link, l));
   }
 }
 
@@ -2617,14 +2619,16 @@ async function morningSummaries(env, at0) {
       .reduce((a, b) => a + (Number(first(b.fields["Group size"])) || 1), 0);
     const waiting = open2.needsCount || 0;
     if (!night.conversations && !night.bookings && !waiting && !onBoat) continue;
-    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-    await whatsappTeam(env, people, template("talay_morning", [
-      center.name,
-      night.conversations,
-      night.bookings ? `${night.bookings} (${Math.round(night.revenue).toLocaleString("en-US")} THB)` : "none",
-      waiting ? plural(waiting, "diver", "divers") : "nobody",
-      onBoat ? plural(onBoat, "diver", "divers") : "no bookings via Talay",
-    ]));
+    await whatsappTeam(env, people, (l) => {
+      const w = WORDS[l], divers = (n) => `${n} ${n === 1 ? w.one : w.many}`;
+      return template("talay_morning", [
+        center.name,
+        night.conversations,
+        night.bookings ? `${night.bookings} (${Math.round(night.revenue).toLocaleString("en-US")} THB)` : w.none,
+        waiting ? divers(waiting) : w.nobody,
+        onBoat ? divers(onBoat) : w.noBoat,
+      ], "", l);
+    });
   }
 }
 // "Stuur een testmelding" on the Systeem page: the last 24 hours, demo and test included.
