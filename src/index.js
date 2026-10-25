@@ -9,7 +9,7 @@
 //   Products: "Name FR", "Duration FR", "Included FR", "Check-in FR" (also DE, ES, NL)
 //   Centers:  "Meeting point FR" (also DE, ES, NL)
 
-import { handleZone, runHqAlerts, handlePush, handleWeekly } from "./zone.js"; // customer zone for dive centers: talay.io/zone (+ alerts for Talay HQ)
+import { handleZone, runHqAlerts, runOutreachSync, handlePush, handleWeekly } from "./zone.js"; // customer zone for dive centers: talay.io/zone (+ alerts for Talay HQ)
 import { handleDemo } from "./demo.js"; // demo requests from the homepage form: talay.io/api/demo
 import { handleIntake } from "./intake.js"; // onboarding form for a new centre: talay.io/start -> talay.io/api/intake
 import { handleNotify } from "./notify.js"; // WhatsApp and push to dive center staff, called by Make: talay.io/api/notify
@@ -372,9 +372,10 @@ function tr(rec, field, lang) {
 // ---------- Router ----------
 
 export default {
-  // Cloudflare cron (wrangler.jsonc → triggers): alerts for Talay HQ, every 15 minutes.
+  // Cloudflare cron (wrangler.jsonc → triggers): alerts for Talay HQ and the mail campaign sync, every 15 minutes.
   async scheduled(event, env, ctx) {
     ctx.waitUntil(runHqAlerts(env, event.scheduledTime).catch((e) => console.error("hq alerts", e)));
+    ctx.waitUntil(runOutreachSync(env).catch((e) => console.error("outreach sync", e))); // mailcampagne: Instantly → Airtable Outreach
   },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
