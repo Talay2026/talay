@@ -4700,8 +4700,14 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .btable.bday .tname small.ref{display:block;font-size:12px;color:var(--muted);font-weight:500}
 .btable.bday a.tel{font-weight:500;text-decoration:none}
 .btable.bday a.tel:hover{text-decoration:underline}
-.btable td.tlinks a{color:#2E6F80;font-weight:600;text-decoration:none;white-space:nowrap}
-.btable td.tlinks a:hover{text-decoration:underline}
+.btable td.tlinks{text-align:right;white-space:nowrap}
+.btable td.tlinks a{display:inline-block;margin-left:6px;padding:4px 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--deep);font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap}
+.btable td.tlinks a:hover{background:var(--paper);border-color:#D9CFBD}
+.btable td.tlinks .st{font-size:12.5px;color:var(--muted)}
+/* The numbers at the top of each page: centred */
+.cards .cardn,.kpis .kpi{text-align:center}
+.minis.strip .mini{justify-content:center;text-align:center}
+@media (max-width:760px){.btable td.tlinks a{margin:0 6px 0 0}}
 @media (max-width:760px){#books .btable.bday tr.grp{background:none;border:0;padding:12px 2px 4px;margin:0}#books .btable.bday tr.grp td{background:none;padding:0;justify-content:flex-start;text-align:left}#books .btable.bday .tname{flex-direction:column;align-items:flex-start;gap:0}}
 .minis.strip{gap:0;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
 .minis.strip .mini{background:none;border:0;border-radius:0;box-shadow:none;padding:14px 20px}
@@ -5393,7 +5399,7 @@ function zoneClient(cfg) {
             var wa = b.phone ? '<a class="tel" href="https://wa.me/' + esc(b.phone.replace(/[^0-9]/g, "")) + '" target="_blank" rel="noopener">' + esc(b.phone) + "</a>" : "";
             return '<tr class="' + (isCx(b) ? "cx" : "") + '"><td data-l="' + tr("Name") + '" class="tname">' + esc(b.name) + '<small class="ref">' + esc(b.ref) + '</small></td><td data-l="' + tr("Phone") + '">' + wa + '</td><td class="num" data-l="' + tr("Divers") + '">' + b.divers +
               '</td><td class="num" data-l="' + tr("Paid online") + '">' + thb(b.deposit) + '</td><td class="num" data-l="' + tr("At the shop") + '">' + (isCx(b) ? "–" : thb(b.balance)) + '</td><td class="keep" data-l="' + tr("Status") + '">' + stTag(b) +
-              (b.refunded ? "<br><small>" + tr("Refunded {x}", { x: thb(b.refunded) }) + "</small>" : "") + '</td><td class="keep noprint tlinks">' + links.join(" · ") + "</td></tr>";
+              (b.refunded ? "<br><small>" + tr("Refunded {x}", { x: thb(b.refunded) }) + "</small>" : "") + '</td><td class="keep noprint tlinks">' + links.join(" ") + "</td></tr>";
           }).join("");
       });
       html += "</tbody></table></div>";
@@ -5512,7 +5518,7 @@ function zoneClient(cfg) {
         else act.push('<span class="st">' + t("No chat linked") + "</span>");
         if (i.chat) act.push('<a href="#" data-uchat="' + k + '">' + t("Chat") + "</a>");
         return '<tr><td class="tname" data-l="' + t("Diver") + '">' + who + '</td><td data-l="' + t("Product") + '">' + esc(i.product) + '</td><td data-l="' + t("For") + '">' + esc(dayLabel(i.date)) + '</td><td class="num" data-l="' + t("Divers") + '">' + i.divers +
-          '</td><td class="num" data-l="' + t("Value") + '">' + thb(i.total) + '</td><td data-l="' + t("Left") + '">' + (ago(i.at) === t("now") ? t("just now") : t("{t} ago", { t: ago(i.at) })) + '</td><td class="keep noprint tlinks">' + act.join(" · ") + "</td></tr>";
+          '</td><td class="num" data-l="' + t("Value") + '">' + thb(i.total) + '</td><td data-l="' + t("Left") + '">' + (ago(i.at) === t("now") ? t("just now") : t("{t} ago", { t: ago(i.at) })) + '</td><td class="keep noprint tlinks">' + act.join(" ") + "</td></tr>";
       }).join("") + "</tbody></table></div>" +
       '<p style="color:var(--muted);font-size:13px">' + t("WhatsApp, Instagram and Messenger only allow a free message within 24 hours of the diver's last message, so older ones can't get a reminder from here.") + "</p>";
     function go(k, draft) {
@@ -5560,7 +5566,7 @@ function zoneClient(cfg) {
         if (i.chat) act.push('<a href="#" data-achat="' + k + '">' + t("Chat") + "</a>");
         else if (i.phone) act.push(esc(i.phone));
         return '<tr><td class="tname" data-l="' + t("Diver") + '">' + who + '</td><td data-l="' + t("When") + '">' + when + '</td><td data-l="' + t("Interested in") + '">' + esc(i.interested || "–") +
-          '</td><td data-l="' + t("Level") + '">' + esc(human(i.cert) || "–") + '</td><td class="num" data-l="' + t("Group") + '">' + esc(i.group || "1") + '</td><td class="keep noprint tlinks">' + act.join(" · ") + "</td></tr>";
+          '</td><td data-l="' + t("Level") + '">' + esc(human(i.cert) || "–") + '</td><td class="num" data-l="' + t("Group") + '">' + esc(i.group || "1") + '</td><td class="keep noprint tlinks">' + act.join(" ") + "</td></tr>";
       }).join("") + "</tbody></table></div>" +
       '<p style="color:var(--muted);font-size:13px">' + t("WhatsApp, Instagram and Messenger only allow a free message within 24 hours of the diver's last message. For the others, message them from your own app.") + "</p>";
     function go(k, draft) {
