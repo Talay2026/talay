@@ -2377,7 +2377,9 @@ async function adminPipelineAi(env, b) {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2026-10-21" },
       body: JSON.stringify({
-        model: "claude-opus-5-5", max_tokens: 4000, system: PROSPECT_PROMPT,
+        model: "claude-opus-5-5", max_tokens: 4000,
+        // Same prompt and schema for every centre: cached, so "Concepten klaarzetten" pays full price only once.
+        system: [{ type: "text", text: PROSPECT_PROMPT, cache_control: { type: "ephemeral" } }],
         output_config: { effort: "low", format: { type: "json_schema", schema: PROSPECT_SCHEMA } },
         messages: [{ role: "user", content: card.join("\n") }],
       }),
