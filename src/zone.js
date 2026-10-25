@@ -21,6 +21,7 @@
 //   Centers: Slug, Name, Assistant name, Staff emails, Logo
 
 import { teamFor, whatsappTeam, template, WORDS } from "./notify.js";
+import { ZONE_LANGS, ZONE_LOCALE, ZONE_TEXT, zoneLang, zoneT } from "./zone-i18n.js";
 
 const WINDOW_H = 24; // WhatsApp customer service window
 const splitEmails = (v) => String(v || "").toLowerCase().split(/[\s,;]+/).filter(Boolean);
@@ -62,7 +63,7 @@ export async function handleZone(request, env, ctx) {
     const center = centers.find((c) => c.slug === wanted) || centers[0];
 
     const p = url.pathname.replace(/\/+$/, "") || "/zone";
-    if (p === "/zone") return html(app(center, centers, email, superadmin));
+    if (p === "/zone") return html(app(center, centers, email, superadmin, zoneLang(request)));
     const fresh = url.searchParams.get("fresh") === "1";
     if (p === "/zone/api/conversations") {
       const view = url.searchParams.get("view") === "all" ? "all" : "open";
@@ -3816,7 +3817,8 @@ main{max-width:440px;text-align:center}a{color:#0A2029;font-weight:700}</style><
 <p><a href="/cdn-cgi/access/logout">Sign out</a></p></main></body></html>`;
 }
 
-function app(center, centers, email, superadmin = false) {
+function app(center, centers, email, superadmin = false, lang = "en") {
+  const T = zoneT(lang), A = esc(center.assistant);
   const switcher = centers.length > 1
     ? `<select id="center" aria-label="Dive center">${centers.map((c) =>
       `<option value="${esc(c.slug)}"${c.slug === center.slug ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select>` : "";
@@ -3826,9 +3828,10 @@ function app(center, centers, email, superadmin = false) {
   const cfg = {
     qs: centers.length > 1 ? `?center=${encodeURIComponent(center.slug)}` : "",
     assistant: center.assistant, center: center.name, email,
+    lang, locale: ZONE_LOCALE[lang] || "", tr: ZONE_TEXT[lang] || {},
   };
 
-  return `<!doctype html><html lang="en"><head>${HEAD}
+  return `<!doctype html><html lang="${lang}"><head>${HEAD}
 <title>${esc(center.name)} · Talay</title>
 <link rel="manifest" href="/zone/manifest.webmanifest?n=${encodeURIComponent(center.name)}" crossorigin="use-credentials">
 <link rel="apple-touch-icon" href="/zone/apple-touch-icon.png">
@@ -4519,12 +4522,12 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 @media (max-width:760px){.trow1,.trow2{grid-template-columns:1fr}.trow2 #tWeek{grid-column:auto}.tarr{grid-template-columns:1fr}}
 </style></head>
 <body>
-<header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>Customer zone</small></span></div><span class="sp"></span>${switcher}<div class="htools">${superadmin ? `<a href="/zone/admin" title="Talay HQ">Talay HQ</a>` : ""}<button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">Sign out</span></a></div></header>
-<nav><button class="on" data-v="today"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></i><span class="nl">Today</span></button><button data-v="convos"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg></i><span class="nl"><span class="long">Conversations</span><span class="short">Chats</span></span><span class="count" id="count" hidden></span></button><button data-v="books"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></i><span class="nl">Bookings</span></button><button data-v="dash"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></i><span class="nl">Dashboard</span></button><button data-v="sett"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></i><span class="nl">Settings</span></button><button data-v="supp"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg></i><span class="nl">Support</span><span class="count" id="tcount" hidden></span></button></nav>
+<header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>${T("Customer zone")}</small></span></div><span class="sp"></span>${switcher}<div class="htools">${superadmin ? `<a href="/zone/admin" title="Talay HQ">Talay HQ</a>` : ""}<button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">${T("Sign out")}</span></a></div></header>
+<nav><button class="on" data-v="today"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></i><span class="nl">${T("Today")}</span></button><button data-v="convos"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg></i><span class="nl"><span class="long">${T("Conversations")}</span><span class="short">${T("Chats")}</span></span><span class="count" id="count" hidden></span></button><button data-v="books"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></i><span class="nl">${T("Bookings")}</span></button><button data-v="dash"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></i><span class="nl">${T("Dashboard")}</span></button><button data-v="sett"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></i><span class="nl">${T("Settings")}</span></button><button data-v="supp"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg></i><span class="nl">${T("Support")}</span><span class="count" id="tcount" hidden></span></button></nav>
 
 <section id="today" class="view on">
   <div class="twrap">
-    <div class="thead"><div><h1 id="tGreet">Today</h1><p id="tDate"></p></div></div>
+    <div class="thead"><div><h1 id="tGreet">${T("Today")}</h1><p id="tDate"></p></div></div>
     <div class="trow1">
       <div class="tcard" id="tNeed"><div class="skel"><i></i></div></div>
       <div class="night big" id="nightToday"><div class="skel"><i></i></div></div>
@@ -4541,32 +4544,32 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 <section id="convos" class="view">
   <div class="list">
     <div class="tools">
-      <input id="search" type="search" placeholder="Search name or message" aria-label="Search">
+      <input id="search" type="search" placeholder="${T("Search name or message")}" aria-label="${T("Search")}">
       <div class="chips" role="tablist">
-        <button class="chip on" data-f="open">Open</button>
-        <button class="chip" data-f="need">Needs you</button>
-        <button class="chip" data-f="booked">Booked</button>
-        <button class="chip" data-f="all">All (30 days)</button>
+        <button class="chip on" data-f="open">${T("Open")}</button>
+        <button class="chip" data-f="need">${T("Needs you")}</button>
+        <button class="chip" data-f="booked">${T("Booked")}</button>
+        <button class="chip" data-f="all">${T("All (30 days)")}</button>
       </div>
     </div>
     <div class="ms small" id="msChat" hidden></div>
     <div class="items" id="list"><div class="skel list"><i></i><i></i><i></i><i></i></div></div>
   </div>
-  <div class="pane" id="pane"><div class="placeholder">Pick a conversation.<br><br><b>Open</b> shows every diver who wrote in the last 24 hours: WhatsApp, Instagram and Messenger only let you reply freely within that window. <b>Needs you</b> means ${esc(center.assistant)} handed it over to your team.</div></div>
+  <div class="pane" id="pane"><div class="placeholder">${T("Pick a conversation.")}<br><br>${T("<b>Open</b> shows every diver who wrote in the last 24 hours: WhatsApp, Instagram and Messenger only let you reply freely within that window. <b>Needs you</b> means {a} handed it over to your team.", { a: A })}</div></div>
 </section>
 
 <section id="books" class="view">
   <div class="bwrap">
     <div class="btools">
-      <button class="chip on" data-r="today">Today</button>
-      <button class="chip" data-r="tomorrow">Tomorrow</button>
-      <button class="chip" data-r="next">Next 30 days</button>
-      <button class="chip" data-r="past">Past 30 days</button>
-      <button class="chip" data-r="calendar">Calendar</button>
-      <button class="chip" data-r="unfinished">Not paid yet<span class="count" id="ucount" hidden></span></button>
-      <button class="chip" data-r="arriving">Arriving soon<span class="count" id="acount" hidden></span></button>
+      <button class="chip on" data-r="today">${T("Today")}</button>
+      <button class="chip" data-r="tomorrow">${T("Tomorrow")}</button>
+      <button class="chip" data-r="next">${T("Next 30 days")}</button>
+      <button class="chip" data-r="past">${T("Past 30 days")}</button>
+      <button class="chip" data-r="calendar">${T("Calendar")}</button>
+      <button class="chip" data-r="unfinished">${T("Not paid yet")}<span class="count" id="ucount" hidden></span></button>
+      <button class="chip" data-r="arriving">${T("Arriving soon")}<span class="count" id="acount" hidden></span></button>
       <span class="sp"></span>
-      <button class="ghost" id="print" type="button">Print list</button>
+      <button class="ghost" id="print" type="button">${T("Print list")}</button>
     </div>
     <div id="bcards" class="cards"></div>
     <div id="blist"><div class="skel"><i></i><i></i><i></i></div></div>
@@ -4577,49 +4580,54 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
   <div class="swrap">
     <div class="scard">
       <h3>${esc(center.assistant)}</h3>
-      <p class="d">Pause ${esc(center.assistant)} for the whole dive center, for example during a storm or a holiday. While paused she doesn't answer anyone: your team answers every diver under <b>Conversations → Open</b>.</p>
+      <p class="d">${T("Pause {a} for the whole dive center, for example during a storm or a holiday. While paused she doesn't answer anyone: your team answers every diver under <b>Conversations → Open</b>.", { a: A })}</p>
       <div class="switch"><span class="pill" id="miaState">…</span><button class="ghost" id="miaToggle" type="button">…</button></div>
       <div class="smsg" id="miaMsg"></div>
     </div>
     <div class="scard">
-      <h3>Notifications on this device</h3>
-      <p class="d">Get a notification as soon as ${esc(center.assistant)} hands a conversation to your team, even when the zone is closed. Turn it on separately on every phone or computer. On an iPhone, first add the zone to your home screen (Share → Add to Home Screen) and open it from there.</p>
-      <div class="switch"><span class="pill" id="pushState">…</span><button class="btn" id="pushOn" type="button">Turn on notifications</button><button class="ghost" id="pushTest" type="button" hidden>Send a test</button><button class="ghost" id="pushOff" type="button" hidden>Turn off</button></div>
+      <h3>${T("Notifications on this device")}</h3>
+      <p class="d">${T("Get a notification as soon as {a} hands a conversation to your team, even when the zone is closed. Turn it on separately on every phone or computer. On an iPhone, first add the zone to your home screen (Share → Add to Home Screen) and open it from there.", { a: A })}</p>
+      <div class="switch"><span class="pill" id="pushState">…</span><button class="btn" id="pushOn" type="button">${T("Turn on notifications")}</button><button class="ghost" id="pushTest" type="button" hidden>${T("Send a test")}</button><button class="ghost" id="pushOff" type="button" hidden>${T("Turn off")}</button></div>
       <div class="smsg" id="pushMsg"></div>
     </div>
-    <div class="lock" id="adminNote" hidden>Only an admin of your dive center can change prices, office hours, the alert email and the team. You can still pause ${esc(center.assistant)}.</div>
+    <div class="lock" id="adminNote" hidden>${T("Only an admin of your dive center can change prices, office hours, the alert email and the team. You can still pause {a}.", { a: A })}</div>
     <div class="scard adm">
-      <h3>Products and prices</h3>
-      <p class="d">What divers pay and until when they can book online. The online deposit is your commission to Talay and follows the price automatically. Changes reach ${esc(center.assistant)} and the booking page within about two minutes.</p>
-      <div class="bscroll"><table class="ptable"><thead><tr><th>Product</th><th>Price (THB)</th><th>Deposit</th><th>Book until (day before)</th><th>Bookable online</th><th></th></tr></thead><tbody id="prods"></tbody></table></div>
+      <h3>${T("Products and prices")}</h3>
+      <p class="d">${T("What divers pay and until when they can book online. The online deposit is your commission to Talay and follows the price automatically. Changes reach {a} and the booking page within about two minutes.", { a: A })}</p>
+      <div class="bscroll"><table class="ptable"><thead><tr><th>${T("Product")}</th><th>${T("Price (THB)")}</th><th>${T("Deposit")}</th><th>${T("Book until (day before)")}</th><th>${T("Bookable online")}</th><th></th></tr></thead><tbody id="prods"></tbody></table></div>
       <div class="smsg" id="pMsg"></div>
     </div>
     <div class="scard adm">
-      <h3>Office hours</h3>
-      <p class="d">When your team answers personally (Thai time, every day).</p>
-      <div class="srow"><label>From <input type="time" id="hFrom" step="900"></label><label>to <input type="time" id="hTo" step="900"></label><button class="btn" id="hSave" type="button">Save</button></div>
+      <h3>${T("Office hours")}</h3>
+      <p class="d">${T("When your team answers personally (Thai time, every day).")}</p>
+      <div class="srow"><label>${T("From")} <input type="time" id="hFrom" step="900"></label><label>${T("to")} <input type="time" id="hTo" step="900"></label><button class="btn" id="hSave" type="button">${T("Save")}</button></div>
       <div class="smsg" id="hMsg"></div>
-      <p class="d">Prefer to answer divers yourselves during the day? Then ${esc(center.assistant)} only answers outside these hours. During office hours she stays silent and every message waits for your team under <b>Conversations → Open</b>. Reminders follow the same rule.</p>
+      <p class="d">${T("Prefer to answer divers yourselves during the day? Then {a} only answers outside these hours. During office hours she stays silent and every message waits for your team under <b>Conversations → Open</b>. Reminders follow the same rule.", { a: A })}</p>
       <div class="switch"><span class="pill" id="modeState">…</span><button class="ghost" id="modeToggle" type="button">…</button></div>
       <div class="smsg" id="modeMsg"></div>
     </div>
     <div class="scard adm">
-      <h3>Alert email</h3>
-      <p class="d">Where handovers, large groups and reminders are sent. A shared inbox works best.</p>
-      <div class="srow"><input type="email" id="aEmail" placeholder="team@yourdivecenter.com"><button class="btn" id="aSave" type="button">Save</button></div>
+      <h3>${T("Alert email")}</h3>
+      <p class="d">${T("Where handovers, large groups and reminders are sent. A shared inbox works best.")}</p>
+      <div class="srow"><input type="email" id="aEmail" placeholder="team@yourdivecenter.com"><button class="btn" id="aSave" type="button">${T("Save")}</button></div>
       <div class="smsg" id="aMsg"></div>
     </div>
     <div class="scard adm">
-      <h3>Team</h3>
-      <p class="d">Everyone here can sign in at talay.io/zone with a code sent to their email.</p>
+      <h3>${T("Team")}</h3>
+      <p class="d">${T("Everyone here can sign in at talay.io/zone with a code sent to their email.")}</p>
       <ul class="people" id="team"></ul>
-      <div class="srow"><input type="email" id="tEmail" placeholder="colleague@email.com"><button class="btn" id="tAdd" type="button">Add</button></div>
+      <div class="srow"><input type="email" id="tEmail" placeholder="${T("colleague@email.com")}"><button class="btn" id="tAdd" type="button">${T("Add")}</button></div>
       <div class="smsg" id="tMsg"></div>
     </div>
     <div class="scard">
-      <h3>What ${esc(center.assistant)} knows about you</h3>
-      <p class="d">To change any of this, message Jonas at <a href="mailto:jonas@talay.io">jonas@talay.io</a>.</p>
+      <h3>${T("What {a} knows about you", { a: A })}</h3>
+      <p class="d">${T("To change any of this, message Jonas at {mail}.", { mail: '<a href="mailto:jonas@talay.io">jonas@talay.io</a>' })}</p>
       <dl class="info" id="info"></dl>
+    </div>
+    <div class="scard">
+      <h3>${T("Language")}</h3>
+      <p class="d">${T("The language of the zone on this device. Every colleague can choose their own. The messages to divers don't change: {a} always answers in the diver's language.", { a: A })}</p>
+      <div class="srow"><select id="zLang" aria-label="${T("Language")}">${ZONE_LANGS.map(([code, name]) => `<option value="${code}"${code === lang ? " selected" : ""}>${name}</option>`).join("")}</select></div>
     </div>
   </div>
 </section>
@@ -4627,10 +4635,10 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 <section id="supp" class="view">
   <div class="bwrap">
     <div class="btools">
-      <button class="chip on" data-t="open">Open</button>
-      <button class="chip" data-t="done">Done</button>
+      <button class="chip on" data-t="open">${T("Open")}</button>
+      <button class="chip" data-t="done">${T("Done")}</button>
       <span class="sp"></span>
-      <button class="btn" id="tNew" type="button">New ticket</button>
+      <button class="btn" id="tNew" type="button">${T("New ticket")}</button>
     </div>
     <div id="tbody"><div class="skel"><i></i><i></i><i></i></div></div>
   </div>
@@ -4639,10 +4647,10 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 <section id="dash" class="view">
   <div class="bwrap">
     <div class="btools">
-      <select id="period" aria-label="Period" class="psel"></select>
+      <select id="period" aria-label="${T("Period")}" class="psel"></select>
       <span class="sp"></span>
-      <button class="ghost" id="stPrint" type="button">Print statement</button>
-      <button class="ghost" id="stCsv" type="button">Download CSV</button>
+      <button class="ghost" id="stPrint" type="button">${T("Print statement")}</button>
+      <button class="ghost" id="stCsv" type="button">${T("Download CSV")}</button>
     </div>
     <div class="start" id="start" hidden></div>
     <div class="ms" id="ms" hidden></div>
@@ -4661,28 +4669,32 @@ function zoneClient(cfg) {
   var soundOn = true, audio = null;
   try { soundOn = localStorage.getItem("talay-sound") !== "off"; } catch (e) {}
   var $ = function (s) { return document.querySelector(s); };
+  // Zone language (Settings → Language): cfg.tr holds the translations, keyed by the English text.
+  var LOC = cfg.locale || [], NUM = cfg.locale || "en-US";
+  function t(s, v) { var x = (cfg.tr && cfg.tr[s]) || s; return v ? x.replace(/\{(\w+)\}/g, function (m, k) { return k in v ? v[k] : m; }) : x; }
+  function tn(n, one, many, v) { var o = v || {}; o.n = n; return t(n === 1 ? one : many, o); }
   function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function api(path, opt) {
     var sep = path.indexOf("?") > -1 ? "&" : "?";
     var extra = cfg.qs ? sep + cfg.qs.slice(1) : "";
     return fetch("/zone/api/" + path + extra, opt).then(function (r) {
       if (r.status === 401) { location.reload(); throw new Error("auth"); }
-      return r.json().then(function (j) { if (!r.ok || j.error) throw new Error(j.error || "Error"); return j; });
+      return r.json().then(function (j) { if (!r.ok || j.error) throw new Error(t(j.error || "Error")); return j; });
     });
   }
   function post(path, body) { return api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); }
-  function ago(iso) { var s = (Date.now() - Date.parse(iso)) / 1000; if (s < 60) return "now"; if (s < 3600) return Math.floor(s / 60) + " min"; if (s < 86400) return Math.floor(s / 3600) + " h"; return new Date(iso).toLocaleDateString([], { day: "numeric", month: "short" }); }
+  function ago(iso) { var s = (Date.now() - Date.parse(iso)) / 1000; if (s < 60) return t("now"); if (s < 3600) return t("{n} min", { n: Math.floor(s / 60) }); if (s < 86400) return t("{n} h", { n: Math.floor(s / 3600) }); return new Date(iso).toLocaleDateString(LOC, { day: "numeric", month: "short" }); }
   function left(iso) {
     if (!iso) return { t: "", soon: false };
     var h = (Date.parse(iso) - Date.now()) / 3600000;
-    if (h <= 0) return { t: "Reply window closed", soon: false };
-    if (h < 1) return { t: Math.max(1, Math.round(h * 60)) + " min left to reply", soon: true };
-    return { t: Math.floor(h) + " h left to reply", soon: h < 3 };
+    if (h <= 0) return { t: t("Reply window closed"), soon: false };
+    if (h < 1) return { t: t("{n} min left to reply", { n: Math.max(1, Math.round(h * 60)) }), soon: true };
+    return { t: t("{n} h left to reply", { n: Math.floor(h) }), soon: h < 3 };
   }
-  function clock(iso) { return new Date(iso).toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); }
+  function clock(iso) { return new Date(iso).toLocaleString(LOC, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); }
 
   // ---- sound + title badge
-  function setSoundLabel() { $("#sound").innerHTML = soundOn ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15L6 16ZM10 21h4"/></svg><span class="sl">Sound on</span>' : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 9.7-4.7M18 11v5l1.5 2H8M10 21h4M3 3l18 18"/></svg><span class="sl">Sound off</span>'; $("#sound").title = soundOn ? "Sound on" : "Sound off"; }
+  function setSoundLabel() { $("#sound").innerHTML = soundOn ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15L6 16ZM10 21h4"/></svg><span class="sl">' + t("Sound on") + '</span>' : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 9.7-4.7M18 11v5l1.5 2H8M10 21h4M3 3l18 18"/></svg><span class="sl">' + t("Sound off") + '</span>'; $("#sound").title = soundOn ? t("Sound on") : t("Sound off"); }
   setSoundLabel();
   $("#sound").onclick = function () { soundOn = !soundOn; try { localStorage.setItem("talay-sound", soundOn ? "on" : "off"); } catch (e) {} setSoundLabel(); if (soundOn) beep(); };
   document.addEventListener("click", function () { if (!audio && window.AudioContext) { try { audio = new AudioContext(); } catch (e) {} } }, { once: true });
@@ -4710,6 +4722,7 @@ function zoneClient(cfg) {
   }
 
   // ---- tabs
+  var zl = $("#zLang"); if (zl) zl.onchange = function () { document.cookie = "talay-zone-lang=" + zl.value + "; path=/zone; max-age=31536000; samesite=lax; secure"; location.reload(); };
   var sel = $("#center"); if (sel) sel.onchange = function () { location.href = "/zone?center=" + encodeURIComponent(sel.value); };
   document.querySelectorAll("nav button").forEach(function (b) {
     b.onclick = function () {
@@ -4755,23 +4768,23 @@ function zoneClient(cfg) {
     });
     var el = $("#list");
     if (!list.length) {
-      var msg = term ? "Nothing found for “" + esc(term) + "”."
-        : filter === "need" ? "Nothing waiting for your team. 🎉"
-        : filter === "open" ? "No open conversations right now. When a diver writes, it shows up here within a few seconds."
-        : "No conversations in this view yet.";
+      var msg = term ? t("Nothing found for “{q}”.", { q: esc(term) })
+        : filter === "need" ? t("Nothing waiting for your team. 🎉")
+        : filter === "open" ? t("No open conversations right now. When a diver writes, it shows up here within a few seconds.")
+        : t("No conversations in this view yet.");
       el.innerHTML = '<div class="empty">' + msg + "</div>"; return;
     }
     el.innerHTML = list.map(function (c) {
       var l = left(c.closesAt);
-      var who = c.previewDir === "Customer" ? "" : (c.previewDir === "Team" ? "You: " : cfg.assistant + ": ");
+      var who = c.previewDir === "Customer" ? "" : (c.previewDir === "Team" ? t("You") + ": " : cfg.assistant + ": ");
       return '<button class="item' + (c.id === current ? " on" : "") + '" data-id="' + esc(c.id) + '" data-close="' + esc(c.closesAt || "") + '">' +
         avatar(c.name, c.cc) + '<div class="ib">' +
         '<div class="top"><span class="nm">' + esc(dname(c.name)) + "</span>" +
         '<span class="tm">' + ago(c.lastAt) + "</span></div>" +
         ((c.needsYou || c.teamActive || /booked/i.test(c.status) || c.language) ? '<div class="tags">' +
-        (c.needsYou ? '<span class="tag need">Needs you</span>' : "") +
-        (c.teamActive ? '<span class="tag team">Team</span>' : "") +
-        (/booked/i.test(c.status) ? '<span class="tag st">Booked</span>' : "") +
+        (c.needsYou ? '<span class="tag need">' + t("Needs you") + "</span>" : "") +
+        (c.teamActive ? '<span class="tag team">' + t("Team") + "</span>" : "") +
+        (/booked/i.test(c.status) ? '<span class="tag st">' + t("Booked") + "</span>" : "") +
         (c.language ? '<span class="tag lang">' + esc(langName(c.language)) + "</span>" : "") + "</div>" : "") +
         '<div class="pv">' + esc(who + c.preview) + "</div>" +
         (l.t ? '<div class="left' + (l.soon ? " soon" : "") + '">' + l.t + "</div>" : "") + "</div></button>";
@@ -4810,40 +4823,40 @@ function zoneClient(cfg) {
       lastChat = key;
       var L = d.lead, l = left(d.closesAt);
       var actions = "";
-      if (d.hasLead && L.human) actions += '<button class="ghost" id="handback">Let ' + esc(cfg.assistant) + " take over</button>";
-      if (d.hasLead && d.needsYou && !L.human) actions += '<button class="ghost" id="handled">Mark as handled</button>';
-      var facts = fact("Channel", L.channel && L.channel !== "WhatsApp" ? L.channel : "") + fact("Language", L.language && langName(L.language)) + fact("Level", human(L.cert)) + fact("On the island", prettyDates(L.dates)) +
-        fact("Group", L.group) + fact("Interested in", /^rec[A-Za-z0-9]{14}$/.test(L.interested) ? "" : L.interested) + fact("Status", human(L.status)) + fact("WhatsApp", L.contact && L.name && L.contact !== L.name ? prettyPhone(L.contact) : "") +
-        (L.human ? "<span><b>Team is handling this.</b> " + esc(cfg.assistant) + " is paused for this diver.</span>" : "");
+      if (d.hasLead && L.human) actions += '<button class="ghost" id="handback">' + t("Let {a} take over", { a: esc(cfg.assistant) }) + "</button>";
+      if (d.hasLead && d.needsYou && !L.human) actions += '<button class="ghost" id="handled">' + t("Mark as handled") + "</button>";
+      var facts = fact(t("Channel"), L.channel && L.channel !== "WhatsApp" ? L.channel : "") + fact(t("Language"), L.language && langName(L.language)) + fact(t("Level"), human(L.cert)) + fact(t("On the island"), prettyDates(L.dates)) +
+        fact(t("Group"), L.group) + fact(t("Interested in"), /^rec[A-Za-z0-9]{14}$/.test(L.interested) ? "" : L.interested) + fact(t("Status"), human(L.status)) + fact("WhatsApp", L.contact && L.name && L.contact !== L.name ? prettyPhone(L.contact) : "") +
+        (L.human ? "<span>" + t("<b>Team is handling this.</b> {a} is paused for this diver.", { a: esc(cfg.assistant) }) + "</span>" : "");
 
       $("#pane").innerHTML =
         '<div class="head"><button class="back" aria-label="Back">‹</button>' + avatar(L.name || L.contact, d.cc) + '<div><b>' + esc(dname(L.name, L.contact)) + "</b>" +
         (l.t ? '<div class="sub">' + esc(l.t) + "</div>" : "") + "</div>" +
-        (d.needsYou ? '<span class="tag need">Needs you</span>' : "") +
-        ((d.bookings || []).filter(function (b) { return !/cancel|refund/i.test(b.status); }).length > 1 ? '<span class="tag ret">Returning diver</span>' : "") +
+        (d.needsYou ? '<span class="tag need">' + t("Needs you") + "</span>" : "") +
+        ((d.bookings || []).filter(function (b) { return !/cancel|refund/i.test(b.status); }).length > 1 ? '<span class="tag ret">' + t("Returning diver") + "</span>" : "") +
         '<div class="actions">' + actions + "</div></div>" +
         (facts ? '<div class="facts">' + facts + "</div>" : "") + bookingCard(d.bookings) +
         '<div class="msgs" id="msgs">' + (function () {
           var prevDay = "";
           return d.messages.map(function (m, idx) {
-            var who = m.dir === "Customer" ? "" : (m.dir === "Team" ? "Team" : cfg.assistant);
-            var dt = new Date(m.at), day = dt.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
+            var who = m.dir === "Customer" ? "" : (m.dir === "Team" ? t("Team") : cfg.assistant);
+            var dt = new Date(m.at), day = dt.toLocaleDateString(LOC, { weekday: "long", day: "numeric", month: "long" });
             var sep = day !== prevDay ? '<div class="day">' + esc(day) + "</div>" : ""; prevDay = day;
-            var rep = m.dir === "Mia" ? '<button class="rep" type="button" data-rep="' + idx + '" title="Report this answer to Talay">Report</button>' : "";
+            var rep = m.dir === "Mia" ? '<button class="rep" type="button" data-rep="' + idx + '" title="' + t("Report this answer to Talay") + '">' + t("Report") + "</button>" : "";
             return sep + '<div class="m ' + esc(m.dir) + '">' + (who ? '<span class="who">' + esc(who) + "</span>" : "") + esc(m.text) +
-              "<small>" + esc(dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })) + rep + "</small></div>";
+              "<small>" + esc(dt.toLocaleTimeString(LOC, { hour: "2-digit", minute: "2-digit" })) + rep + "</small></div>";
           }).join("");
         })() + "</div>" +
         (d.canReply
           ? '<div class="composer">' +
             '<div class="pchips" id="pchips" hidden></div>' +
-            '<div class="cbox"><textarea id="txt" placeholder="Reply on ' + esc((L && L.channel) || "WhatsApp") + '…" rows="1"></textarea>' +
+            '<div class="cbox"><textarea id="txt" placeholder="' + t("Reply on {ch}…", { ch: esc((L && L.channel) || "WhatsApp") }) + '" rows="1"></textarea>' +
             '<button class="send" id="send" aria-label="Send"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>' +
-            '<div class="cmeta"><label class="sig">Signed as <input id="sig" maxlength="30" placeholder="your name"></label>' +
-            '<select id="prod" aria-label="Booking link" hidden><option value="">+ Booking link…</option></select>' +
+            '<div class="cmeta"><label class="sig">' + t("Signed as") + ' <input id="sig" maxlength="30" placeholder="' + t("your name") + '"></label>' +
+            '<select id="prod" aria-label="' + t("Booking link") + '" hidden><option value="">' + t("+ Booking link…") + "</option></select>" +
             '<span class="sp"></span><span class="bt' + (l.soon ? " soon" : "") + '">' + esc(l.t) + "</span></div>" +
-            '<div class="note" id="note">⌘/Ctrl + Enter sends · replying pauses ' + esc(cfg.assistant) + " for this diver for 4 hours.</div></div>"
-          : '<div class="closed">More than 24 hours since the diver\'s last message, so WhatsApp, Instagram and Messenger no longer allow a free reply. Read only.</div>');
+            '<div class="note" id="note">' + t("⌘/Ctrl + Enter sends · replying pauses {a} for this diver for 4 hours.", { a: esc(cfg.assistant) }) + "</div></div>"
+          : '<div class="closed">' + t("More than 24 hours since the diver's last message, so WhatsApp, Instagram and Messenger no longer allow a free reply. Read only.") + "</div>");
 
       document.querySelectorAll("[data-rep]").forEach(function (b) {
         b.onclick = function () {
@@ -4852,8 +4865,8 @@ function zoneClient(cfg) {
           var q = before.length ? before[before.length - 1] : "";
           newTicket({
             type: "Wrong answer", contact: d.id,
-            title: "Wrong answer" + (q ? ": " + q.slice(0, 60) : ""),
-            context: (before.length ? "Diver:\n" + before.join("\n") + "\n\n" : "") + cfg.assistant + ":\n" + mia.text + "\n\n(" + clock(mia.at) + ", " + (L.name || L.contact || "diver") + ")",
+            title: t("Wrong answer") + (q ? ": " + q.slice(0, 60) : ""),
+            context: (before.length ? t("Diver") + ":\n" + before.join("\n") + "\n\n" : "") + cfg.assistant + ":\n" + mia.text + "\n\n(" + clock(mia.at) + ", " + (L.name || L.contact || t("Diver")) + ")",
           });
         };
       });
@@ -4864,15 +4877,15 @@ function zoneClient(cfg) {
       if ($("#handback")) $("#handback").onclick = function () { act("handback", this); };
       if ($("#handled")) $("#handled").onclick = function () { act("handled", this); };
       if (d.canReply) {
-        var t = $("#txt"), s = $("#sig");
-        t.value = draft;
-        if (pendingDraft) { t.value = pendingDraft; pendingDraft = null; t.focus(); }
+        var tx = $("#txt"), s = $("#sig");
+        tx.value = draft;
+        if (pendingDraft) { tx.value = pendingDraft; pendingDraft = null; tx.focus(); }
         try { s.value = localStorage.getItem("talay-sig") || ""; } catch (e) {}
         if (!s.value && cfg.email) { var nm = String(cfg.email).split("@")[0].split(/[._-]/)[0]; if (nm && !/^(info|team|hello|contact|admin|dive|office)$/i.test(nm)) s.value = nm.charAt(0).toUpperCase() + nm.slice(1); }
         s.oninput = function () { try { localStorage.setItem("talay-sig", s.value); } catch (e) {} };
-        t.onkeydown = function (e) { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send(); };
-        var grow = function () { t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 180) + "px"; };
-        t.addEventListener("input", grow); setTimeout(grow, 0);
+        tx.onkeydown = function (e) { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send(); };
+        var grow = function () { tx.style.height = "auto"; tx.style.height = Math.min(tx.scrollHeight, 180) + "px"; };
+        tx.addEventListener("input", grow); setTimeout(grow, 0);
         $("#send").onclick = send;
         loadProducts(id);
       }
@@ -4884,7 +4897,7 @@ function zoneClient(cfg) {
       var p = $("#prod"); if (!p || id !== current) return;
       d.products.forEach(function (x, i) {
         var o = document.createElement("option"); o.value = String(i);
-        o.textContent = x.name + (x.price ? " · " + x.price.toLocaleString("en-US") + " THB" : ""); p.appendChild(o);
+        o.textContent = x.name + (x.price ? " · " + x.price.toLocaleString(NUM) + " THB" : ""); p.appendChild(o);
       });
       p.onchange = function () {
         var x = d.products[Number(p.value)]; p.value = ""; if (!x) return;
@@ -4892,7 +4905,7 @@ function zoneClient(cfg) {
       };
       var pc = $("#pchips");
       if (pc && d.products.length) {
-        pc.innerHTML = '<span class="pcl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Send a booking link</span><div class="pscroll">' + d.products.map(function (x, i) { return '<button type="button" class="pchip" data-pi="' + i + '">' + esc(x.name) + "</button>"; }).join("") + "</div>";
+        pc.innerHTML = '<span class="pcl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>' + t("Send a booking link") + '</span><div class="pscroll">' + d.products.map(function (x, i) { return '<button type="button" class="pchip" data-pi="' + i + '">' + esc(x.name) + "</button>"; }).join("") + "</div>";
         pc.hidden = false;
         pc.querySelectorAll("[data-pi]").forEach(function (b) {
           b.onclick = function () { var x = d.products[Number(b.dataset.pi)]; var t = $("#txt"); t.value = (t.value.trim() ? t.value.trim() + "\n\n" : "") + x.text; t.focus(); };
@@ -4921,8 +4934,8 @@ function zoneClient(cfg) {
 
   // ---- bookings
   var bdata = null, brange = "today";
-  function thb(n) { return Math.round(n).toLocaleString("en-US") + " THB"; }
-  function dayLabel(iso) { return new Date(iso + "T12:00:00Z").toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" }); }
+  function thb(n) { return Math.round(n).toLocaleString(NUM) + " THB"; }
+  function dayLabel(iso) { return new Date(iso + "T12:00:00Z").toLocaleDateString(LOC, { weekday: "long", day: "numeric", month: "long" }); }
   function addDays(iso, n) { var d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
   document.querySelectorAll(".chip[data-r]").forEach(function (c) {
     c.onclick = function () {
@@ -4941,30 +4954,31 @@ function zoneClient(cfg) {
   function isCx(b) { return /cancel|refund/i.test(b.status); }
   function stTag(b) {
     var s = b.status || "Confirmed", cls = isCx(b) ? "cx" : (/move/i.test(s) ? "mv" : "ok");
-    return '<span class="st ' + cls + '">' + esc(s) + (b.late ? " · late" : "") + "</span>";
+    return '<span class="st ' + cls + '">' + esc(t(s)) + (b.late ? " · " + t("late") : "") + "</span>";
   }
+  var tr = t; // renderBookings uses t for today's date
   function renderBookings() {
     if (brange === "unfinished") { renderUnfinished(); return; }
     if (brange === "arriving") { renderArriving(); return; }
     if (brange === "calendar") { renderCalendar(); return; }
     if (!bdata) return;
-    var t = bdata.today, list = bdata.bookings.filter(function (b) {
-      if (brange === "today") return b.date === t;
+    var td = bdata.today, list = bdata.bookings.filter(function (b) {
+      if (brange === "today") return b.date === td;
       if (brange === "tomorrow") return b.date === bdata.tomorrow;
-      if (brange === "next") return b.date >= t && b.date <= addDays(t, 30);
-      return b.date < t && b.date >= addDays(t, -30);
+      if (brange === "next") return b.date >= td && b.date <= addDays(td, 30);
+      return b.date < td && b.date >= addDays(td, -30);
     });
     if (brange === "past") list.reverse();
     var live = list.filter(function (b) { return !isCx(b); });
     var sum = function (k) { return live.reduce(function (a, b) { return a + b[k]; }, 0); };
     $("#bcards").innerHTML =
-      '<div class="cardn"><small>Divers</small><b>' + sum("divers") + "</b></div>" +
-      '<div class="cardn"><small>Bookings</small><b>' + live.length + "</b></div>" +
-      '<div class="cardn"><small>' + (brange === "past" ? "Collected at the shop" : "To collect at the shop") + "</small><b>" + thb(sum("balance")) + "</b></div>" +
-      '<div class="cardn"><small>Paid online</small><b>' + thb(sum("deposit")) + "</b></div>";
+      '<div class="cardn"><small>' + t("Divers") + "</small><b>" + sum("divers") + "</b></div>" +
+      '<div class="cardn"><small>' + t("Bookings") + "</small><b>" + live.length + "</b></div>" +
+      '<div class="cardn"><small>' + (brange === "past" ? t("Collected at the shop") : t("To collect at the shop")) + "</small><b>" + thb(sum("balance")) + "</b></div>" +
+      '<div class="cardn"><small>' + t("Paid online") + "</small><b>" + thb(sum("deposit")) + "</b></div>";
     if (!list.length) {
-      $("#blist").innerHTML = '<div class="bempty">' + (brange === "today" ? "No bookings via " + esc(cfg.assistant) + " for today." :
-        brange === "tomorrow" ? "No bookings via " + esc(cfg.assistant) + " for tomorrow yet." : "No bookings in this period.") + "</div>";
+      $("#blist").innerHTML = '<div class="bempty">' + (brange === "today" ? t("No bookings via {a} for today.", { a: esc(cfg.assistant) }) :
+        brange === "tomorrow" ? t("No bookings via {a} for tomorrow yet.", { a: esc(cfg.assistant) }) : t("No bookings in this period.")) + "</div>";
       return;
     }
     var html = "", days = {};
@@ -4972,21 +4986,21 @@ function zoneClient(cfg) {
     Object.keys(days).forEach(function (day) {
       var rows = days[day], dl = rows.filter(function (b) { return !isCx(b); });
       var divers = dl.reduce(function (a, b) { return a + b.divers; }, 0);
-      html += '<div class="dayh">' + esc(dayLabel(day)) + "<span>" + divers + " diver" + (divers === 1 ? "" : "s") + " · " +
-        dl.length + " booking" + (dl.length === 1 ? "" : "s") + "</span></div>";
+      html += '<div class="dayh">' + esc(dayLabel(day)) + "<span>" + tn(divers, "1 diver", "{n} divers") + " · " +
+        tn(dl.length, "1 booking", "{n} bookings") + "</span></div>";
       var prods = {};
-      rows.forEach(function (b) { (prods[b.product || "Other"] = prods[b.product || "Other"] || []).push(b); });
+      rows.forEach(function (b) { var pk = b.product || t("Other"); (prods[pk] = prods[pk] || []).push(b); });
       Object.keys(prods).forEach(function (p) {
         html += '<div class="prodh">' + esc(p) + '</div><div class="bscroll"><table class="btable"><thead><tr>' +
-          "<th>Ref</th><th>Name</th><th>Phone</th><th class=\"num\">Divers</th><th class=\"num\">Paid online</th><th class=\"num\">At the shop</th><th>Status</th><th class=\"noprint\"></th></tr></thead><tbody>" +
+          "<th>" + t("Ref") + "</th><th>" + t("Name") + "</th><th>" + t("Phone") + '</th><th class="num">' + t("Divers") + '</th><th class="num">' + t("Paid online") + '</th><th class="num">' + t("At the shop") + "</th><th>" + t("Status") + '</th><th class="noprint"></th></tr></thead><tbody>' +
           prods[p].map(function (b) {
             var links = [];
-            if (b.chat) links.push('<a href="#" data-chat="' + esc(b.chat) + '">Chat</a>');
-            if (b.manage && !isCx(b) && b.date >= t) links.push('<a href="' + esc(b.manage) + '" target="_blank" rel="noopener">Move / cancel</a>');
+            if (b.chat) links.push('<a href="#" data-chat="' + esc(b.chat) + '">' + tr("Chat") + "</a>");
+            if (b.manage && !isCx(b) && b.date >= td) links.push('<a href="' + esc(b.manage) + '" target="_blank" rel="noopener">' + tr("Move / cancel") + "</a>");
             var wa = b.phone ? '<a href="https://wa.me/' + esc(b.phone.replace(/[^0-9]/g, "")) + '" target="_blank" rel="noopener">' + esc(b.phone) + "</a>" : "";
-            return '<tr class="' + (isCx(b) ? "cx" : "") + '"><td data-l="Ref">' + esc(b.ref) + '</td><td data-l="Name" class="tname">' + esc(b.name) + '</td><td data-l="Phone">' + wa + '</td><td class="num" data-l="Divers">' + b.divers +
-              '</td><td class="num" data-l="Paid online">' + thb(b.deposit) + '</td><td class="num" data-l="At the shop">' + (isCx(b) ? "–" : thb(b.balance)) + '</td><td class="keep" data-l="Status">' + stTag(b) +
-              (b.refunded ? '<br><small>Refunded ' + thb(b.refunded) + "</small>" : "") + '</td><td class="keep noprint tlinks">' + links.join(" · ") + "</td></tr>";
+            return '<tr class="' + (isCx(b) ? "cx" : "") + '"><td data-l="' + tr("Ref") + '">' + esc(b.ref) + '</td><td data-l="' + tr("Name") + '" class="tname">' + esc(b.name) + '</td><td data-l="' + tr("Phone") + '">' + wa + '</td><td class="num" data-l="' + tr("Divers") + '">' + b.divers +
+              '</td><td class="num" data-l="' + tr("Paid online") + '">' + thb(b.deposit) + '</td><td class="num" data-l="' + tr("At the shop") + '">' + (isCx(b) ? "–" : thb(b.balance)) + '</td><td class="keep" data-l="' + tr("Status") + '">' + stTag(b) +
+              (b.refunded ? "<br><small>" + tr("Refunded {x}", { x: thb(b.refunded) }) + "</small>" : "") + '</td><td class="keep noprint tlinks">' + links.join(" · ") + "</td></tr>";
           }).join("") + "</tbody></table></div>";
       });
     });
@@ -5019,61 +5033,61 @@ function zoneClient(cfg) {
       $("#prods").innerHTML = d.products.map(function (p) {
         var hours = ""; for (var h = 8; h <= 22; h++) hours += '<option value="' + h + '"' + (h === p.cutoff ? " selected" : "") + ">" + h + ":00</option>";
         return '<tr class="' + (p.active ? "" : "off") + '" data-id="' + esc(p.id) + '" data-pct="' + p.pct + '"><td class="nm">' + esc(p.name) + '<br><span class="muted">' + esc(p.code) + "</span></td>" +
-          '<td data-l="Price (THB)"><input type="number" min="100" step="50" value="' + p.price + '" class="pp" inputmode="numeric"></td>' +
-          '<td class="muted dep" data-l="Deposit">' + Math.round(p.deposit).toLocaleString("en-US") + " THB<br>" + p.pct + "%</td>" +
-          '<td data-l="Book until (day before)"><select class="pc">' + hours + "</select></td>" +
-          '<td data-l="Bookable online"><input type="checkbox" class="pa"' + (p.active ? " checked" : "") + "></td>" +
-          '<td class="tlinks"><button class="ghost ps" type="button">Save</button></td></tr>';
+          '<td data-l="' + t("Price (THB)") + '"><input type="number" min="100" step="50" value="' + p.price + '" class="pp" inputmode="numeric"></td>' +
+          '<td class="muted dep" data-l="' + t("Deposit") + '">' + Math.round(p.deposit).toLocaleString(NUM) + " THB<br>" + p.pct + "%</td>" +
+          '<td data-l="' + t("Book until (day before)") + '"><select class="pc">' + hours + "</select></td>" +
+          '<td data-l="' + t("Bookable online") + '"><input type="checkbox" class="pa"' + (p.active ? " checked" : "") + "></td>" +
+          '<td class="tlinks"><button class="ghost ps" type="button">' + t("Save") + '</button></td></tr>';
       }).join("");
       $("#prods").querySelectorAll("tr").forEach(function (tr) {
         var pp = tr.querySelector(".pp");
-        pp.oninput = function () { tr.querySelector(".dep").innerHTML = Math.round((Number(pp.value) || 0) * Number(tr.dataset.pct) / 100).toLocaleString("en-US") + " THB<br>" + tr.dataset.pct + "%"; };
+        pp.oninput = function () { tr.querySelector(".dep").innerHTML = Math.round((Number(pp.value) || 0) * Number(tr.dataset.pct) / 100).toLocaleString(NUM) + " THB<br>" + tr.dataset.pct + "%"; };
         tr.querySelector(".ps").onclick = function () {
           var btn = this, name = tr.querySelector(".nm").firstChild.textContent;
           save({ action: "product", id: tr.dataset.id, price: Number(pp.value), cutoff: Number(tr.querySelector(".pc").value), active: tr.querySelector(".pa").checked },
-            "#pMsg", name + " saved.", btn);
+            "#pMsg", t("{x} saved.", { x: name }), btn);
         };
       });
-      $("#miaState").textContent = d.paused ? "Paused" : "Answering divers";
+      $("#miaState").textContent = d.paused ? t("Paused") : t("Answering divers");
       $("#miaState").className = "pill " + (d.paused ? "off" : "on");
-      $("#miaToggle").textContent = d.paused ? "Turn " + cfg.assistant + " back on" : "Pause " + cfg.assistant;
+      $("#miaToggle").textContent = d.paused ? t("Turn {a} back on", { a: cfg.assistant }) : t("Pause {a}", { a: cfg.assistant });
       $("#hFrom").value = d.from; $("#hTo").value = d.to;
-      $("#modeState").textContent = d.outsideOnly ? "Only outside office hours" : "Day and night";
+      $("#modeState").textContent = d.outsideOnly ? t("Only outside office hours") : t("Day and night");
       $("#modeState").className = "pill " + (d.outsideOnly ? "off" : "on");
-      $("#modeToggle").textContent = d.outsideOnly ? "Answer day and night" : "Answer only outside office hours";
+      $("#modeToggle").textContent = d.outsideOnly ? t("Answer day and night") : t("Answer only outside office hours");
       if (document.activeElement !== $("#aEmail")) $("#aEmail").value = d.alert;
       $("#team").innerHTML = d.staff.map(function (e) {
-        return "<li><span>" + esc(e) + (e === ME ? " <small>(you)</small>" : "") + "</span>" +
-          (e === ME ? "" : '<button type="button" data-rm="' + esc(e) + '">Remove</button>') + "</li>";
+        return "<li><span>" + esc(e) + (e === ME ? " <small>(" + t("you") + ")</small>" : "") + "</span>" +
+          (e === ME ? "" : '<button type="button" data-rm="' + esc(e) + '">' + t("Remove") + "</button>") + "</li>";
       }).join("");
       $("#team").querySelectorAll("[data-rm]").forEach(function (b) {
         b.onclick = function () {
-          if (!confirm("Remove " + b.dataset.rm + "? They can no longer sign in.")) return;
-          save({ action: "team", emails: sdata.staff.filter(function (x) { return x !== b.dataset.rm; }) }, "#tMsg", "Removed.");
+          if (!confirm(t("Remove {e}? They can no longer sign in.", { e: b.dataset.rm }))) return;
+          save({ action: "team", emails: sdata.staff.filter(function (x) { return x !== b.dataset.rm; }) }, "#tMsg", t("Removed."));
         };
       });
-      var I = d.info, rows = [["Assistant", I.assistant], ["Languages", I.languages], ["Meeting point", I.meeting], ["Dive sites", I.sites], ["Boat times", I.boats], ["Emergency phone", I.emergency]];
+      var I = d.info, rows = [[t("Assistant"), I.assistant], [t("Languages"), I.languages], [t("Meeting point"), I.meeting], [t("Dive sites"), I.sites], [t("Boat times"), I.boats], [t("Emergency phone"), I.emergency]];
       $("#info").innerHTML = rows.filter(function (r) { return r[1]; }).map(function (r) { return "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>"; }).join("");
     }).catch(function (e) { if (e.message !== "auth") say("#miaMsg", e.message, true); });
   }
   $("#miaToggle").onclick = function () {
     if (!sdata) return;
     var pause = !sdata.paused;
-    if (pause && !confirm("Pause " + cfg.assistant + " for every diver? Your team then answers all messages.")) return;
-    save({ action: "mia", paused: pause }, "#miaMsg", pause ? cfg.assistant + " is paused." : cfg.assistant + " is answering again.", this);
+    if (pause && !confirm(t("Pause {a} for every diver? Your team then answers all messages.", { a: cfg.assistant }))) return;
+    save({ action: "mia", paused: pause }, "#miaMsg", pause ? t("{a} is paused.", { a: cfg.assistant }) : t("{a} is answering again.", { a: cfg.assistant }), this);
   };
   $("#modeToggle").onclick = function () {
     if (!sdata) return;
     var only = !sdata.outsideOnly;
-    save({ action: "mode", outsideOnly: only }, "#modeMsg", only ? cfg.assistant + " now only answers outside office hours." : cfg.assistant + " answers day and night again.", this);
+    save({ action: "mode", outsideOnly: only }, "#modeMsg", only ? t("{a} now only answers outside office hours.", { a: cfg.assistant }) : t("{a} answers day and night again.", { a: cfg.assistant }), this);
   };
-  $("#hSave").onclick = function () { save({ action: "hours", from: $("#hFrom").value, to: $("#hTo").value }, "#hMsg", "Saved in all five languages.", this); };
-  $("#aSave").onclick = function () { save({ action: "alert", email: $("#aEmail").value }, "#aMsg", "Saved.", this); };
+  $("#hSave").onclick = function () { save({ action: "hours", from: $("#hFrom").value, to: $("#hTo").value }, "#hMsg", t("Saved in all five languages."), this); };
+  $("#aSave").onclick = function () { save({ action: "alert", email: $("#aEmail").value }, "#aMsg", t("Saved."), this); };
   $("#tAdd").onclick = function () {
     var e = ($("#tEmail").value || "").trim().toLowerCase(); if (!e || !sdata) return;
-    if (sdata.staff.indexOf(e) > -1) { say("#tMsg", "Already in the team.", true); return; }
+    if (sdata.staff.indexOf(e) > -1) { say("#tMsg", t("Already in the team."), true); return; }
     var btn = this;
-    save({ action: "team", emails: sdata.staff.concat([e]) }, "#tMsg", e + " can now sign in.", btn).then(function () { $("#tEmail").value = ""; });
+    save({ action: "team", emails: sdata.staff.concat([e]) }, "#tMsg", t("{e} can now sign in.", { e: e }), btn).then(function () { $("#tEmail").value = ""; });
   };
 
   // ---- unfinished bookings
@@ -5090,24 +5104,24 @@ function zoneClient(cfg) {
     var list = udata.items;
     var value = list.reduce(function (a, i) { return a + i.total; }, 0);
     $("#bcards").innerHTML =
-      '<div class="cardn"><small>Started, not paid (7 days)</small><b>' + list.length + "</b></div>" +
-      '<div class="cardn"><small>Divers</small><b>' + list.reduce(function (a, i) { return a + i.divers; }, 0) + "</b></div>" +
-      '<div class="cardn"><small>Value still open</small><b>' + thb(value) + "</b></div>";
-    if (!list.length) { $("#blist").innerHTML = '<div class="bempty">Nobody left the payment page in the last 7 days. 🎉</div>'; return; }
-    $("#blist").innerHTML = '<p class="d" style="color:var(--muted);font-size:14px;margin:0 0 10px">These divers chose a date and went to the payment page, but didn\'t pay. A friendly reminder often brings them back.</p>' +
-      '<div class="bscroll"><table class="btable"><thead><tr><th>Diver</th><th>Product</th><th>For</th><th class="num">Divers</th><th class="num">Value</th><th>Left</th><th class="noprint"></th></tr></thead><tbody>' +
+      '<div class="cardn"><small>' + t("Started, not paid (7 days)") + "</small><b>" + list.length + "</b></div>" +
+      '<div class="cardn"><small>' + t("Divers") + "</small><b>" + list.reduce(function (a, i) { return a + i.divers; }, 0) + "</b></div>" +
+      '<div class="cardn"><small>' + t("Value still open") + "</small><b>" + thb(value) + "</b></div>";
+    if (!list.length) { $("#blist").innerHTML = '<div class="bempty">' + t("Nobody left the payment page in the last 7 days. 🎉") + "</div>"; return; }
+    $("#blist").innerHTML = '<p class="d" style="color:var(--muted);font-size:14px;margin:0 0 10px">' + t("These divers chose a date and went to the payment page, but didn't pay. A friendly reminder often brings them back.") + "</p>" +
+      '<div class="bscroll"><table class="btable"><thead><tr><th>' + t("Diver") + "</th><th>" + t("Product") + "</th><th>" + t("For") + '</th><th class="num">' + t("Divers") + '</th><th class="num">' + t("Value") + "</th><th>" + t("Left") + '</th><th class="noprint"></th></tr></thead><tbody>' +
       list.map(function (i, k) {
-        var who = esc(i.name || i.phone || "Unknown diver") + (i.phone && i.name !== i.phone ? '<br><small style="color:var(--muted)">' + esc(i.phone) + "</small>" : "");
+        var who = esc(i.name || i.phone || t("Unknown diver")) + (i.phone && i.name !== i.phone ? '<br><small style="color:var(--muted)">' + esc(i.phone) + "</small>" : "");
         var act = [];
-        if (i.booked) act.push('<span class="st ok">Booked since</span>');
-        else if (i.chat && i.canMessage) act.push('<a href="#" data-remind="' + k + '">Send reminder</a>');
-        else if (i.chat) act.push('<span class="st">Outside 24 h</span>');
-        else act.push('<span class="st">No chat linked</span>');
-        if (i.chat) act.push('<a href="#" data-uchat="' + k + '">Chat</a>');
-        return '<tr><td class="tname" data-l="Diver">' + who + '</td><td data-l="Product">' + esc(i.product) + '</td><td data-l="For">' + esc(dayLabel(i.date)) + '</td><td class="num" data-l="Divers">' + i.divers +
-          '</td><td class="num" data-l="Value">' + thb(i.total) + '</td><td data-l="Left">' + (ago(i.at) === "now" ? "just now" : ago(i.at) + " ago") + '</td><td class="keep noprint tlinks">' + act.join(" · ") + "</td></tr>";
+        if (i.booked) act.push('<span class="st ok">' + t("Booked since") + "</span>");
+        else if (i.chat && i.canMessage) act.push('<a href="#" data-remind="' + k + '">' + t("Send reminder") + "</a>");
+        else if (i.chat) act.push('<span class="st">' + t("Outside 24 h") + "</span>");
+        else act.push('<span class="st">' + t("No chat linked") + "</span>");
+        if (i.chat) act.push('<a href="#" data-uchat="' + k + '">' + t("Chat") + "</a>");
+        return '<tr><td class="tname" data-l="' + t("Diver") + '">' + who + '</td><td data-l="' + t("Product") + '">' + esc(i.product) + '</td><td data-l="' + t("For") + '">' + esc(dayLabel(i.date)) + '</td><td class="num" data-l="' + t("Divers") + '">' + i.divers +
+          '</td><td class="num" data-l="' + t("Value") + '">' + thb(i.total) + '</td><td data-l="' + t("Left") + '">' + (ago(i.at) === t("now") ? t("just now") : t("{t} ago", { t: ago(i.at) })) + '</td><td class="keep noprint tlinks">' + act.join(" · ") + "</td></tr>";
       }).join("") + "</tbody></table></div>" +
-      '<p style="color:var(--muted);font-size:13px">WhatsApp, Instagram and Messenger only allow a free message within 24 hours of the diver\'s last message, so older ones can\'t get a reminder from here.</p>';
+      '<p style="color:var(--muted);font-size:13px">' + t("WhatsApp, Instagram and Messenger only allow a free message within 24 hours of the diver's last message, so older ones can't get a reminder from here.") + "</p>";
     function go(k, draft) {
       var i = udata.items[k]; pendingDraft = draft ? i.reminder : null;
       document.querySelector('nav button[data-v="convos"]').click();
@@ -5128,35 +5142,35 @@ function zoneClient(cfg) {
       if (brange === "arriving") renderArriving();
     }).catch(function (e) { if (brange === "arriving" && e.message !== "auth") $("#blist").innerHTML = '<div class="bempty">' + esc(e.message) + "</div>"; });
   }
-  function shortDay(iso) { return new Date(iso + "T12:00:00Z").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" }); }
+  function shortDay(iso) { return new Date(iso + "T12:00:00Z").toLocaleDateString(LOC, { weekday: "short", day: "numeric", month: "short" }); }
   function whenText(i) {
-    if (i.here) return "On the island now";
+    if (i.here) return t("On the island now");
     var days = Math.round((Date.parse(i.from) - Date.parse(adata.today)) / 86400000);
-    return days === 1 ? "Arrives tomorrow" : "Arrives in " + days + " days";
+    return days === 1 ? t("Arrives tomorrow") : t("Arrives in {n} days", { n: days });
   }
   function renderArriving() {
     if (!adata) { $("#bcards").innerHTML = ""; $("#blist").innerHTML = '<div class="skel"><i></i><i></i><i></i></div>'; return; }
     var list = adata.items;
     var divers = list.reduce(function (a, i) { return a + (Number(i.group) || 1); }, 0);
     $("#bcards").innerHTML =
-      '<div class="cardn"><small>Not booked yet</small><b>' + list.length + "</b></div>" +
-      '<div class="cardn"><small>Divers</small><b>' + divers + "</b></div>" +
-      '<div class="cardn"><small>On the island now</small><b>' + list.filter(function (i) { return i.here; }).length + "</b></div>";
-    if (!list.length) { $("#blist").innerHTML = '<div class="bempty">Nobody without a booking arrives in the next 14 days.</div>'; return; }
-    $("#blist").innerHTML = '<p class="d" style="color:var(--muted);font-size:14px;margin:0 0 10px">These divers told ' + esc(cfg.assistant) + " when they're on the island, but haven't booked yet. A personal message now often makes the difference.</p>" +
-      '<div class="bscroll"><table class="btable"><thead><tr><th>Diver</th><th>When</th><th>Interested in</th><th>Level</th><th class="num">Group</th><th class="noprint"></th></tr></thead><tbody>' +
+      '<div class="cardn"><small>' + t("Not booked yet") + "</small><b>" + list.length + "</b></div>" +
+      '<div class="cardn"><small>' + t("Divers") + "</small><b>" + divers + "</b></div>" +
+      '<div class="cardn"><small>' + t("On the island now") + "</small><b>" + list.filter(function (i) { return i.here; }).length + "</b></div>";
+    if (!list.length) { $("#blist").innerHTML = '<div class="bempty">' + t("Nobody without a booking arrives in the next 14 days.") + "</div>"; return; }
+    $("#blist").innerHTML = '<p class="d" style="color:var(--muted);font-size:14px;margin:0 0 10px">' + t("These divers told {a} when they're on the island, but haven't booked yet. A personal message now often makes the difference.", { a: esc(cfg.assistant) }) + "</p>" +
+      '<div class="bscroll"><table class="btable"><thead><tr><th>' + t("Diver") + "</th><th>" + t("When") + "</th><th>" + t("Interested in") + "</th><th>" + t("Level") + '</th><th class="num">' + t("Group") + '</th><th class="noprint"></th></tr></thead><tbody>' +
       list.map(function (i, k) {
-        var who = esc(i.name || i.phone || "Unknown diver") + (i.language ? ' <span class="tag lang">' + esc(String(i.language).slice(0, 2)) + "</span>" : "");
+        var who = esc(i.name || i.phone || t("Unknown diver")) + (i.language ? ' <span class="tag lang">' + esc(String(i.language).slice(0, 2)) + "</span>" : "");
         var when = '<b>' + esc(whenText(i)) + '</b><br><small style="color:var(--muted)">' + esc(shortDay(i.from)) + " – " + esc(shortDay(i.to)) + (i.dates ? " · “" + esc(i.dates) + "”" : "") + "</small>";
         var act = [];
-        if (i.chat && i.canMessage) act.push('<a href="#" data-amsg="' + k + '">Send a message</a>');
-        else if (i.chat) act.push('<span class="st">Outside 24 h</span>');
-        if (i.chat) act.push('<a href="#" data-achat="' + k + '">Chat</a>');
+        if (i.chat && i.canMessage) act.push('<a href="#" data-amsg="' + k + '">' + t("Send a message") + "</a>");
+        else if (i.chat) act.push('<span class="st">' + t("Outside 24 h") + "</span>");
+        if (i.chat) act.push('<a href="#" data-achat="' + k + '">' + t("Chat") + "</a>");
         else if (i.phone) act.push(esc(i.phone));
-        return '<tr><td class="tname" data-l="Diver">' + who + '</td><td data-l="When">' + when + '</td><td data-l="Interested in">' + esc(i.interested || "–") +
-          '</td><td data-l="Level">' + esc(i.cert || "–") + '</td><td class="num" data-l="Group">' + esc(i.group || "1") + '</td><td class="keep noprint tlinks">' + act.join(" · ") + "</td></tr>";
+        return '<tr><td class="tname" data-l="' + t("Diver") + '">' + who + '</td><td data-l="' + t("When") + '">' + when + '</td><td data-l="' + t("Interested in") + '">' + esc(i.interested || "–") +
+          '</td><td data-l="' + t("Level") + '">' + esc(i.cert || "–") + '</td><td class="num" data-l="' + t("Group") + '">' + esc(i.group || "1") + '</td><td class="keep noprint tlinks">' + act.join(" · ") + "</td></tr>";
       }).join("") + "</tbody></table></div>" +
-      '<p style="color:var(--muted);font-size:13px">WhatsApp, Instagram and Messenger only allow a free message within 24 hours of the diver\'s last message. For the others, message them from your own app.</p>';
+      '<p style="color:var(--muted);font-size:13px">' + t("WhatsApp, Instagram and Messenger only allow a free message within 24 hours of the diver's last message. For the others, message them from your own app.") + "</p>";
     function go(k, draft) {
       var i = adata.items[k];
       var first = String(i.name || "").split(" ")[0];
@@ -5173,7 +5187,7 @@ function zoneClient(cfg) {
 
   // ---- dashboard
   var ddata = null;
-  function fmtSec(s) { if (s == null) return "–"; if (s < 60) return s + " s"; return Math.floor(s / 60) + " min " + (s % 60) + " s"; }
+  function fmtSec(s) { if (s == null) return "–"; if (s < 60) return t("{n} s", { n: s }); return t("{m} min {s} s", { m: Math.floor(s / 60), s: s % 60 }); }
   function pct(a, b) { return b ? Math.round(a / b * 100) + "%" : "–"; }
   $("#period").onchange = function () { loadDash(); };
   // ---- Push notifications on this device
@@ -5184,13 +5198,13 @@ function zoneClient(cfg) {
     function show(t, err) { msg.textContent = t || ""; msg.classList.toggle("err", !!err); }
     function urlKey(b) { var s = b.replace(/-/g, "+").replace(/_/g, "/"); s += "===".slice((s.length + 3) % 4); var r = atob(s), a = new Uint8Array(r.length); for (var i = 0; i < r.length; i++) a[i] = r.charCodeAt(i); return a; }
     function setUi(active) {
-      state.textContent = active ? "On for this device" : (supported ? "Off" : "Not available here");
+      state.textContent = active ? t("On for this device") : (supported ? t("Off") : t("Not available here"));
       state.classList.toggle("on", !!active);
       on.hidden = !!active || !supported; test.hidden = !active; off.hidden = !active;
     }
     if (!supported) {
       setUi(false);
-      show(/iPhone|iPad/.test(navigator.userAgent) ? "On iPhone: add the zone to your home screen first (Share → Add to Home Screen), then open it from there." : "This browser doesn't support notifications.", false);
+      show(/iPhone|iPad/.test(navigator.userAgent) ? t("On iPhone: add the zone to your home screen first (Share → Add to Home Screen), then open it from there.") : t("This browser doesn't support notifications."), false);
       return;
     }
     setUi(false);
@@ -5199,27 +5213,27 @@ function zoneClient(cfg) {
       show("");
       on.disabled = true;
       Notification.requestPermission().then(function (perm) {
-        if (perm !== "granted") throw new Error("Notifications are blocked. Allow them for talay.io in your browser or phone settings.");
+        if (perm !== "granted") throw new Error(t("Notifications are blocked. Allow them for talay.io in your browser or phone settings."));
         return api("push-key");
       }).then(function (d) {
-        if (!d.key) throw new Error("Notifications are not set up yet. Contact Talay.");
+        if (!d.key) throw new Error(t("Notifications are not set up yet. Contact Talay."));
         return navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlKey(d.key) }); });
       }).then(function (sub) {
         return post("push-subscribe", { endpoint: sub.endpoint });
-      }).then(function () { setUi(true); show("Done. Tap “Send a test” to check."); })
-        .catch(function (e) { show(e.message || "Something went wrong. Try again.", true); })
+      }).then(function () { setUi(true); show(t("Done. Tap “Send a test” to check.")); })
+        .catch(function (e) { show(e.message || t("Something went wrong. Try again."), true); })
         .then(function () { on.disabled = false; });
     };
     test.onclick = function () {
-      show("Sending…");
-      post("push-test", {}).then(function () { show("Sent. It can take a few seconds."); }).catch(function (e) { show(e.message, true); });
+      show(t("Sending…"));
+      post("push-test", {}).then(function () { show(t("Sent. It can take a few seconds.")); }).catch(function (e) { show(e.message, true); });
     };
     off.onclick = function () {
       navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (s) {
         if (!s) return;
         var ep = s.endpoint;
         return s.unsubscribe().then(function () { return post("push-unsubscribe", { endpoint: ep }); });
-      }).then(function () { setUi(false); show("Turned off for this device."); }).catch(function (e) { show(e.message, true); });
+      }).then(function () { setUi(false); show(t("Turned off for this device.")); }).catch(function (e) { show(e.message, true); });
     };
   })();
 
@@ -5231,19 +5245,19 @@ function zoneClient(cfg) {
     var cx = function (b) { return /cancel|refund/i.test(b.status); };
     var up = list.filter(function (b) { return b.date >= today && !cx(b); }).sort(function (a, b) { return a.date.localeCompare(b.date); });
     var past = list.filter(function (b) { return up.indexOf(b) < 0; });
-    var fmt = function (iso) { return new Date(iso + "T12:00:00Z").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }); };
-    var money = function (v) { return Math.round(v).toLocaleString("en-US") + " THB"; };
+    var fmt = function (iso) { return new Date(iso + "T12:00:00Z").toLocaleDateString(LOC, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }); };
+    var money = function (v) { return Math.round(v).toLocaleString(NUM) + " THB"; };
     var ico = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
     var card = function (b) {
       var days = Math.round((Date.parse(b.date) - Date.parse(today)) / 86400000);
-      var when = days === 0 ? "Today" : days === 1 ? "Tomorrow" : "In " + days + " days";
-      return '<div class="bkc"><span class="bki">' + ico + '</span><div class="bkb"><b>' + esc(b.product) + " · " + esc(fmt(b.date)) + " · " + b.divers + (b.divers === 1 ? " diver" : " divers") +
-        '</b><small>' + money(b.deposit) + " paid online · " + money(b.balance) + " at the shop · " + esc(b.ref) + '</small></div><span class="bkw">' + when + "</span>" +
-        (b.manage ? '<a class="ghost bkm" href="' + esc(b.manage) + '" target="_blank" rel="noopener">Move / cancel</a>' : "") + "</div>";
+      var when = days === 0 ? t("Today") : days === 1 ? t("Tomorrow") : t("In {n} days", { n: days });
+      return '<div class="bkc"><span class="bki">' + ico + '</span><div class="bkb"><b>' + esc(b.product) + " · " + esc(fmt(b.date)) + " · " + tn(b.divers, "1 diver", "{n} divers") +
+        "</b><small>" + t("{d} paid online · {b} at the shop", { d: money(b.deposit), b: money(b.balance) }) + " · " + esc(b.ref) + '</small></div><span class="bkw">' + when + "</span>" +
+        (b.manage ? '<a class="ghost bkm" href="' + esc(b.manage) + '" target="_blank" rel="noopener">' + t("Move / cancel") + "</a>" : "") + "</div>";
     };
-    var pastLine = past.length ? '<div class="bkp">' + (up.length ? "Earlier: " : "Booked before: ") + past.slice(0, 3).map(function (b) {
-      return esc(b.product) + " (" + esc(fmt(b.date)) + (cx(b) ? ", cancelled" : "") + ")";
-    }).join(" · ") + (past.length > 3 ? " · +" + (past.length - 3) + " more" : "") + "</div>" : "";
+    var pastLine = past.length ? '<div class="bkp">' + (up.length ? t("Earlier") + ": " : t("Booked before") + ": ") + past.slice(0, 3).map(function (b) {
+      return esc(b.product) + " (" + esc(fmt(b.date)) + (cx(b) ? ", " + t("cancelled") : "") + ")";
+    }).join(" · ") + (past.length > 3 ? " · " + t("+{n} more", { n: past.length - 3 }) : "") + "</div>" : "";
     return '<div class="bkwrap">' + up.map(card).join("") + pastLine + "</div>";
   }
 
@@ -5255,13 +5269,13 @@ function zoneClient(cfg) {
     var cc = d.length > 10 ? d.slice(0, d.length - 9) : "", rest = cc ? d.slice(cc.length) : d;
     return (cc ? "+" + cc + " " : "") + rest.replace(/(\d{3})(?=\d)/g, "$1 ").trim();
   }
-  function dname(name, contact) { var n = name || contact || "Diver"; return isPhone(n) ? prettyPhone(n) : n; }
+  function dname(name, contact) { var n = name || contact || t("Diver"); return isPhone(n) ? prettyPhone(n) : n; }
   var LANGN = { en: "English", nl: "Dutch", fr: "French", de: "German", es: "Spanish", it: "Italian", pt: "Portuguese", th: "Thai" };
-  function langName(v) { var s = String(v || "").trim(); return LANGN[s.toLowerCase()] || (s.length <= 3 ? s.toUpperCase() : s.charAt(0).toUpperCase() + s.slice(1)); }
-  function human(v) { var s = String(v || "").replace(/_/g, " ").trim(); return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""; }
+  function langName(v) { var s = String(v || "").trim(); return (LANGN[s.toLowerCase()] && t(LANGN[s.toLowerCase()])) || (s.length <= 3 ? s.toUpperCase() : s.charAt(0).toUpperCase() + s.slice(1)); }
+  function human(v) { var s = String(v || "").replace(/_/g, " ").trim(); return s ? t(s.charAt(0).toUpperCase() + s.slice(1)) : ""; }
   function prettyDates(v) {
     var s = String(v || "");
-    return s.replace(/(\d{4})-(\d{2})-(\d{2})/g, function (m) { return new Date(m + "T12:00:00Z").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }); });
+    return s.replace(/(\d{4})-(\d{2})-(\d{2})/g, function (m) { return new Date(m + "T12:00:00Z").toLocaleDateString(LOC, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }); });
   }
 
   // ---- Avatars
@@ -5276,7 +5290,7 @@ function zoneClient(cfg) {
 
   // ---- Today
   function greet() {
-    var h = new Date().getHours(), part = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+    var h = new Date().getHours(), part = h < 12 ? t("Good morning") : h < 18 ? t("Good afternoon") : t("Good evening");
     var nm = ""; try { nm = localStorage.getItem("talay-sig") || ""; } catch (e) {}
     if (!nm && cfg.email) { var x = String(cfg.email).split("@")[0].split(/[._-]/)[0]; if (x && !/^(info|team|hello|contact|admin|dive|office)$/i.test(x)) nm = x.charAt(0).toUpperCase() + x.slice(1); }
     return part + (nm ? ", " + nm : "");
@@ -5291,18 +5305,18 @@ function zoneClient(cfg) {
   }
   function loadToday() {
     $("#tGreet").textContent = greet();
-    $("#tDate").textContent = new Date().toLocaleDateString([], { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Bangkok" }) + " · " + cfg.center;
+    $("#tDate").textContent = new Date().toLocaleDateString(LOC, { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Bangkok" }) + " · " + cfg.center;
     loadDay();
     api("conversations?view=open").then(function (d) {
       var need = d.conversations.filter(function (c) { return c.needsYou; });
       var open = d.conversations.length;
-      $("#tNeed").innerHTML = '<div class="th"><b>Needs your team</b>' + (need.length ? '<span class="tag need">' + need.length + "</span>" : "") + '<a href="#" class="tlink" id="tAllChats">All chats (' + open + ")</a></div>" +
+      $("#tNeed").innerHTML = '<div class="th"><b>' + t("Needs your team") + "</b>" + (need.length ? '<span class="tag need">' + need.length + "</span>" : "") + '<a href="#" class="tlink" id="tAllChats">' + t("All chats ({n})", { n: open }) + "</a></div>" +
         (need.length ? need.slice(0, 5).map(function (c) {
           return '<button class="trow" data-chat="' + esc(c.id) + '">' + avatar(c.name, c.cc) + '<span class="tr-b"><b>' + esc(dname(c.name)) + "</b><small>" + esc(String(c.preview || "").slice(0, 90)) + '</small></span><span class="tr-t">' + ago(c.lastAt) + "</span></button>";
-        }).join("") : '<p class="tok"><span class="okdot"></span>Nothing waiting. ' + esc(cfg.assistant) + " is handling every conversation.</p>");
+        }).join("") : '<p class="tok"><span class="okdot"></span>' + t("Nothing waiting. {a} is handling every conversation.", { a: esc(cfg.assistant) }) + "</p>");
       $("#tNeed").querySelectorAll("[data-chat]").forEach(function (b) { b.onclick = function () { goChat(b.dataset.chat); }; });
       $("#tAllChats").onclick = function (e) { e.preventDefault(); document.querySelector('nav button[data-v="convos"]').click(); };
-    }).catch(function () { $("#tNeed").innerHTML = '<div class="th"><b>Needs your team</b></div><p class="tok">Couldn\'t load conversations.</p>'; });
+    }).catch(function () { $("#tNeed").innerHTML = '<div class="th"><b>' + t("Needs your team") + '</b></div><p class="tok">' + t("Couldn't load conversations.") + "</p>"; });
     api("bookings").then(function (d) {
       var live = d.bookings.filter(function (b) { return !isCx(b); });
       var day = function (iso) {
@@ -5312,26 +5326,26 @@ function zoneClient(cfg) {
       };
       var block = function (label, iso, r) {
         var rows = day(iso), tot = rows.reduce(function (a, x) { return a + x[1].divers; }, 0);
-        return '<div class="th"><b>' + label + '</b><a href="#" class="tlink" data-gb="' + r + '">Boat list</a></div>' +
-          '<div class="tbig"><b>' + tot + "</b><span>" + (tot === 1 ? "diver" : "divers") + " · " + esc(new Date(iso + "T12:00:00Z").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" })) + "</span></div>" +
-          (rows.length ? rows.map(function (x) { return '<div class="tboat"><span>' + esc(x[0]) + "</span><b>" + x[1].divers + "</b></div>"; }).join("") : '<p class="tok">No bookings via ' + esc(cfg.assistant) + " yet.</p>");
+        return '<div class="th"><b>' + label + '</b><a href="#" class="tlink" data-gb="' + r + '">' + t("Boat list") + "</a></div>" +
+          '<div class="tbig"><b>' + tot + "</b><span>" + (tot === 1 ? t("diver") : t("divers")) + " · " + esc(new Date(iso + "T12:00:00Z").toLocaleDateString(LOC, { weekday: "short", day: "numeric", month: "short" })) + "</span></div>" +
+          (rows.length ? rows.map(function (x) { return '<div class="tboat"><span>' + esc(x[0]) + "</span><b>" + x[1].divers + "</b></div>"; }).join("") : '<p class="tok">' + t("No bookings via {a} yet.", { a: esc(cfg.assistant) }) + "</p>");
       };
-      $("#tToday").innerHTML = block("On the boat today", d.today, "today");
-      $("#tTomorrow").innerHTML = block("Tomorrow", d.tomorrow, "tomorrow");
+      $("#tToday").innerHTML = block(t("On the boat today"), d.today, "today");
+      $("#tTomorrow").innerHTML = block(t("Tomorrow"), d.tomorrow, "tomorrow");
       document.querySelectorAll("#today [data-gb]").forEach(function (a) { a.onclick = function (e) { e.preventDefault(); goBookings(a.dataset.gb); }; });
       var next = [], max = 1;
       for (var i = 0; i < 7; i++) { var iso = addDays(d.today, i); var dv = live.filter(function (b) { return b.date === iso; }).reduce(function (a, b) { return a + b.divers; }, 0); next.push([iso, dv]); max = Math.max(max, dv); }
       var total = next.reduce(function (a, x) { return a + x[1]; }, 0);
-      $("#tWeek").innerHTML = '<div class="th"><b>Next 7 days</b><small>' + total + (total === 1 ? " diver" : " divers") + ' booked</small><a href="#" class="tlink" id="tCal">Calendar</a></div><div class="tbars">' +
-        next.map(function (x) { return '<div class="tb"><span class="tbv">' + (x[1] || "") + '</span><span class="tbb" style="height:' + Math.max(4, Math.round(x[1] / max * 70)) + 'px"></span><small>' + new Date(x[0] + "T12:00:00Z").toLocaleDateString([], { weekday: "short" }) + "</small></div>"; }).join("") + "</div>";
+      $("#tWeek").innerHTML = '<div class="th"><b>' + t("Next 7 days") + "</b><small>" + tn(total, "1 diver booked", "{n} divers booked") + '</small><a href="#" class="tlink" id="tCal">' + t("Calendar") + '</a></div><div class="tbars">' +
+        next.map(function (x) { return '<div class="tb"><span class="tbv">' + (x[1] || "") + '</span><span class="tbb" style="height:' + Math.max(4, Math.round(x[1] / max * 70)) + 'px"></span><small>' + new Date(x[0] + "T12:00:00Z").toLocaleDateString(LOC, { weekday: "short" }) + "</small></div>"; }).join("") + "</div>";
       $("#tCal").onclick = function (e) { e.preventDefault(); goBookings("calendar"); };
-    }).catch(function () { $("#tToday").innerHTML = '<div class="th"><b>On the boat today</b></div><p class="tok">Couldn\'t load bookings.</p>'; $("#tTomorrow").innerHTML = ""; $("#tWeek").innerHTML = ""; });
+    }).catch(function () { $("#tToday").innerHTML = '<div class="th"><b>' + t("On the boat today") + '</b></div><p class="tok">' + t("Couldn't load bookings.") + "</p>"; $("#tTomorrow").innerHTML = ""; $("#tWeek").innerHTML = ""; });
     api("arriving").then(function (d) {
       var n = d.items.length;
-      $("#tArr").innerHTML = '<div class="th"><b>Arriving soon, not booked</b>' + (n ? '<span class="tag lang">' + n + "</span>" : "") + '<a href="#" class="tlink" id="tArrAll">See all</a></div>' +
+      $("#tArr").innerHTML = '<div class="th"><b>' + t("Arriving soon, not booked") + "</b>" + (n ? '<span class="tag lang">' + n + "</span>" : "") + '<a href="#" class="tlink" id="tArrAll">' + t("See all") + "</a></div>" +
         (n ? '<div class="tarr">' + d.items.slice(0, 4).map(function (i) {
-          return '<div class="trow static">' + avatar(i.name || i.phone, "") + '<span class="tr-b"><b>' + esc(i.name || i.phone || "Diver") + "</b><small>" + esc(i.interested || "Interested") + " · " + (i.here ? "on the island now" : "arrives " + esc(new Date(i.from + "T12:00:00Z").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" }))) + "</small></span></div>";
-        }).join("") + "</div>" : '<p class="tok">Nobody without a booking arrives in the next 14 days.</p>');
+          return '<div class="trow static">' + avatar(i.name || i.phone, "") + '<span class="tr-b"><b>' + esc(i.name || i.phone || t("Diver")) + "</b><small>" + esc(i.interested || t("Interested")) + " · " + (i.here ? t("on the island now") : t("arrives {d}", { d: esc(new Date(i.from + "T12:00:00Z").toLocaleDateString(LOC, { weekday: "short", day: "numeric", month: "short" })) })) + "</small></span></div>";
+        }).join("") + "</div>" : '<p class="tok">' + t("Nobody without a booking arrives in the next 14 days.") + "</p>");
       $("#tArrAll").onclick = function (e) { e.preventDefault(); goBookings("arriving"); };
     }).catch(function () { $("#tArr").innerHTML = ""; });
   }
@@ -5345,26 +5359,26 @@ function zoneClient(cfg) {
     var days = [];
     for (var i = 0; i < 14; i++) days.push(addDays(bdata.today, i));
     var total = live.filter(function (b) { return b.date >= days[0] && b.date <= days[13]; }).reduce(function (a, b) { return a + b.divers; }, 0);
-    $("#bcards").innerHTML = '<div class="cardn"><small>Divers next 14 days</small><b>' + total + "</b></div>" +
-      '<div class="cardn"><small>Busiest day</small><b>' + (function () { var best = null; days.forEach(function (dd) { var v = live.filter(function (b) { return b.date === dd; }).reduce(function (a, b) { return a + b.divers; }, 0); if (!best || v > best[1]) best = [dd, v]; }); return best && best[1] ? esc(new Date(best[0] + "T12:00:00Z").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" })) : "–"; })() + "</b></div>";
+    $("#bcards").innerHTML = '<div class="cardn"><small>' + t("Divers next 14 days") + "</small><b>" + total + "</b></div>" +
+      '<div class="cardn"><small>' + t("Busiest day") + "</small><b>" + (function () { var best = null; days.forEach(function (dd) { var v = live.filter(function (b) { return b.date === dd; }).reduce(function (a, b) { return a + b.divers; }, 0); if (!best || v > best[1]) best = [dd, v]; }); return best && best[1] ? esc(new Date(best[0] + "T12:00:00Z").toLocaleDateString(LOC, { weekday: "short", day: "numeric", month: "short" })) : "–"; })() + "</b></div>";
     $("#blist").innerHTML = '<div class="cal">' + days.map(function (dd, idx) {
       var g = {};
       live.filter(function (b) { return b.date === dd; }).forEach(function (b) { g[b.product] = g[b.product] || { divers: 0, n: 0 }; g[b.product].divers += b.divers; g[b.product].n++; });
       var keys = Object.keys(g).sort(function (a, b) { return g[b].divers - g[a].divers; });
       var tot = keys.reduce(function (a, k2) { return a + g[k2].divers; }, 0);
       var dt = new Date(dd + "T12:00:00Z");
-      return '<div class="cday' + (idx === 0 ? " today" : "") + (dt.getUTCDay() === 0 || dt.getUTCDay() === 6 ? " wk" : "") + '"><div class="cdh"><small>' + dt.toLocaleDateString([], { weekday: "short" }) + "</small><b>" + dt.getUTCDate() + "</b>" + (tot ? '<span class="ctot">' + tot + "</span>" : "") + "</div>" +
-        (keys.length ? keys.map(function (k2) { return '<div class="cblk"><b>' + esc(k2) + "</b><small>" + g[k2].divers + (g[k2].divers === 1 ? " diver" : " divers") + "</small></div>"; }).join("") : '<div class="cnone">–</div>') + "</div>";
+      return '<div class="cday' + (idx === 0 ? " today" : "") + (dt.getUTCDay() === 0 || dt.getUTCDay() === 6 ? " wk" : "") + '"><div class="cdh"><small>' + dt.toLocaleDateString(LOC, { weekday: "short" }) + "</small><b>" + dt.getUTCDate() + "</b>" + (tot ? '<span class="ctot">' + tot + "</span>" : "") + "</div>" +
+        (keys.length ? keys.map(function (k2) { return '<div class="cblk"><b>' + esc(k2) + "</b><small>" + tn(g[k2].divers, "1 diver", "{n} divers") + "</small></div>"; }).join("") : '<div class="cnone">–</div>') + "</div>";
     }).join("") + "</div>";
   }
 
   // ---- Milestones
   var MS_LABEL = {
-    divers: function (v) { return v.toLocaleString("en-US") + " divers booked through Talay"; },
-    revenue: function (v) { return v.toLocaleString("en-US") + " THB booked through Talay"; },
-    conversations: function (v) { return v.toLocaleString("en-US") + " conversations answered"; },
+    divers: function (v) { return t("{n} divers booked through Talay", { n: v.toLocaleString(NUM) }); },
+    revenue: function (v) { return t("{n} THB booked through Talay", { n: v.toLocaleString(NUM) }); },
+    conversations: function (v) { return t("{n} conversations answered", { n: v.toLocaleString(NUM) }); },
   };
-  function ordinalDay(iso) { return new Date(iso).toLocaleDateString([], { day: "numeric", month: "long" }); }
+  function ordinalDay(iso) { return new Date(iso).toLocaleDateString(LOC, { day: "numeric", month: "long" }); }
   function loadMilestones() {
     return api("milestones").then(function (d) {
       if (!d || d.error) return;
@@ -5376,14 +5390,14 @@ function zoneClient(cfg) {
       var trophy = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0V4ZM8 6H5a3 3 0 0 0 3 3M16 6h3a3 3 0 0 1-3 3M12 13v4M8 21h8M9 17h6"/></svg>';
       var dv = d.divers || { total: 0, next: 10 };
       var goal = dv.next, have = dv.total;
-      var prog = goal ? '<div class="msprog"><span style="width:' + Math.min(100, Math.round(have / goal * 100)) + '%"></span></div><small>' + have.toLocaleString("en-US") + " of " + goal.toLocaleString("en-US") + " divers · " + (goal - have).toLocaleString("en-US") + " to go</small>" : "";
-      var head = latest ? "<b>" + esc(MS_LABEL[latest.k](latest.value)) + "</b><small>Reached on " + esc(ordinalDay(latest.at)) + "</small>" :
-        "<b>Your first milestone: 10 divers through Talay</b><small>Every booking through " + esc(cfg.assistant) + " counts.</small>";
+      var prog = goal ? '<div class="msprog"><span style="width:' + Math.min(100, Math.round(have / goal * 100)) + '%"></span></div><small>' + t("{have} of {goal} divers · {left} to go", { have: have.toLocaleString(NUM), goal: goal.toLocaleString(NUM), left: (goal - have).toLocaleString(NUM) }) + "</small>" : "";
+      var head = latest ? "<b>" + esc(MS_LABEL[latest.k](latest.value)) + "</b><small>" + t("Reached on {d}", { d: esc(ordinalDay(latest.at)) }) + "</small>" :
+        "<b>" + t("Your first milestone: 10 divers through Talay") + "</b><small>" + t("Every booking through {a} counts.", { a: esc(cfg.assistant) }) + "</small>";
       var html = '<div class="msicon">' + trophy + '</div><div class="msbody">' + head + prog + "</div>";
       var dash = $("#ms"); dash.innerHTML = html; dash.hidden = false;
       var recent = latest && (Date.now() - Date.parse(latest.at)) < 7 * 86400000;
       var chat = $("#msChat");
-      if (recent) { chat.innerHTML = '<div class="msicon">' + trophy + '</div><div class="msbody"><b>' + esc(MS_LABEL[latest.k](latest.value)) + "</b><small>Reached on " + esc(ordinalDay(latest.at)) + "</small></div>"; chat.hidden = false; }
+      if (recent) { chat.innerHTML = '<div class="msicon">' + trophy + '</div><div class="msbody"><b>' + esc(MS_LABEL[latest.k](latest.value)) + "</b><small>" + t("Reached on {d}", { d: esc(ordinalDay(latest.at)) }) + "</small></div>"; chat.hidden = false; }
       else chat.hidden = true;
     }).catch(function () {});
   }
@@ -5393,19 +5407,20 @@ function zoneClient(cfg) {
   function dayHtml(d) {
     var sun = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
     var stat = function (v, l) { return "<div><b>" + v + "</b><span>" + l + "</span></div>"; };
-    var thbs = function (v) { return Math.round(v).toLocaleString("en-US") + " THB"; };
+    var thbs = function (v) { return Math.round(v).toLocaleString(NUM) + " THB"; };
     var parts = [];
-    if (!d.conversations && !d.bookings) parts.push("A quiet day so far. " + esc(cfg.assistant) + " is ready for the next diver.");
+    var A = esc(cfg.assistant);
+    if (!d.conversations && !d.bookings) parts.push(t("A quiet day so far. {a} is ready for the next diver.", { a: A }));
     else {
-      parts.push(esc(cfg.assistant) + " sent " + d.replies + " " + (d.replies === 1 ? "reply" : "replies") + ".");
-      if (d.outsideBookings) parts.push(d.outsideBookings + " " + (d.outsideBookings === 1 ? "booking" : "bookings") + " (" + thbs(d.outsideRevenue) + ") came in outside office hours.");
-      if (d.handedOver) parts.push(d.handedOver + " " + (d.handedOver === 1 ? "conversation needs" : "conversations need") + " your team.");
+      parts.push(tn(d.replies, "{a} sent 1 reply.", "{a} sent {n} replies.", { a: A }));
+      if (d.outsideBookings) parts.push(tn(d.outsideBookings, "1 booking ({x}) came in outside office hours.", "{n} bookings ({x}) came in outside office hours.", { x: thbs(d.outsideRevenue) }));
+      if (d.handedOver) parts.push(tn(d.handedOver, "1 conversation needs your team.", "{n} conversations need your team."));
     }
-    var when = new Date(d.date).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Bangkok" }) + " · since 00:00";
-    return '<div class="nh">' + sun + "<b>Today so far</b><small>" + esc(when) + "</small></div>" +
-      '<div class="nstats">' + stat(d.conversations, d.conversations === 1 ? "conversation" : "conversations") +
-      stat(d.bookings, (d.bookings === 1 ? "booking" : "bookings") + (d.divers ? " · " + d.divers + (d.divers === 1 ? " diver" : " divers") : "")) +
-      stat(Math.round(d.revenue).toLocaleString("en-US"), "THB booked today") + "</div>" +
+    var when = new Date(d.date).toLocaleDateString(LOC, { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Bangkok" }) + " · " + t("since 00:00");
+    return '<div class="nh">' + sun + "<b>" + t("Today so far") + "</b><small>" + esc(when) + "</small></div>" +
+      '<div class="nstats">' + stat(d.conversations, d.conversations === 1 ? t("conversation") : t("conversations")) +
+      stat(d.bookings, (d.bookings === 1 ? t("booking") : t("bookings")) + (d.divers ? " · " + tn(d.divers, "1 diver", "{n} divers") : "")) +
+      stat(Math.round(d.revenue).toLocaleString(NUM), t("THB booked today")) + "</div>" +
       '<p class="nline">' + parts.join(" ") + "</p>";
   }
   function loadDay() {
@@ -5430,7 +5445,7 @@ function zoneClient(cfg) {
     return '<div class="nh">' + moon + '<b>While you were diving</b><small>' + esc(when) + '</small></div>' +
       '<div class="nstats">' + stat(d.conversations, d.conversations === 1 ? "conversation" : "conversations") +
       stat(d.bookings, d.bookings === 1 ? "booking" : "bookings") +
-      stat(Math.round(d.revenue).toLocaleString("en-US"), "THB booked") + '</div>' +
+      stat(Math.round(d.revenue).toLocaleString(NUM), "THB booked") + '</div>' +
       '<p class="nline">' + line + '</p>';
   }
   function loadNight(fresh) {
@@ -5452,14 +5467,14 @@ function zoneClient(cfg) {
       if (!s) return;
       var seen = false; try { seen = !!localStorage.getItem("talay-seen-prices"); } catch (e) {}
       var items = [
-        ["Check your prices and products", seen, "sett"],
-        ["Set your office hours", !!s.hoursText, "sett"],
-        ["Add your team", (s.staff || []).length > 1, "sett"],
-        ["Turn on notifications on this device", push, "sett"],
+        [t("Check your prices and products"), seen, "sett"],
+        [t("Set your office hours"), !!s.hoursText, "sett"],
+        [t("Add your team"), (s.staff || []).length > 1, "sett"],
+        [t("Turn on notifications on this device"), push, "sett"],
       ];
       var done = items.filter(function (i) { return i[1]; }).length;
       if (done === items.length) { el.hidden = true; return; }
-      el.innerHTML = '<div class="sh"><b>Get started with Talay</b><small>' + done + " of " + items.length + ' done</small><button type="button" class="lnk3" id="startHide">Hide</button></div>' +
+      el.innerHTML = '<div class="sh"><b>' + t("Get started with Talay") + "</b><small>" + t("{done} of {n} done", { done: done, n: items.length }) + '</small><button type="button" class="lnk3" id="startHide">' + t("Hide") + "</button></div>" +
         '<div class="sprog"><span style="width:' + Math.round(done / items.length * 100) + '%"></span></div>' +
         '<ul class="slist">' + items.map(function (i) {
           return '<li class="' + (i[1] ? "ok" : "") + '"><span class="ck">' + (i[1] ? '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8.5 3.2 3L13 4.5"/></svg>' : "") + "</span>" +
@@ -5478,53 +5493,56 @@ function zoneClient(cfg) {
       ddata = d; $("#dbody").style.opacity = "";
       var sel = $("#period");
       if (!sel.options.length) {
-        sel.innerHTML = '<option value="">Last 30 days</option>' + d.months.map(function (m) { return '<option value="' + m.value + '">' + esc(m.label) + "</option>"; }).join("");
+        sel.innerHTML = '<option value="">' + t("Last 30 days") + "</option>" + d.months.map(function (m) { return '<option value="' + m.value + '">' + esc(monthLabel(m.value)) + "</option>"; }).join("");
       }
       renderDash();
     }).catch(function (e) { $("#dbody").style.opacity = ""; if (e.message !== "auth") $("#dbody").innerHTML = '<div class="bempty">' + esc(e.message) + "</div>"; });
   }
+  function monthLabel(ym) { return new Date(ym + "-15T12:00:00Z").toLocaleDateString(cfg.locale || "en-GB", { month: "long", year: "numeric" }); }
+  function periodLabel(d) { return /^\d{4}-\d{2}$/.test(d.period) ? monthLabel(d.period) : t("Last 30 days"); }
   function funnelHtml(f) {
     if (!f) return "";
     var steps = [
-      ["Conversations", f.conversations, "divers who wrote"],
-      ["Got a booking link", f.linkSent, "from " + esc(cfg.assistant) + " or your team"],
-      ["Opened the payment page", f.opened, "chose a date and divers"],
-      ["Booked", f.booked, "paid the deposit"],
+      [t("Conversations"), f.conversations, t("divers who wrote")],
+      [t("Got a booking link"), f.linkSent, t("from {a} or your team", { a: esc(cfg.assistant) })],
+      [t("Opened the payment page"), f.opened, t("chose a date and divers")],
+      [t("Booked"), f.booked, t("paid the deposit")],
     ];
     var top = Math.max(1, f.conversations);
     var html = steps.map(function (s, i) {
       var w = Math.max(4, Math.round(s[1] / top * 100));
       var prev = i ? steps[i - 1][1] : 0;
-      var conv = i ? '<span class="fpct" title="of the step before">' + (prev ? Math.round(s[1] / prev * 100) + "% of previous" : "–") + "</span>" : "";
+      var conv = i ? '<span class="fpct" title="' + t("of the step before") + '">' + (prev ? t("{n}% of previous", { n: Math.round(s[1] / prev * 100) }) : "–") + "</span>" : "";
       return '<div class="fstep">' + conv + '<div class="fbar"><span style="width:' + w + '%"></span></div>' +
         '<b>' + s[1] + '</b><small>' + s[0] + '</small><em>' + s[2] + "</em></div>";
     }).join("");
     var lost = Math.max(0, f.opened - f.booked);
-    var tip = lost ? lost + " " + (lost === 1 ? "diver" : "divers") + " opened the payment page but didn't pay. See <b>Bookings → Not paid yet</b> to send a reminder." : "Nobody dropped off at the payment page in this period.";
-    return '<div class="panel funnel"><h4>From question to booking</h4><div class="fsteps">' + html + '</div><p class="hnote">' + tip + "</p></div>";
+    var tip = lost ? tn(lost, "1 diver opened the payment page but didn't pay. See <b>Bookings → Not paid yet</b> to send a reminder.", "{n} divers opened the payment page but didn't pay. See <b>Bookings → Not paid yet</b> to send a reminder.") : t("Nobody dropped off at the payment page in this period.");
+    return '<div class="panel funnel"><h4>' + t("From question to booking") + "</h4>" + '<div class="fsteps">' + html + '</div><p class="hnote">' + tip + "</p></div>";
   }
+  function country(cc, en) { if (!cfg.locale) return en; try { return new Intl.DisplayNames([cfg.locale], { type: "region" }).of(String(cc).toUpperCase()) || en; } catch (e) { return en; } }
   function flag(cc) { return String(cc || "").toUpperCase().replace(/./g, function (c) { return String.fromCodePoint(127397 + c.charCodeAt(0)); }); }
   function heatParts(d) {
     if (!d.heat) return { heat: "", ctry: "" };
-    var days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], max = 1, total = 0;
+    var days = [0, 1, 2, 3, 4, 5, 6].map(function (i) { return new Date(Date.UTC(2024, 0, 1 + i, 12)).toLocaleDateString(cfg.locale || "en-GB", { weekday: "short", timeZone: "UTC" }); }), max = 1, total = 0;
     d.heat.forEach(function (r) { r.forEach(function (v) { max = Math.max(max, v); total += v; }); });
     var best = null;
     d.heat.forEach(function (r, di) { for (var h = 0; h < 24; h += 3) { var s = r[h] + r[h + 1] + r[h + 2]; if (!best || s > best.s) best = { s: s, d: di, h: h }; } });
     var cells = d.heat.map(function (r, di) {
       return '<span class="hd">' + days[di] + "</span>" + r.map(function (v, h) {
         var a = v ? 0.18 + 0.82 * v / max : 0;
-        return '<i title="' + days[di] + " " + String(h).padStart(2, "0") + ":00 · " + v + " new " + (v === 1 ? "diver" : "divers") + '" style="background:' + (v ? "rgba(220,164,74," + a.toFixed(2) + ")" : "var(--paper)") + '"></i>';
+        return '<i title="' + days[di] + " " + String(h).padStart(2, "0") + ":00 · " + tn(v, "1 new diver", "{n} new divers") + '" style="background:' + (v ? "rgba(220,164,74," + a.toFixed(2) + ")" : "var(--paper)") + '"></i>';
       }).join("");
     }).join("");
     var hours = '<span></span>' + [0, 3, 6, 9, 12, 15, 18, 21].map(function (h) { return '<span class="hh" style="grid-column:span 3">' + String(h).padStart(2, "0") + "</span>"; }).join("");
-    var note = total && best && best.s ? "Busiest: " + days[best.d] + " " + String(best.h).padStart(2, "0") + ":00–" + String(best.h + 3).padStart(2, "0") + ":00 (Koh Tao time)." : "No new divers in this period yet.";
+    var note = total && best && best.s ? t("Busiest: {w} {f}–{u} (Koh Tao time).", { w: days[best.d], f: String(best.h).padStart(2, "0") + ":00", u: String(best.h + 3).padStart(2, "0") + ":00" }) : t("No new divers in this period yet.");
     var cmax = Math.max(1, d.countries.length ? d.countries[0][2] : 1);
     var ctry = d.countries.length ? d.countries.map(function (c) {
-      return '<div class="barrow"><span class="lb lbw"><span class="flag">' + flag(c[0]) + "</span> " + esc(c[1]) + '</span><span class="bar" style="width:' + (c[2] / cmax * 60) + '%"></span><span>' + c[2] + "</span></div>";
-    }).join("") : '<div class="bempty">No phone numbers yet.</div>';
+      return '<div class="barrow"><span class="lb lbw"><span class="flag">' + flag(c[0]) + "</span> " + esc(country(c[0], c[1])) + '</span><span class="bar" style="width:' + (c[2] / cmax * 60) + '%"></span><span>' + c[2] + "</span></div>";
+    }).join("") : '<div class="bempty">' + t("No phone numbers yet.") + "</div>";
     return {
-      heat: '<div class="panel"><h4>When new divers write</h4><div class="heat">' + hours + cells + '</div><p class="hnote">' + note + "</p></div>",
-      ctry: '<div class="panel"><h4>Where they come from</h4>' + ctry + '<p class="hnote">From the country code of their phone number.</p></div>',
+      heat: '<div class="panel"><h4>' + t("When new divers write") + '</h4><div class="heat">' + hours + cells + '</div><p class="hnote">' + note + "</p></div>",
+      ctry: '<div class="panel"><h4>' + t("Where they come from") + "</h4>" + ctry + '<p class="hnote">' + t("From the country code of their phone number.") + "</p></div>",
     };
   }
   function renderDash() {
@@ -5534,63 +5552,64 @@ function zoneClient(cfg) {
       if (!P || P[key] == null || k[key] == null) return "";
       var a = Number(k[key]), b = Number(P[key]);
       if (!b && !a) return "";
-      if (!b) return '<em class="trend up">New</em>';
+      if (!b) return '<em class="trend up">' + t("New") + "</em>";
       var ch = Math.round((a - b) / b * 100);
-      if (!ch) return '<em class="trend flat">= vs previous</em>';
+      if (!ch) return '<em class="trend flat">' + t("= vs previous") + "</em>";
       var good = lowerBetter ? ch < 0 : ch > 0;
-      return '<em class="trend ' + (good ? "up" : "down") + '">' + (ch > 0 ? "↑ " : "↓ ") + Math.abs(ch) + "% vs previous</em>";
+      return '<em class="trend ' + (good ? "up" : "down") + '">' + t("{n}% vs previous", { n: (ch > 0 ? "↑ " : "↓ ") + Math.abs(ch) }) + "</em>";
     };
     var kp = function (label, val, sub, hi, key, lowerBetter) { return '<div class="kpi' + (hi ? " hi" : "") + '"><small>' + label + "</small><b>" + val + "</b>" + (key ? tr(key, lowerBetter) : "") + (sub ? "<span>" + sub + "</span>" : "") + "</div>"; };
     var maxW = Math.max(1, Math.max.apply(null, d.weeks.map(function (w) { return Math.max(w.conversations, w.bookings); })));
     var W = Math.max(d.weeks.length, 1), bw = 100 / W;
     var bars = d.weeks.map(function (w, i) {
       var h1 = w.conversations / maxW * 100, h2 = w.bookings / maxW * 100, x = i * bw;
-      return '<rect x="' + (x + bw * 0.12) + '" y="' + (100 - h1) + '" width="' + (bw * 0.36) + '" height="' + h1 + '" fill="#4E7480" rx="1"><title>' + w.conversations + " conversations</title></rect>" +
-        '<rect x="' + (x + bw * 0.52) + '" y="' + (100 - h2) + '" width="' + (bw * 0.36) + '" height="' + h2 + '" fill="#DCA44A" rx="1"><title>' + w.bookings + " bookings</title></rect>";
+      return '<rect x="' + (x + bw * 0.12) + '" y="' + (100 - h1) + '" width="' + (bw * 0.36) + '" height="' + h1 + '" fill="#4E7480" rx="1"><title>' + tn(w.conversations, "1 conversation", "{n} conversations") + "</title></rect>" +
+        '<rect x="' + (x + bw * 0.52) + '" y="' + (100 - h2) + '" width="' + (bw * 0.36) + '" height="' + h2 + '" fill="#DCA44A" rx="1"><title>' + tn(w.bookings, "1 booking", "{n} bookings") + "</title></rect>";
     }).join("");
-    var labels = d.weeks.map(function (w) { return '<span style="flex:1;text-align:center">' + new Date(w.week + "T12:00:00Z").toLocaleDateString([], { day: "numeric", month: "short" }) + "</span>"; }).join("");
+    var labels = d.weeks.map(function (w) { return '<span style="flex:1;text-align:center">' + new Date(w.week + "T12:00:00Z").toLocaleDateString(LOC, { day: "numeric", month: "short" }) + "</span>"; }).join("");
     var langMax = Math.max(1, d.languages.length ? d.languages[0][1] : 1);
     var sec = function (title, sub) { return '<div class="dsec"><h3>' + title + "</h3>" + (sub ? "<p>" + sub + "</p>" : "") + "</div>"; };
     var mini = function (label, val, sub, key, lowerBetter) { return '<div class="mini"><small>' + label + "</small><b>" + val + "</b>" + (key ? tr(key, lowerBetter) : "") + (sub ? "<span>" + sub + "</span>" : "") + "</div>"; };
     var hp = heatParts(d);
-    var weekPanel = '<div class="panel"><h4>Per week</h4><div class="legend"><span><i style="background:#4E7480"></i>Conversations</span><span><i style="background:#DCA44A"></i>Bookings</span></div>' +
+    var weekPanel = '<div class="panel"><h4>' + t("Per week") + '</h4><div class="legend"><span><i style="background:#4E7480"></i>' + t("Conversations") + '</span><span><i style="background:#DCA44A"></i>' + t("Bookings") + "</span></div>" +
         '<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:160px;display:block">' + bars + "</svg>" +
         '<div style="display:flex;font-size:11px;color:var(--muted);margin-top:4px">' + labels + "</div></div>";
-    var langPanel = '<div class="panel"><h4>Languages</h4>' + (d.languages.length ? d.languages.map(function (l) {
-          return '<div class="barrow"><span class="lb">' + esc(l[0]) + '</span><span class="bar" style="width:' + (l[1] / langMax * 70) + '%"></span><span>' + l[1] + "</span></div>"; }).join("") : '<div class="bempty">No conversations yet.</div>') + "</div>";
+    var langPanel = '<div class="panel"><h4>' + t("Languages") + "</h4>" + (d.languages.length ? d.languages.map(function (l) {
+          return '<div class="barrow"><span class="lb">' + esc(langName(l[0])) + '</span><span class="bar" style="width:' + (l[1] / langMax * 70) + '%"></span><span>' + l[1] + "</span></div>"; }).join("") : '<div class="bempty">' + t("No conversations yet.") + "</div>") + "</div>";
     var prodPanel =       (d.products.length ? '<div class="panel"><h4>Bookings per product</h4><div class="bscroll"><table class="btable"><thead><tr><th>Product</th><th class="num">Bookings</th><th class="num">Divers</th><th class="num">Value</th></tr></thead><tbody>' +
         d.products.map(function (p) { return "<tr><td>" + esc(p[0]) + '</td><td class="num">' + p[1].bookings + '</td><td class="num">' + p[1].divers + '</td><td class="num">' + thb(p[1].value) + "</td></tr>"; }).join("") + "</tbody></table></div></div>" : "");
-    prodPanel = d.products.length ? '<div class="panel"><h4>Top products</h4>' + d.products.slice(0, 6).map(function (p) {
-      return '<div class="prow"><div><b>' + esc(p[0]) + "</b><small>" + p[1].bookings + (p[1].bookings === 1 ? " booking" : " bookings") + " · " + p[1].divers + (p[1].divers === 1 ? " diver" : " divers") + "</small></div><span>" + thb(p[1].value) + "</span></div>";
+    prodPanel = d.products.length ? '<div class="panel"><h4>' + t("Top products") + "</h4>" + d.products.slice(0, 6).map(function (p) {
+      return '<div class="prow"><div><b>' + esc(p[0]) + "</b><small>" + tn(p[1].bookings, "1 booking", "{n} bookings") + " · " + tn(p[1].divers, "1 diver", "{n} divers") + "</small></div><span>" + thb(p[1].value) + "</span></div>";
     }).join("") + "</div>" : "";
-    var stmtPanel =       '<div class="panel"><div class="st-head"><h2 style="margin:0">Talay statement · ' + esc(d.center) + "</h2><p>" + esc(d.label) + "</p></div>" +
-        "<h4>Statement · " + esc(d.label) + "</h4>" +
-        '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">Talay\'s commission is the online deposit the diver pays when booking; your team collects the rest at the shop. Nothing to transfer: this is your overview.</p>' +
-        (d.statement.length ? '<div class="bscroll"><table class="btable"><thead><tr><th>Booked</th><th>Ref</th><th>Diver</th><th>Product</th><th>Dive date</th><th class="num">Divers</th><th class="num">Value</th><th class="num">Commission</th><th>Status</th></tr></thead><tbody>' +
+    var label = periodLabel(d);
+    var stmtPanel =       '<div class="panel"><div class="st-head"><h2 style="margin:0">' + t("Talay statement") + " · " + esc(d.center) + "</h2><p>" + esc(label) + "</p></div>" +
+        "<h4>" + t("Statement") + " · " + esc(label) + "</h4>" +
+        '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">' + t("Talay's commission is the online deposit the diver pays when booking; your team collects the rest at the shop. Nothing to transfer: this is your overview.") + "</p>" +
+        (d.statement.length ? '<div class="bscroll"><table class="btable"><thead><tr><th>' + t("Booked") + "</th><th>" + t("Ref") + "</th><th>" + t("Diver") + "</th><th>" + t("Product") + "</th><th>" + t("Dive date") + '</th><th class="num">' + t("Divers") + '</th><th class="num">' + t("Value") + '</th><th class="num">' + t("Commission") + "</th><th>" + t("Status") + "</th></tr></thead><tbody>" +
           d.statement.map(function (r) {
-            return '<tr class="' + (r.cancelled ? "cx" : "") + '"><td>' + new Date(r.created).toLocaleDateString([], { day: "numeric", month: "short" }) + "</td><td>" + esc(r.ref) + "</td><td>" + esc(r.name) + "</td><td>" + esc(r.product) + "</td><td>" + (r.date ? esc(dayLabel(r.date)) : "") +
-              '</td><td class="num">' + r.divers + '</td><td class="num">' + thb(r.total) + '</td><td class="num">' + thb(r.commission) + '</td><td class="keep">' + esc(r.status) + (r.refunded ? "<br><small>Refunded " + thb(r.refunded) + "</small>" : "") + "</td></tr>";
+            return '<tr class="' + (r.cancelled ? "cx" : "") + '"><td>' + new Date(r.created).toLocaleDateString(LOC, { day: "numeric", month: "short" }) + "</td><td>" + esc(r.ref) + "</td><td>" + esc(r.name) + "</td><td>" + esc(r.product) + "</td><td>" + (r.date ? esc(dayLabel(r.date)) : "") +
+              '</td><td class="num">' + r.divers + '</td><td class="num">' + thb(r.total) + '</td><td class="num">' + thb(r.commission) + '</td><td class="keep">' + esc(t(r.status)) + (r.refunded ? "<br><small>" + t("Refunded {x}", { x: thb(r.refunded) }) + "</small>" : "") + "</td></tr>";
           }).join("") +
-          '<tr><td colspan="6"><b>Total</b></td><td class="num"><b>' + thb(k.revenue) + '</b></td><td class="num"><b>' + thb(k.commission - k.refunded) + "</b></td><td>" + (k.refunded ? "after " + thb(k.refunded) + " refunded" : "") + "</td></tr>" +
-          "</tbody></table></div>" : '<div class="bempty">No bookings in this period.</div>') + "</div>";
+          '<tr><td colspan="6"><b>' + t("Total") + '</b></td><td class="num"><b>' + thb(k.revenue) + '</b></td><td class="num"><b>' + thb(k.commission - k.refunded) + "</b></td><td>" + (k.refunded ? t("after {x} refunded", { x: thb(k.refunded) }) : "") + "</td></tr>" +
+          "</tbody></table></div>" : '<div class="bempty">' + t("No bookings in this period.") + "</div>") + "</div>";
     var html =
-      sec("Results", esc(d.label) + " · compared with the period before") +
+      sec(t("Results"), t("{l} · compared with the period before", { l: esc(label) })) +
       '<div class="kpis main">' +
-        kp("Revenue via " + esc(cfg.assistant), thb(k.revenue), k.divers + " divers", true, "revenue") +
-        kp("Bookings", k.bookings, k.afterFollowUp + " after a follow-up", false, "bookings") +
-        kp("Conversations", k.conversations, k.outsideHours + " outside office hours (" + pct(k.outsideHours, k.conversations) + ")", false, "conversations") +
-        kp("Booking conversion", k.conversion + "%", "of conversations booked", false, "conversion") +
+        kp(t("Revenue via {a}", { a: esc(cfg.assistant) }), thb(k.revenue), tn(k.divers, "1 diver", "{n} divers"), true, "revenue") +
+        kp(t("Bookings"), k.bookings, t("{n} after a follow-up", { n: k.afterFollowUp }), false, "bookings") +
+        kp(t("Conversations"), k.conversations, t("{n} outside office hours ({p})", { n: k.outsideHours, p: pct(k.outsideHours, k.conversations) }), false, "conversations") +
+        kp(t("Booking conversion"), k.conversion + "%", t("of conversations booked"), false, "conversion") +
       "</div>" +
       '<div class="minis">' +
-        mini(esc(cfg.assistant) + "'s first reply", fmtSec(k.avgResponse), "on average", "avgResponse", true) +
-        mini("Handed to your team", k.handedOver, pct(k.handedOver, k.conversations) + " of conversations") +
-        mini("Collected at your shop", thb(k.atShop), "balance paid on arrival", "atShop") +
+        mini(t("{a}'s first reply", { a: esc(cfg.assistant) }), fmtSec(k.avgResponse), t("on average"), "avgResponse", true) +
+        mini(t("Handed to your team"), k.handedOver, t("{p} of conversations", { p: pct(k.handedOver, k.conversations) })) +
+        mini(t("Collected at your shop"), thb(k.atShop), t("balance paid on arrival"), "atShop") +
       "</div>" +
       '<div class="dgrid"><div class="dmain">' + funnelHtml(d.funnel) + weekPanel + '</div><div class="dside"><div id="msSlot"></div>' + prodPanel + "</div></div>" +
-      sec("Your divers", "When they write, where they come from and the languages they speak") +
+      sec(t("Your divers"), t("When they write, where they come from and the languages they speak")) +
       '<div class="dgrid3">' + hp.heat + hp.ctry + langPanel + "</div>" +
-      sec("Statement", "Every booking through Talay in this period, with the commission") +
-      '<details class="stmt"><summary>Show ' + d.statement.length + (d.statement.length === 1 ? " booking" : " bookings") + " · " + thb(k.revenue) + "</summary>" + stmtPanel + "</details>";
+      sec(t("Statement"), t("Every booking through Talay in this period, with the commission")) +
+      '<details class="stmt"><summary>' + tn(d.statement.length, "Show 1 booking", "Show {n} bookings") + " · " + thb(k.revenue) + "</summary>" + stmtPanel + "</details>";
     $("#dbody").innerHTML = html;
     var ms = $("#ms"), slot = $("#msSlot"); if (ms && slot) slot.appendChild(ms);
   }
@@ -5623,32 +5642,33 @@ function zoneClient(cfg) {
       if (!tview && $("#supp").classList.contains("on")) renderTickets();
     }).catch(function (e) { if (e.message !== "auth" && $("#supp").classList.contains("on")) $("#tbody").innerHTML = '<div class="bempty">' + esc(e.message) + "</div>"; });
   }
+  var tt = t; // ticket loops below use t for the ticket
   function renderTickets() {
     if (!tdata) return;
     var list = tdata.tickets.filter(function (t) { return tfilter === "done" ? t.status === "Done" : t.status !== "Done"; });
     if (!list.length) {
-      $("#tbody").innerHTML = tfilter === "done" ? '<div class="bempty">No closed tickets yet.</div>' :
+      $("#tbody").innerHTML = tfilter === "done" ? '<div class="bempty">' + t("No closed tickets yet.") + "</div>" :
         '<div class="empty-card"><div class="eic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/><path d="m9 11 2 2 4-4"/></svg></div>' +
-        "<b>No open tickets. All good.</b><p>Something not working, a wrong answer from " + esc(cfg.assistant) + ", or an idea for Talay? Click <b>New ticket</b>, or <b>Report</b> under any message from " + esc(cfg.assistant) + ". We reply here.</p></div>";
+        "<b>" + t("No open tickets. All good.") + "</b><p>" + t("Something not working, a wrong answer from {a}, or an idea for Talay? Click <b>New ticket</b>, or <b>Report</b> under any message from {a}. We reply here.", { a: esc(cfg.assistant) }) + "</p></div>";
       return;
     }
     $("#tbody").innerHTML = '<div class="tlist">' + list.map(function (t) {
       return '<button class="titem" data-tid="' + esc(t.id) + '"><div class="tt"><b>' + (t.number ? "#" + esc(t.number) + " · " : "") + esc(t.title) + "</b><small>" +
-        esc(t.type) + (t.priority === "Urgent" ? " · Urgent" : "") + " · " + esc(t.by) + " · updated " + ago(t.updated) + (ago(t.updated) === "now" ? "" : " ago") +
-        '</small></div><span class="' + tsClass(t.status) + '">' + esc(t.status) + "</span></button>";
+        esc(tt(t.type)) + (t.priority === "Urgent" ? " · " + tt("Urgent") : "") + " · " + esc(t.by) + " · " + (ago(t.updated) === tt("now") ? tt("updated just now") : tt("updated {t} ago", { t: ago(t.updated) })) +
+        '</small></div><span class="' + tsClass(t.status) + '">' + esc(tt(t.status)) + "</span></button>";
     }).join("") + "</div>";
     $("#tbody").querySelectorAll("[data-tid]").forEach(function (b) { b.onclick = function () { openTicket(b.dataset.tid); }; });
   }
   function newTicket(pre) {
     document.querySelector('nav button[data-v="supp"]').click();
     tview = "new";
-    $("#tbody").innerHTML = '<div class="scard"><h3>New ticket</h3><p class="d">Tell Talay what\'s wrong or what you\'d like. Jonas gets it right away and answers here.</p>' +
-      '<div class="tform"><div class="two"><label>Type<select id="nType">' + TYPES.map(function (t) { return "<option" + (t === (pre.type || "Question") ? " selected" : "") + ">" + t + "</option>"; }).join("") + "</select></label>" +
-      '<label>Priority<select id="nPrio"><option>Low</option><option selected>Normal</option><option>Urgent</option></select></label></div>' +
-      '<label>Title<input id="nTitle" maxlength="140" value="' + esc(pre.title || "") + '"></label>' +
-      '<label>What happened, or what would you like?<textarea id="nDesc" placeholder="' + (pre.type === "Wrong answer" ? "What should " + esc(cfg.assistant) + " have answered?" : "Be as concrete as you can.") + '"></textarea></label>' +
-      (pre.context ? '<label>Conversation<div class="ctx" id="nCtx">' + esc(pre.context) + "</div></label>" : "") +
-      '<div class="srow"><button class="btn" id="nSend" type="button">Send ticket</button><button class="ghost" id="nCancel" type="button">Cancel</button></div><div class="smsg" id="nMsg"></div></div></div>';
+    $("#tbody").innerHTML = '<div class="scard"><h3>' + t("New ticket") + '</h3><p class="d">' + t("Tell Talay what's wrong or what you'd like. Jonas gets it right away and answers here.") + "</p>" +
+      '<div class="tform"><div class="two"><label>' + t("Type") + '<select id="nType">' + TYPES.map(function (x) { return '<option value="' + x + '"' + (x === (pre.type || "Question") ? " selected" : "") + ">" + t(x) + "</option>"; }).join("") + "</select></label>" +
+      "<label>" + t("Priority") + '<select id="nPrio"><option value="Low">' + t("Low") + '</option><option value="Normal" selected>' + t("Normal") + '</option><option value="Urgent">' + t("Urgent") + "</option></select></label></div>" +
+      "<label>" + t("Title") + '<input id="nTitle" maxlength="140" value="' + esc(pre.title || "") + '"></label>' +
+      "<label>" + t("What happened, or what would you like?") + '<textarea id="nDesc" placeholder="' + (pre.type === "Wrong answer" ? t("What should {a} have answered?", { a: esc(cfg.assistant) }) : t("Be as concrete as you can.")) + '"></textarea></label>' +
+      (pre.context ? "<label>" + t("Conversation") + '<div class="ctx" id="nCtx">' + esc(pre.context) + "</div></label>" : "") +
+      '<div class="srow"><button class="btn" id="nSend" type="button">' + t("Send ticket") + '</button><button class="ghost" id="nCancel" type="button">' + t("Cancel") + '</button></div><div class="smsg" id="nMsg"></div></div></div>';
     $("#nCancel").onclick = function () { tview = null; renderTickets(); };
     $("#nSend").onclick = function () {
       var btn = this; btn.disabled = true;
@@ -5664,18 +5684,18 @@ function zoneClient(cfg) {
     api("ticket?id=" + encodeURIComponent(id)).then(function (d) {
       if (tview !== id) return;
       var t = d.ticket;
-      var html = '<div class="scard"><div class="srow" style="margin-bottom:8px"><button class="ghost" id="tBack" type="button">‹ All tickets</button><span class="sp" style="flex:1"></span><span class="' + tsClass(t.status) + '">' + esc(t.status) + "</span></div>" +
-        "<h3>" + (t.number ? "#" + esc(t.number) + " · " : "") + esc(t.title) + '</h3><p class="d">' + esc(t.type) + " · " + esc(t.priority) + " · opened by " + esc(t.by) + " · " + esc(clock(t.created)) + "</p>" +
+      var html = '<div class="scard"><div class="srow" style="margin-bottom:8px"><button class="ghost" id="tBack" type="button">‹ ' + tt("All tickets") + '</button><span class="sp" style="flex:1"></span><span class="' + tsClass(t.status) + '">' + esc(tt(t.status)) + "</span></div>" +
+        "<h3>" + (t.number ? "#" + esc(t.number) + " · " : "") + esc(t.title) + '</h3><p class="d">' + esc(tt(t.type)) + " · " + esc(tt(t.priority)) + " · " + tt("opened by {who}", { who: esc(t.by) }) + " · " + esc(clock(t.created)) + "</p>" +
         (t.description ? '<div class="tmsg" style="margin-bottom:10px">' + esc(t.description) + "</div>" : "") +
         (t.context ? '<div class="ctx" style="margin-bottom:10px">' + esc(t.context) + "</div>" : "") +
-        (t.contact ? '<p style="margin:0 0 10px"><a href="#" id="tChat">Open the conversation</a></p>' : "") +
-        (t.quote ? '<div class="quote" style="margin-bottom:10px"><b>Quote from Talay</b><div style="white-space:pre-wrap;margin-top:4px">' + esc(t.quote) + "</div>" +
-          (t.approved ? '<p style="margin:8px 0 0"><span class="ts Done">Approved</span></p>' : '<p style="margin:8px 0 0"><button class="btn" id="tApprove" type="button">Approve quote</button></p>') + "</div>" : "") +
+        (t.contact ? '<p style="margin:0 0 10px"><a href="#" id="tChat">' + tt("Open the conversation") + "</a></p>" : "") +
+        (t.quote ? '<div class="quote" style="margin-bottom:10px"><b>' + tt("Quote from Talay") + '</b><div style="white-space:pre-wrap;margin-top:4px">' + esc(t.quote) + "</div>" +
+          (t.approved ? '<p style="margin:8px 0 0"><span class="ts Done">' + tt("Approved") + "</span></p>" : '<p style="margin:8px 0 0"><button class="btn" id="tApprove" type="button">' + tt("Approve quote") + "</button></p>") + "</div>" : "") +
         '<div style="display:grid;gap:8px;margin-bottom:12px">' + d.messages.map(function (m) {
           return '<div class="tmsg' + (m.talay ? " talay" : "") + '"><small>' + (m.talay ? "Talay" : esc(m.author)) + " · " + esc(clock(m.at)) + "</small>" + esc(m.text) + "</div>";
         }).join("") + "</div>" +
-        '<div class="tform"><textarea id="tReply" placeholder="Write a message to Talay…"></textarea><div class="srow"><button class="btn" id="tSend" type="button">Send</button>' +
-        (t.status !== "Done" ? '<button class="ghost" id="tClose" type="button">Mark as solved</button>' : "") + '</div><div class="smsg" id="tMsg"></div></div></div>';
+        '<div class="tform"><textarea id="tReply" placeholder="' + tt("Write a message to Talay…") + '"></textarea><div class="srow"><button class="btn" id="tSend" type="button">' + tt("Send") + "</button>" +
+        (t.status !== "Done" ? '<button class="ghost" id="tClose" type="button">' + tt("Mark as solved") + "</button>" : "") + '</div><div class="smsg" id="tMsg"></div></div></div>';
       $("#tbody").innerHTML = html;
       $("#tBack").onclick = function () { tview = null; renderTickets(); };
       if ($("#tChat")) $("#tChat").onclick = function (e) {
@@ -5687,7 +5707,7 @@ function zoneClient(cfg) {
       };
       $("#tSend").onclick = function () { var v = $("#tReply").value.trim(); if (!v) return; this.disabled = true; act("ticket-message", { id: id, text: v }); };
       if ($("#tClose")) $("#tClose").onclick = function () { act("ticket-close", { id: id }); };
-      if ($("#tApprove")) $("#tApprove").onclick = function () { if (confirm("Approve this quote?")) act("ticket-approve", { id: id }); };
+      if ($("#tApprove")) $("#tApprove").onclick = function () { if (confirm(tt("Approve this quote?"))) act("ticket-approve", { id: id }); };
     }).catch(function (e) { if (e.message !== "auth") $("#tbody").innerHTML = '<div class="bempty">' + esc(e.message) + "</div>"; });
   }
   loadTickets();
@@ -5706,8 +5726,8 @@ function zoneClient(cfg) {
     if ($("#install")) return;
     var bar = document.createElement("div");
     bar.id = "install";
-    bar.innerHTML = '<span>📲 ' + (deferredInstall ? "Install " + esc(cfg.center) + " as an app on this device." : "Add this to your home screen: tap <b>Share</b>, then <b>Add to Home Screen</b>.") + "</span>" +
-      (deferredInstall ? '<button class="btn" id="instGo" type="button">Install</button>' : "") + '<button class="lnk2" id="instX" type="button" aria-label="Close">✕</button>';
+    bar.innerHTML = '<span>📲 ' + (deferredInstall ? t("Install {c} as an app on this device.", { c: esc(cfg.center) }) : t("Add this to your home screen: tap <b>Share</b>, then <b>Add to Home Screen</b>.")) + "</span>" +
+      (deferredInstall ? '<button class="btn" id="instGo" type="button">' + t("Install") + "</button>" : "") + '<button class="lnk2" id="instX" type="button" aria-label="' + t("Close") + '">✕</button>';
     document.body.appendChild(bar);
     if ($("#instGo")) $("#instGo").onclick = function () { deferredInstall.prompt(); deferredInstall.userChoice.then(function () { bar.remove(); }); };
     $("#instX").onclick = function () { try { localStorage.setItem("talay-install-hide", "1"); } catch (e) {} bar.remove(); };
