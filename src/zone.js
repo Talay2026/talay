@@ -4701,13 +4701,18 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .btable.bday a.tel{font-weight:500;text-decoration:none}
 .btable.bday a.tel:hover{text-decoration:underline}
 .btable td.tlinks{text-align:right;white-space:nowrap}
-.btable td.tlinks a{display:inline-block;margin-left:6px;padding:4px 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--deep);font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap}
+.btable td.tlinks a{display:inline-block;vertical-align:top;margin:-3px 0 -3px 6px;padding:0 12px;line-height:22px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--deep);font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap}
 .btable td.tlinks a:hover{background:var(--paper);border-color:#D9CFBD}
 .btable td.tlinks .st{font-size:12.5px;color:var(--muted)}
 /* The numbers at the top of each page: centred */
 .cards .cardn,.kpis .kpi{text-align:center}
-.minis.strip .mini{justify-content:center;text-align:center}
+.minis.strip .mini{justify-content:center;align-items:center;align-content:flex-start;text-align:center}
+.minis.strip .mini span{flex-basis:100%}
 @media (max-width:760px){.btable td.tlinks a{margin:0 6px 0 0}}
+.chip{display:inline-flex;align-items:center;justify-content:center;line-height:20px}
+.chip .count{line-height:18px}
+.th{align-items:baseline}
+.th .tag{align-self:center}
 @media (max-width:760px){#books .btable.bday tr.grp{background:none;border:0;padding:12px 2px 4px;margin:0}#books .btable.bday tr.grp td{background:none;padding:0;justify-content:flex-start;text-align:left}#books .btable.bday .tname{flex-direction:column;align-items:flex-start;gap:0}}
 .minis.strip{gap:0;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
 .minis.strip .mini{background:none;border:0;border-radius:0;box-shadow:none;padding:14px 20px}
