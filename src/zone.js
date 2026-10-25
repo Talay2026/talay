@@ -4956,12 +4956,12 @@ function zoneClient(cfg) {
         fact(t("Group"), L.group) + fact(t("Interested in"), /^rec[A-Za-z0-9]{14}$/.test(L.interested) ? "" : L.interested) + fact(t("Status"), human(L.status)) + fact("WhatsApp", L.contact && L.name && L.contact !== L.name ? prettyPhone(L.contact) : "") +
         "";
       // While the team has the chat, Mia stays silent for this diver. "Talay - release handovers" (hourly)
-      // gives it back 4 hours after the last team message; this banner keeps the early hand back in view.
+      // gives it back 2 hours after the last team message; this banner keeps the early hand back in view.
       var paused = "";
       if (d.hasLead && L.human) {
         var lastTeamAt = 0;
         d.messages.forEach(function (m) { if (m.dir === "Team") lastTeamAt = Math.max(lastTeamAt, Date.parse(m.at) || 0); });
-        var back = new Date(Math.ceil((Math.max(lastTeamAt, Date.parse(L.humanAt || 0) || 0, Date.now() - 4 * 3600e3) + 4 * 3600e3) / 3600e3) * 3600e3);
+        var back = new Date(Math.ceil((Math.max(lastTeamAt, Date.parse(L.humanAt || 0) || 0, Date.now() - MIA_BACK_H * 3600e3) + MIA_BACK_H * 3600e3) / 3600e3) * 3600e3);
         paused = '<div class="paused"><span class="pi"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></span><div class="pt"><b>' + t("{a} is paused for this diver", { a: esc(cfg.assistant) }) + "</b><span>" +
           t("Done helping? Give the chat back, so {a} answers the next question. Otherwise {a} only takes over again around {t}.", { a: esc(cfg.assistant), t: esc(back.toLocaleTimeString(LOC, { hour: "2-digit", minute: "2-digit" })) }) +
           '</span></div><button class="btn primary" id="handback2" type="button">▶ ' + t("Let {a} take over", { a: esc(cfg.assistant) }) + "</button></div>";
@@ -5003,7 +5003,7 @@ function zoneClient(cfg) {
             '<div class="cmeta"><label class="sig"><input type="checkbox" id="sigon"> ' + t("Signed as") + ' <input id="sig" maxlength="30" placeholder="' + t("your name") + '"></label>' +
             '<select id="prod" aria-label="' + t("Booking link") + '" hidden><option value="">' + t("+ Booking link…") + "</option></select>" +
             '<span class="sp"></span><span class="bt' + (l.soon ? " soon" : "") + '">' + esc(l.t) + "</span></div>" +
-            '<div class="note" id="note">' + t("Enter sends · Shift + Enter for a new line · replying pauses {a} for this diver for 4 hours.", { a: esc(cfg.assistant) }) + "</div></div>"
+            '<div class="note" id="note">' + t("Enter sends · Shift + Enter for a new line · replying pauses {a} for this diver for 2 hours.", { a: esc(cfg.assistant) }) + "</div></div>"
           : '<div class="closed">' + t("More than 24 hours since the diver's last message, so WhatsApp, Instagram and Messenger no longer allow a free reply. Read only.") + "</div>");
 
       document.querySelectorAll("[data-rep]").forEach(function (b) {
@@ -5064,6 +5064,7 @@ function zoneClient(cfg) {
   }
 
   document.addEventListener("click", function (e) { var ep = $("#epick"), eb = $("#emo"); if (ep && !ep.hidden && !ep.contains(e.target) && !eb.contains(e.target)) { ep.hidden = true; eb.setAttribute("aria-expanded", "false"); } });
+  var MIA_BACK_H = 2; // hours after the last team message; same as the formula in Make "Talay - release handovers"
   var EMOJI = ["😊", "🙂", "😄", "😉", "🙏", "👍", "👋", "🙌", "👌", "🎉", "❤️", "💙", "🤿", "🐠", "🐢", "🦈", "🐋", "🌊", "☀️", "🏝️", "⛵", "📅", "✅", "📍"];
 
   function loadProducts(id) {
