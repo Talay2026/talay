@@ -443,6 +443,14 @@ export const ZONE_ROWS = [
   ["Write the WhatsApp number with the country code, for example +66 81 234 5678.", "Escribe el número de WhatsApp con el prefijo del país, por ejemplo +66 81 234 5678.", "Écrivez le numéro WhatsApp avec l’indicatif du pays, par exemple +66 81 234 5678.", "Schreiben Sie die WhatsApp-Nummer mit Ländervorwahl, zum Beispiel +66 81 234 5678.", "Schrijf het WhatsApp-nummer met de landcode, bijvoorbeeld +66 81 234 5678."],
   ["Team details aren't available yet. Ask Jonas to finish the setup.", "Los datos del equipo aún no están disponibles. Pide a Jonas que termine la configuración.", "Les données de l’équipe ne sont pas encore disponibles. Demandez à Jonas de terminer la configuration.", "Die Teamdaten sind noch nicht verfügbar. Bitten Sie Jonas, die Einrichtung abzuschließen.", "De teamgegevens zijn nog niet beschikbaar. Vraag Jonas om de installatie af te ronden."],
   ["Diver details", "Datos del buceador", "Infos du plongeur", "Taucherdaten", "Gegevens duiker"],
+  ["Translate", "Traducir", "Traduire", "Übersetzen", "Vertalen"],
+  ["Show original", "Ver original", "Voir l’original", "Original anzeigen", "Origineel tonen"],
+  ["Translating…", "Traduciendo…", "Traduction…", "Wird übersetzt…", "Vertalen…"],
+  ["Translated · original: {x}", "Traducido · original: {x}", "Traduit · original : {x}", "Übersetzt · Original: {x}", "Vertaald · origineel: {x}"],
+  ["Translate to {l}", "Traducir al {l}", "Traduire en {l}", "Auf {l} übersetzen", "Vertalen naar het {l}"],
+  ["Undo translation", "Deshacer traducción", "Annuler la traduction", "Übersetzung rückgängig", "Vertaling ongedaan maken"],
+  ["Translating didn't work. Try again.", "La traducción no funcionó. Inténtalo de nuevo.", "La traduction n’a pas fonctionné. Réessayez.", "Die Übersetzung hat nicht geklappt. Versuch es noch einmal.", "Vertalen lukte niet. Probeer opnieuw."],
+  ["Translation isn't switched on yet.", "La traducción aún no está activada.", "La traduction n’est pas encore activée.", "Die Übersetzung ist noch nicht eingeschaltet.", "Vertalen staat nog niet aan."],
 ];
 
 // { es: { English: Spanish, … }, fr: …, de: …, nl: …, th: … }
@@ -880,5 +888,13 @@ export const ZONE_TH = {
   "Write the WhatsApp number with the country code, for example +66 81 234 5678.": "ใส่เบอร์ WhatsApp พร้อมรหัสประเทศ เช่น +66 81 234 5678",
   "Team details aren't available yet. Ask Jonas to finish the setup.": "ข้อมูลทีมยังใช้ไม่ได้ ขอให้ Jonas ตั้งค่าให้เสร็จ",
   "Diver details": "ข้อมูลนักดำน้ำ",
+  "Translate": "แปล",
+  "Show original": "ดูต้นฉบับ",
+  "Translating…": "กำลังแปล…",
+  "Translated · original: {x}": "แปลแล้ว · ต้นฉบับ: {x}",
+  "Translate to {l}": "แปลเป็นภาษา{l}",
+  "Undo translation": "ยกเลิกการแปล",
+  "Translating didn't work. Try again.": "แปลไม่สำเร็จ ลองอีกครั้ง",
+  "Translation isn't switched on yet.": "ยังไม่ได้เปิดการแปล",
 };
 ZONE_TEXT.th = ZONE_TH;

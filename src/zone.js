@@ -120,6 +120,7 @@ export async function handleZone(request, env, ctx) {
       if (p === "/zone/api/handback") return await leadAction(request, env, center, "handback");
       if (p === "/zone/api/handled") return await leadAction(request, env, center, "handled");
       if (p === "/zone/api/lead-team") return await leadTeam(request, env, center);
+      if (p === "/zone/api/translate") return await translate(request, env);
     }
     return json({ error: "Not found" }, 404);
   } catch (err) {
@@ -624,6 +625,35 @@ async function leadAction(request, env, center, action) {
 
 // Team-only fields on the lead: Leads → Team note (long text) and Assigned to (an e-mail of this
 // center's team, or empty). Divers never see them.
+// Translate one chat message for the team: a diver's message into the zone language, or the
+// team's draft into the diver's language. Nothing is sent; the team reads or edits the result.
+// Same message and language again within 30 days comes from the cache. Needs ANTHROPIC_API_KEY.
+const TRANSLATE_PROMPT = `You translate WhatsApp, Instagram and Messenger messages between a dive centre and a diver. Translate the user's message into the language named in <to>. Keep the meaning, the tone and the length; keep emojis, names, prices, dates, times, phone numbers and links exactly as they are. Keep common diving terms as divers use them in that language (Open Water, Advanced, fun dive, Discover Scuba Diving). When the message is already in that language, return it unchanged. Return only the translation, with no quotes, notes or explanation.`;
+async function translate(request, env) {
+  const body = await readBody(request);
+  const text = String(body?.text || "").trim().slice(0, 3000);
+  const to = String(body?.to || "").trim();
+  if (!text || !/^[\p{L} ()-]{2,30}$/u.test(to)) return json({ error: "Bad request" }, 400);
+  if (!env.ANTHROPIC_API_KEY) return json({ error: "Translation isn't switched on yet." }, 503);
+  const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(to + "\n" + text)))].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
+  try {
+    return json(await cached(env, `tr/${hash}`, 30 * 86400, async () => {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2026-10-21" },
+        body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 2000, system: TRANSLATE_PROMPT, messages: [{ role: "user", content: `<to>${to}</to>\n\n${text}` }] }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || d.stop_reason === "refusal") { console.error("translate", r.status, JSON.stringify(d).slice(0, 300)); throw new Error("translate"); }
+      const out = (d.content || []).filter((c) => c.type === "text").map((c) => c.text).join("").trim();
+      if (!out) throw new Error("translate");
+      return { text: out };
+    }));
+  } catch (e) {
+    return json({ error: "Translating didn't work. Try again." }, 502);
+  }
+}
+
 async function leadTeam(request, env, center) {
   const body = await readBody(request);
   const id = String(body?.c || "");
@@ -4797,6 +4827,16 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 }
 /* Dark mode (25 Oct): readable trend pills in the mini strip */
 @media (prefers-color-scheme:dark){.mini em.trend.up{background:rgba(95,192,138,.16);color:#6FCF9B}.mini em.trend.down{background:rgba(240,168,119,.16);color:#F0A877}}
+/* Translate in the chat (25 Oct) */
+.m .rep.trb{opacity:1;color:var(--muted)}
+.m .trtxt{display:block}
+.m .trfrom{display:block;margin-top:5px;font-size:12px;color:var(--muted);font-style:italic}
+.trout{font:inherit;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:5px;background:none;border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--deep);cursor:pointer}
+.trout:disabled{opacity:.45;cursor:default}
+.cmeta .sig,.cmeta .bt,.trout{white-space:nowrap}
+@media (max-width:760px){.cmeta{flex-wrap:wrap;row-gap:8px}.trout{order:5}}
+.trout:not(:disabled):hover{background:rgba(9,38,47,.05)}
+@media (prefers-color-scheme:dark){.trout:not(:disabled):hover{background:rgba(255,255,255,.06)}}
 /* Booking links (25 Oct): one button with a menu instead of a row of chips */
 .pbl{display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:13px;font-weight:600;color:var(--deep);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer}
 .pbl:hover{background:var(--paper)}
@@ -5245,6 +5285,8 @@ function zoneClient(cfg) {
           '</span></div><button class="btn primary" id="handback2" type="button">▶ ' + t("Let {a} take over", { a: esc(cfg.assistant) }) + "</button></div>";
       }
 
+      // Translate shows on the diver's messages when the diver writes in another language than the zone (or the language isn't known yet).
+      var dl = langCode(L.language), foreign = !dl || dl !== cfg.lang;
       $("#pane").innerHTML =
         '<div class="head"><button class="back" aria-label="Back">‹</button>' + avatar(L.name || L.contact, d.cc) + '<div><b>' + esc(dname(L.name, L.contact)) + "</b>" +
         (l.t ? '<div class="sub">' + esc(l.t) + "</div>" : "") + "</div>" +
@@ -5263,12 +5305,15 @@ function zoneClient(cfg) {
             var dt = new Date(m.at), day = dt.toLocaleDateString(LOC, { weekday: "long", day: "numeric", month: "long" });
             var sep = day !== prevDay ? '<div class="day">' + esc(day) + "</div>" : ""; prevDay = day;
             var rep = m.dir === "Mia" ? '<button class="rep" type="button" data-rep="' + idx + '" title="' + t("Report this answer to Talay") + '">' + t("Report") + "</button>" : "";
+            var tr = m.dir === "Customer" && m.text && !/^📎 /.test(m.text) && foreign ? TR[cfg.lang + "|" + m.text] : null;
+            if (m.dir === "Customer" && m.text && !/^📎 /.test(m.text) && foreign) rep = '<button class="rep trb" type="button" data-tr="' + idx + '">' + (tr ? t("Show original") : t("Translate")) + "</button>";
             var files = (m.files || []).map(function (f) {
               return /^image\//.test(f.type)
                 ? '<a class="mimg" href="' + esc(f.url) + '" target="_blank" rel="noopener"><img src="' + esc(f.thumb || f.url) + '" alt="' + esc(f.name) + '" loading="lazy"></a>'
                 : '<a class="mfile" href="' + esc(f.url) + '" target="_blank" rel="noopener">📎 ' + esc(f.name || t("File")) + "</a>";
             }).join("");
             var body = files && /^📎 /.test(m.text) ? "" : esc(m.text);
+            if (tr) body = '<span class="trtxt">' + esc(tr) + '</span><span class="trfrom">' + esc(t("Translated · original: {x}", { x: m.text.length > 90 ? m.text.slice(0, 90) + "…" : m.text })) + "</span>";
             return sep + '<div class="m ' + esc(m.dir) + '">' + (who ? '<span class="who">' + esc(who) + "</span>" : "") + files + body +
               "<small>" + esc(dt.toLocaleTimeString(LOC, { hour: "2-digit", minute: "2-digit" })) + rep + "</small></div>";
           }).join("");
@@ -5283,6 +5328,7 @@ function zoneClient(cfg) {
             '<div class="fchip" id="fchip" hidden></div>' +
             '<div class="epick" id="epick" hidden>' + EMOJI.map(function (x) { return '<button type="button">' + x + "</button>"; }).join("") + "</div>" +
             '<div class="cmeta"><label class="sig"><input type="checkbox" id="sigon"> ' + t("Signed as") + ' <input id="sig" maxlength="30" placeholder="' + t("your name") + '"></label>' +
+            (dl && dl !== cfg.lang ? '<button type="button" class="trout" id="trOut" disabled>' + TR_ICON + "<span>" + t("Translate to {l}", { l: esc(langName(dl)) }) + "</span></button>" : "") +
             '<select id="prod" aria-label="' + t("Booking link") + '" hidden><option value="">' + t("+ Booking link…") + "</option></select>" +
             '<span class="sp"></span><span class="bt' + (l.soon ? " soon" : "") + '">' + esc(l.t) + "</span></div>" +
             '<div class="note" id="note"></div></div>'
@@ -5298,6 +5344,15 @@ function zoneClient(cfg) {
             title: t("Wrong answer") + (q ? ": " + q.slice(0, 60) : ""),
             context: (before.length ? t("Diver") + ":\n" + before.join("\n") + "\n\n" : "") + cfg.assistant + ":\n" + mia.text + "\n\n(" + clock(mia.at) + ", " + (L.name || L.contact || t("Diver")) + ")",
           });
+        };
+      });
+      document.querySelectorAll("[data-tr]").forEach(function (b) {
+        b.onclick = function () {
+          var m = d.messages[Number(b.dataset.tr)], k = cfg.lang + "|" + m.text;
+          if (TR[k]) { delete TR[k]; lastChat = ""; loadChat(); return; }
+          b.disabled = true; b.textContent = t("Translating…");
+          post("translate", { text: m.text, to: LANGN[cfg.lang] || "English" }).then(function (r) { TR[k] = r.text; lastChat = ""; loadChat(); })
+            .catch(function (e) { b.disabled = false; b.textContent = e.message; });
         };
       });
       $("#ciMore").onclick = function () { var c = this.parentNode, o = !c.classList.contains("open"); c.classList.toggle("open", o); this.setAttribute("aria-expanded", String(o)); };
@@ -5342,6 +5397,22 @@ function zoneClient(cfg) {
         var grow = function () { tx.style.height = "auto"; tx.style.height = Math.min(tx.scrollHeight, 180) + "px"; };
         tx.addEventListener("input", grow); setTimeout(grow, 0);
         $("#send").onclick = send;
+        var to = $("#trOut");
+        if (to) {
+          // Translate the draft into the diver's language; the original stays one tap away until the draft changes.
+          var orig = null, toLab = to.querySelector("span"), toText = toLab.textContent;
+          var toSync = function () { to.disabled = !tx.value.trim(); };
+          tx.addEventListener("input", function () { if (orig !== null) { orig = null; toLab.textContent = toText; } toSync(); });
+          toSync();
+          to.onclick = function () {
+            if (orig !== null) { tx.value = orig; orig = null; toLab.textContent = toText; grow(); tx.focus(); return; }
+            var v = tx.value.trim(); if (!v) return;
+            to.disabled = true; toLab.textContent = t("Translating…");
+            post("translate", { text: v, to: LANGN[dl] || L.language }).then(function (r) {
+              orig = tx.value; tx.value = r.text; toLab.textContent = t("Undo translation"); to.disabled = false; grow(); tx.focus();
+            }).catch(function (e) { toLab.textContent = toText; toSync(); $("#note").textContent = e.message; });
+          };
+        }
         loadProducts(id);
       }
     }).catch(function (e) { if (e.message !== "auth" && id === current) $("#pane").innerHTML = '<div class="placeholder">' + esc(e.message) + "</div>"; });
@@ -5912,6 +5983,9 @@ function zoneClient(cfg) {
   }
   function dname(name, contact) { var n = name || contact || t("Diver"); return isPhone(n) ? prettyPhone(n) : n; }
   var LANGN = { en: "English", nl: "Dutch", fr: "French", de: "German", es: "Spanish", it: "Italian", pt: "Portuguese", th: "Thai" };
+  // Leads store the language as a code or a name ("es", "Spanish"); both give "es".
+  function langCode(v) { var s = String(v || "").trim().toLowerCase(); if (LANGN[s]) return s; for (var k in LANGN) if (LANGN[k].toLowerCase() === s) return k; return s; }
+  var TR = {}, TR_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h8M8 3v2M10 5c-.6 3.5-2.8 6.4-6 8M6 9c1.2 2 3 3.6 5 4.5M13 21l4-9 4 9M14.5 18h5"/></svg>';
   function langName(v) { var s = String(v || "").trim(); return (LANGN[s.toLowerCase()] && t(LANGN[s.toLowerCase()])) || (s.length <= 3 ? s.toUpperCase() : s.charAt(0).toUpperCase() + s.slice(1)); }
   function human(v) { var s = String(v || "").replace(/_/g, " ").trim(); return s ? t(s.charAt(0).toUpperCase() + s.slice(1)) : ""; }
   function prettyDates(v) {
