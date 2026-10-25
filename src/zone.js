@@ -80,6 +80,7 @@ export async function handleZone(request, env, ctx) {
       if (!okId(id)) return json({ error: "Bad request" });
       return json(await cached(env, `prod/${center.slug}/${id}`, 300, () => products(env, center, id), fresh));
     }
+    if (p === "/zone/api/quick") return json({ quick: quickReplies(await centerRecord(env, center)) });
     if (p === "/zone/api/bookings") return json(await cached(env, `book/${center.slug}`, 60, () => bookings(env, center), fresh));
     if (p === "/zone/api/dashboard") {
       const per = /^\d{4}-\d{2}$/.test(url.searchParams.get("period") || "") ? url.searchParams.get("period") : "";
@@ -1571,7 +1572,7 @@ async function settings(env, center) {
   return {
     admin: center.admin, admins: splitEmails(f["Admin emails"]), products,
     staff, team: await teamDetails(env, center, staff),
-    alert: s("Alert Email"),
+    alert: s("Alert Email"), quick: quickReplies(f),
     hoursText: s("Escalation hours"),
     from: hours ? hours[1].padStart(5, "0") : "09:00",
     to: hours ? hours[2].padStart(5, "0") : "18:00",
@@ -1582,6 +1583,17 @@ async function settings(env, center) {
       sites: s("Dive sites"), boats: s("Boat departure times"), emergency: s("Center emergency phone"),
     },
   };
+}
+
+// Quick replies: the team's saved texts, typed into a chat with "/". Stored as JSON in the
+// Centers long text field "Quick replies": [{ "title": "Address", "text": "…" }].
+const QUICK_MAX = 30;
+function quickReplies(f) {
+  try {
+    const v = JSON.parse(String(first(f["Quick replies"]) || "[]"));
+    return (Array.isArray(v) ? v : []).map((x) => ({ title: String(x?.title || "").slice(0, 40), text: String(x?.text || "").slice(0, 1500) }))
+      .filter((x) => x.title && x.text).slice(0, QUICK_MAX);
+  } catch (e) { return []; }
 }
 
 // Team details live in the Airtable table "Notify" (one row per person per center, also used by
@@ -1640,7 +1652,7 @@ async function saveMember(env, center, email, body) {
 async function saveSettings(request, env, center, email) {
   const body = await readBody(request);
   if (!body) return json({ error: "Bad request" }, 400);
-  if (body.action !== "mia" && !center.admin) {
+  if (body.action !== "mia" && body.action !== "quick" && !center.admin) {
     return json({ error: "Only an admin of your dive center can change this." }, 403);
   }
   if (body.action === "product") return await saveProduct(env, center, email, body);
@@ -1671,6 +1683,11 @@ async function saveSettings(request, env, center, email) {
     fields["Outside hours only"] = !!body.outsideOnly;
   } else if (body.action === "mia") {
     fields["Mia paused"] = !!body.paused;
+  } else if (body.action === "quick") {
+    const items = (Array.isArray(body.items) ? body.items : []).map((x) => ({ title: String(x?.title || "").trim().slice(0, 40), text: String(x?.text || "").trim().slice(0, 1500) }));
+    if (items.some((x) => !x.title || !x.text)) return json({ error: "Give every quick reply a name and a text." }, 400);
+    if (items.length > QUICK_MAX) return json({ error: `Maximum ${QUICK_MAX} quick replies.` }, 400);
+    fields["Quick replies"] = JSON.stringify(items);
   } else {
     return json({ error: "Unknown setting." }, 400);
   }
@@ -1696,6 +1713,7 @@ function describe(b) {
   if (b.action === "hours") return `office hours: ${b.from}–${b.to}`;
   if (b.action === "mode") return b.outsideOnly ? "assistant answers only outside office hours" : "assistant answers day and night";
   if (b.action === "mia") return b.paused ? "paused the assistant" : "turned the assistant back on";
+  if (b.action === "quick") return `quick replies: ${(b.items || []).map((x) => x.title).join(", ")}`;
   return b.action;
 }
 
@@ -4838,6 +4856,24 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 }
 /* Dark mode (25 Oct): readable trend pills in the mini strip */
 @media (prefers-color-scheme:dark){.mini em.trend.up{background:rgba(95,192,138,.16);color:#6FCF9B}.mini em.trend.down{background:rgba(240,168,119,.16);color:#F0A877}}
+/* Quick replies (25 Oct) */
+.composer{position:relative}
+.qpop{position:absolute;left:12px;right:12px;bottom:calc(100% - 4px);z-index:30;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 28px -10px rgba(9,38,47,.3);padding:4px;max-width:520px}
+.qpop button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;text-align:left;font:inherit;background:none;border:0;border-radius:8px;padding:7px 10px;cursor:pointer;color:var(--deep)}
+.qpop button b{font-size:13.5px;font-weight:600}
+.qpop button span{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.qpop button.on,.qpop button:hover{background:var(--paper)}
+.qpop .qnone{font-size:13px;color:var(--muted);padding:8px 10px}
+.qedit{padding:10px 2px 14px;display:grid;gap:10px}
+.qedit label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+.qedit textarea{font:inherit;font-size:14px;color:var(--deep);border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--paper-2);resize:vertical}
+.qlist:empty{display:none}
+.qedit[hidden]{display:none}
+.qlist{grid-template-columns:minmax(0,1fr)}
+.qlist .pmi{overflow:hidden}
+.qlist .pms{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#qNew{margin-top:8px}
+@media (prefers-color-scheme:dark){.qpop{box-shadow:0 8px 28px -10px rgba(0,0,0,.6)}}
 /* Unread dot (25 Oct) */
 .item .udot{width:9px;height:9px;border-radius:50%;background:var(--sand);flex:none}
 .item.unread .nm{font-weight:800}
@@ -5050,6 +5086,14 @@ header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-sh
       <ul class="people" id="team"></ul>
       <div class="srow"><input type="email" id="tEmail" placeholder="${T("colleague@email.com")}"><button class="btn" id="tAdd" type="button">${T("Add")}</button></div>
       <div class="smsg" id="tMsg"></div>
+    </div>
+    <div class="scard">
+      <h3>${T("Quick replies")}</h3>
+      <p class="d">${T("Texts your team often sends, like your address or what to bring. In a chat, type / and the first letters of the name to put one in.")}</p>
+      <ul class="people qlist" id="qlist"></ul>
+      <div class="pedit qedit" id="qedit" hidden><label>${T("Name")}<input type="text" id="qTitle" maxlength="40" placeholder="${T("e.g. address")}"></label><label>${T("Text")}<textarea id="qText" rows="4" maxlength="1500"></textarea></label><div class="nact"><span class="sp"></span><button type="button" class="ghost" id="qCancel">${T("Cancel")}</button><button type="button" class="btn" id="qSave">${T("Save")}</button></div></div>
+      <button type="button" class="ghost" id="qNew">${T("+ New quick reply")}</button>
+      <div class="smsg" id="qMsg"></div>
     </div>
     <div class="scard">
       <h3>${T("What {a} knows about you", { a: A })}</h3>
@@ -5355,6 +5399,7 @@ function zoneClient(cfg) {
         paused + (d.canReply
           ? '<div class="composer">' +
             '<div class="pchips" id="pchips" hidden></div>' +
+            '<div class="qpop" id="qpop" role="listbox" hidden></div>' +
             '<div class="cbox"><textarea id="txt" placeholder="' + t("Reply on {ch}…", { ch: esc((L && L.channel) || "WhatsApp") }) + '" title="' + t("Enter sends · Shift + Enter for a new line · replying pauses {a} for this diver for 2 hours.", { a: esc(cfg.assistant) }) + '" rows="1"></textarea>' +
             '<button class="emo" id="att" type="button" title="' + t("Photo or file") + '" aria-label="' + t("Photo or file") + '"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9"/></svg></button><input type="file" id="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden>' +
             '<button class="emo" id="emo" type="button" title="' + t("Emoji") + '" aria-label="' + t("Emoji") + '" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/></svg></button>' +
@@ -5409,7 +5454,7 @@ function zoneClient(cfg) {
         var so = $("#sigon"); so.checked = !d.messages.some(function (m) { return m.dir === "Team"; });
         // Enter sends, Shift + Enter is a new line. On a phone the keyboard's return key stays a new line.
         var touch = matchMedia("(pointer:coarse)").matches;
-        tx.onkeydown = function (e) { if (e.key === "Enter" && !e.isComposing && (e.metaKey || e.ctrlKey || (!touch && !e.shiftKey))) { e.preventDefault(); send(); } };
+        tx.onkeydown = function (e) { if (quickKey(e, tx)) return; if (e.key === "Enter" && !e.isComposing && (e.metaKey || e.ctrlKey || (!touch && !e.shiftKey))) { e.preventDefault(); send(); } };
         var fi = $("#file"), fc = $("#fchip");
         $("#att").onclick = function () { fi.click(); };
         fi.onchange = function () { pickFile(fi.files && fi.files[0]); fi.value = ""; };
@@ -5430,6 +5475,8 @@ function zoneClient(cfg) {
         });
         var grow = function () { tx.style.height = "auto"; tx.style.height = Math.min(tx.scrollHeight, 180) + "px"; };
         tx.addEventListener("input", grow); setTimeout(grow, 0);
+        tx.addEventListener("input", function () { quickShow(tx); });
+        tx.addEventListener("blur", function () { setTimeout(quickHide, 150); });
         $("#send").onclick = send;
         var to = $("#trOut");
         if (to) {
@@ -5709,6 +5756,82 @@ function zoneClient(cfg) {
   }
   setInterval(function () { if (!document.hidden && $("#books").classList.contains("on")) loadBookings(); }, 60000);
 
+  // ---- quick replies: type "/" plus the first letters of a name; at most 5 matches show.
+  var QUICK = [], qSel = 0, qHits = [];
+  function loadQuick() { api("quick").then(function (d) { QUICK = d.quick || []; }).catch(function () {}); }
+  loadQuick();
+  function quickQuery(tx) {
+    var before = tx.value.slice(0, tx.selectionStart == null ? tx.value.length : tx.selectionStart);
+    var m = before.match(/(^|\s)\/([^\s\/]{0,30})$/);
+    return m ? { q: m[2].toLowerCase(), start: before.length - m[2].length - 1 } : null;
+  }
+  function quickHide() { var p = $("#qpop"); if (p) p.hidden = true; qHits = []; }
+  function quickShow(tx) {
+    var p = $("#qpop"), m = quickQuery(tx); if (!p) return;
+    if (!m) return quickHide();
+    var norm = function (s) { return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }, q = norm(m.q);
+    qHits = QUICK.filter(function (x) { return norm(x.title).indexOf(q) === 0; })
+      .concat(q ? QUICK.filter(function (x) { var n = norm(x.title); return n.indexOf(q) > 0; }) : []).slice(0, 5);
+    if (!qHits.length) {
+      // Nothing saved yet: one hint where to add them. Otherwise say nothing matches.
+      if (QUICK.length ? !m.q : m.q) return quickHide();
+      p.innerHTML = '<div class="qnone">' + (QUICK.length ? t("No quick reply starts with “{q}”.", { q: esc(m.q) }) : t("No quick replies yet. Add them in Settings.")) + "</div>";
+      p.hidden = false; return;
+    }
+    qSel = Math.min(qSel, qHits.length - 1);
+    p.innerHTML = qHits.map(function (x, i) { return '<button type="button" role="option" data-q="' + i + '" class="' + (i === qSel ? "on" : "") + '"><b>/' + esc(x.title) + "</b><span>" + esc(x.text.replace(/\s+/g, " ").slice(0, 90)) + "</span></button>"; }).join("");
+    p.hidden = false;
+    p.querySelectorAll("button").forEach(function (b) { b.onmousedown = function (e) { e.preventDefault(); quickPick(tx, Number(b.dataset.q)); }; });
+  }
+  function quickPick(tx, i) {
+    var x = qHits[i], m = quickQuery(tx); if (!x || !m) return quickHide();
+    var end = tx.selectionStart == null ? tx.value.length : tx.selectionStart;
+    tx.value = tx.value.slice(0, m.start) + x.text + tx.value.slice(end);
+    tx.selectionStart = tx.selectionEnd = m.start + x.text.length;
+    quickHide(); qSel = 0; tx.dispatchEvent(new Event("input")); tx.focus();
+  }
+  function quickKey(e, tx) {
+    var p = $("#qpop"); if (!p || p.hidden || !qHits.length) { if (e.key === "Escape") quickHide(); return false; }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); qSel = (qSel + (e.key === "ArrowDown" ? 1 : qHits.length - 1)) % qHits.length; quickShow(tx); return true; }
+    if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); quickPick(tx, qSel); return true; }
+    if (e.key === "Escape") { e.preventDefault(); quickHide(); return true; }
+    return false;
+  }
+  var qEditing = -1;
+  function renderQuick(list) {
+    QUICK = list || [];
+    $("#qlist").innerHTML = QUICK.map(function (x, i) {
+      return '<li data-i="' + i + '"><span class="av">/</span><div class="pmi"><div class="pmn"><b>/' + esc(x.title) + '</b></div><div class="pms">' + esc(x.text.replace(/\s+/g, " ").slice(0, 110)) + (x.text.length > 110 ? "…" : "") + "</div></div>" +
+        '<button type="button" class="ped">' + t("Edit") + '</button><button type="button" class="prm">' + t("Delete") + "</button></li>";
+    }).join("");
+    $("#qlist").querySelectorAll("li").forEach(function (li) {
+      var i = Number(li.dataset.i);
+      li.querySelector(".ped").onclick = function () { quickEdit(i); };
+      li.querySelector(".prm").onclick = function () {
+        if (!confirm(t("Delete the quick reply “{x}”?", { x: QUICK[i].title }))) return;
+        quickSave(QUICK.filter(function (_, j) { return j !== i; }), t("Deleted."));
+      };
+    });
+  }
+  function quickEdit(i) {
+    qEditing = i; var x = QUICK[i] || { title: "", text: "" };
+    $("#qTitle").value = x.title; $("#qText").value = x.text; $("#qedit").hidden = false; $("#qNew").hidden = true; $("#qTitle").focus();
+  }
+  function quickClose() { $("#qedit").hidden = true; $("#qNew").hidden = false; qEditing = -1; }
+  function quickSave(items, ok, btn) {
+    if (btn) btn.disabled = true;
+    return post("settings", { action: "quick", items: items }).then(function () { renderQuick(items); quickClose(); say("#qMsg", ok); })
+      .catch(function (e) { say("#qMsg", e.message, true); }).finally(function () { if (btn) btn.disabled = false; });
+  }
+  $("#qNew").onclick = function () { quickEdit(-1); };
+  $("#qCancel").onclick = quickClose;
+  $("#qSave").onclick = function () {
+    var x = { title: $("#qTitle").value.trim().replace(/^\/+/, "").replace(/\s+/g, "-"), text: $("#qText").value.trim() };
+    if (!x.title || !x.text) return say("#qMsg", t("Give every quick reply a name and a text."), true);
+    var items = QUICK.slice(); if (qEditing >= 0) items[qEditing] = x; else items.push(x);
+    quickSave(items, t("Saved."), this);
+  };
+
   // ---- settings
   var sdata = null, ME = cfg.email;
   function say(id, text, err) { var el = $(id); el.textContent = text; el.className = "smsg" + (err ? " err" : ""); if (!err && text) setTimeout(function () { if (el.textContent === text) el.textContent = ""; }, 4000); }
@@ -5810,6 +5933,7 @@ function zoneClient(cfg) {
       $("#modeToggle").textContent = d.outsideOnly ? t("Answer day and night") : t("Answer only outside office hours");
       if (document.activeElement !== $("#aEmail")) $("#aEmail").value = d.alert;
       renderTeam(d);
+      if ($("#qedit").hidden) renderQuick(d.quick);
       var I = d.info, rows = [[t("Assistant"), I.assistant], [t("Languages"), I.languages], [t("Meeting point"), I.meeting], [t("Dive sites"), I.sites], [t("Boat times"), I.boats], [t("Emergency phone"), I.emergency]];
       $("#info").innerHTML = rows.filter(function (r) { return r[1]; }).map(function (r) { return "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>"; }).join("");
     }).catch(function (e) { if (e.message !== "auth") say("#miaMsg", e.message, true); });
