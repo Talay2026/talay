@@ -4685,6 +4685,25 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .tarr .trow .tr-b small{white-space:normal;overflow:visible}
 @media (max-width:1100px){.trow2{grid-template-columns:1fr 1fr}.trow2 #tWeek{grid-column:1 / -1}.tarr{grid-template-columns:1fr 1fr}}
 @media (max-width:760px){.trow1,.trow2{grid-template-columns:1fr}.trow2 #tWeek{grid-column:auto}.tarr{grid-template-columns:1fr}}
+/* Calm chat (25 Oct): one quiet info block above the messages, everything on the same left edge */
+.pane .head{border-bottom:0;padding:16px 22px 6px}
+.cinfo{background:var(--card);border-bottom:1px solid var(--line);padding:0 22px 14px 70px;display:grid;gap:10px}
+.cinfo .facts{display:flex;flex-wrap:wrap;gap:4px 18px;padding:0;border:0;background:none;font-size:13px;color:var(--muted)}
+.cinfo .facts span{background:none;border:0;border-radius:0;padding:0;font-size:13px}
+.cinfo .facts span b{font-weight:600;color:var(--deep)}
+.cinfo .teamrow{padding:0;border:0;background:none;gap:4px 18px}
+.cinfo .teamrow .asg,.cinfo .teamrow .nbtn{background:none;border:0;border-radius:6px;padding:2px 0;color:var(--muted);font-weight:500;font-size:13px}
+.cinfo .teamrow .asg:hover,.cinfo .teamrow .nbtn:hover{background:none;color:var(--deep)}
+.cinfo .teamrow .nbtn.has{background:none;color:#7A5B12;font-weight:500}
+.cinfo .bkwrap{padding:0;border:0;background:none;gap:6px}
+.cinfo .bkc{padding:8px 12px;border-radius:10px;background:var(--paper-2);border:1px solid var(--line);gap:10px}
+.cinfo .bki{width:auto;height:auto;background:none}
+.cinfo .bkb b{font-weight:600}
+.cinfo .bkw{background:none;padding:0}
+.cinfo .bkm{border:0;background:none;padding:0;box-shadow:none;color:var(--bar);font-weight:600;font-size:13px}
+.cinfo .bkm:hover{text-decoration:underline;background:none}
+.composer .note:empty{display:none}
+@media (max-width:760px){.pane .head{padding:12px 16px 4px}.cinfo{padding:0 16px 12px}.cinfo .facts{flex-wrap:wrap;overflow:visible;white-space:normal}}
 </style></head>
 <body>
 <header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>${T("Customer zone")}</small></span></div><span class="sp"></span>${switcher}<div class="htools">${superadmin ? `<a href="/zone/admin" title="Talay HQ">Talay HQ</a>` : ""}<button class="lnk hlang" id="hlang" type="button" title="${T("Language")}" aria-haspopup="menu" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg><span class="sl">${(ZONE_LANGS.find(l => l[0] === lang) || ZONE_LANGS[0])[1]}</span><svg class="chev sl" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">${T("Sign out")}</span></a></div></header><div class="lmenu" id="lmenu" role="menu" hidden>${ZONE_LANGS.map(([code, name]) => `<button type="button" role="menuitemradio" aria-checked="${code === lang}" data-l="${code}"${code === lang ? ' class="on"' : ""}><span class="code">${code}</span>${name}<svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7"/></svg></button>`).join("")}</div>
@@ -5014,7 +5033,7 @@ function zoneClient(cfg) {
       if (d.hasLead && L.human) actions += '<button class="ghost hb" id="handback">▶ ' + t("Let {a} take over", { a: esc(cfg.assistant) }) + "</button>";
       if (d.hasLead && d.needsYou && !L.human) actions += '<button class="ghost" id="handled">' + t("Mark as handled") + "</button>";
       var facts = fact(t("Channel"), L.channel && L.channel !== "WhatsApp" ? L.channel : "") + fact(t("Language"), L.language && langName(L.language)) + fact(t("Level"), human(L.cert)) + fact(t("On the island"), prettyDates(L.dates)) +
-        fact(t("Group"), L.group) + fact(t("Interested in"), /^rec[A-Za-z0-9]{14}$/.test(L.interested) ? "" : L.interested) + fact(t("Status"), human(L.status)) + fact("WhatsApp", L.contact && L.name && L.contact !== L.name ? prettyPhone(L.contact) : "") +
+        fact(t("Group"), L.group) + fact(t("Interested in"), /^rec[A-Za-z0-9]{14}$/.test(L.interested) ? "" : L.interested) + fact("WhatsApp", L.contact && L.name && L.contact !== L.name ? prettyPhone(L.contact) : "") +
         "";
       // While the team has the chat, Mia stays silent for this diver. "Talay - release handovers" (hourly)
       // gives it back 2 hours after the last team message; this banner keeps the early hand back in view.
@@ -5034,11 +5053,11 @@ function zoneClient(cfg) {
         (d.needsYou ? '<span class="tag need">' + t("Needs you") + "</span>" : "") +
         ((d.bookings || []).filter(function (b) { return !/cancel|refund/i.test(b.status); }).length > 1 ? '<span class="tag ret">' + t("Returning diver") + "</span>" : "") +
         '<div class="actions">' + actions + "</div></div>" +
-        (facts ? '<div class="facts">' + facts + "</div>" : "") +
+        '<div class="cinfo">' + (facts ? '<div class="facts">' + facts + "</div>" : "") +
         (d.hasLead ? '<div class="teamrow"><button type="button" class="asg" id="assign" aria-haspopup="menu" aria-expanded="false" title="' + t("Assigned to") + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span id="asgName">' + esc(L.assigned ? (L.assigned === String(cfg.email || "").toLowerCase() ? t("You") : person(L.assigned)) : t("Not assigned")) + '</span><svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>' +
           '<button type="button" class="nbtn' + (L.note ? " has" : "") + '" id="nOpen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>' + (L.note ? esc(L.note.length > 70 ? L.note.slice(0, 70) + "…" : L.note) : t("Add a team note")) + "</button>" +
           '<div class="nbox" id="nBox" hidden><textarea id="nTxt" rows="3" maxlength="2000" placeholder="' + t("Only your team sees this, never the diver. E.g. wants to be in the same group as her friend.") + '">' + esc(L.note) + '</textarea><div class="nact"><span class="nmsg" id="nMsg"></span><button type="button" class="ghost" id="nCancel">' + t("Cancel") + '</button><button type="button" class="btn primary" id="nSave">' + t("Save") + "</button></div></div></div>" : "") +
-        bookingCard(d.bookings) +
+        bookingCard(d.bookings) + "</div>" +
         '<div class="msgs" id="msgs">' + (function () {
           var prevDay = "";
           return d.messages.map(function (m, idx) {
@@ -5059,7 +5078,7 @@ function zoneClient(cfg) {
         paused + (d.canReply
           ? '<div class="composer">' +
             '<div class="pchips" id="pchips" hidden></div>' +
-            '<div class="cbox"><textarea id="txt" placeholder="' + t("Reply on {ch}…", { ch: esc((L && L.channel) || "WhatsApp") }) + '" rows="1"></textarea>' +
+            '<div class="cbox"><textarea id="txt" placeholder="' + t("Reply on {ch}…", { ch: esc((L && L.channel) || "WhatsApp") }) + '" title="' + t("Enter sends · Shift + Enter for a new line · replying pauses {a} for this diver for 2 hours.", { a: esc(cfg.assistant) }) + '" rows="1"></textarea>' +
             '<button class="emo" id="att" type="button" title="' + t("Photo or file") + '" aria-label="' + t("Photo or file") + '"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9"/></svg></button><input type="file" id="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden>' +
             '<button class="emo" id="emo" type="button" title="' + t("Emoji") + '" aria-label="' + t("Emoji") + '" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/></svg></button>' +
             '<button class="send" id="send" aria-label="Send"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>' +
@@ -5068,7 +5087,7 @@ function zoneClient(cfg) {
             '<div class="cmeta"><label class="sig"><input type="checkbox" id="sigon"> ' + t("Signed as") + ' <input id="sig" maxlength="30" placeholder="' + t("your name") + '"></label>' +
             '<select id="prod" aria-label="' + t("Booking link") + '" hidden><option value="">' + t("+ Booking link…") + "</option></select>" +
             '<span class="sp"></span><span class="bt' + (l.soon ? " soon" : "") + '">' + esc(l.t) + "</span></div>" +
-            '<div class="note" id="note">' + t("Enter sends · Shift + Enter for a new line · replying pauses {a} for this diver for 2 hours.", { a: esc(cfg.assistant) }) + "</div></div>"
+            '<div class="note" id="note"></div></div>'
           : '<div class="closed">' + t("More than 24 hours since the diver's last message, so WhatsApp, Instagram and Messenger no longer allow a free reply. Read only.") + "</div>");
 
       document.querySelectorAll("[data-rep]").forEach(function (b) {
