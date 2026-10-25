@@ -4786,6 +4786,24 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .dgrid3{align-items:stretch}
 .dgrid3 > .panel{margin:0;display:flex;flex-direction:column}
 .dgrid3 > .panel .hnote{margin-top:auto;padding-top:12px}
+/* Phone (25 Oct): diver details folded away so the chat has room */
+.cimore{display:none}
+@media (max-width:760px){
+ .cimore{display:inline-flex;align-items:center;gap:4px;justify-self:start;font:inherit;font-size:13px;font-weight:600;color:var(--muted);background:none;border:0;padding:2px 0;cursor:pointer}
+ .cinfo.open .cimore svg{transform:rotate(180deg)}
+ .cinfo:not(.open) .facts,.cinfo:not(.open) .teamrow{display:none}
+ .night.big .nstats b{font-size:26px}
+ .night.big .nstats span{font-size:12px;line-height:1.35;display:block}
+}
+/* Dark mode (25 Oct): readable trend pills in the mini strip */
+@media (prefers-color-scheme:dark){.mini em.trend.up{background:rgba(95,192,138,.16);color:#6FCF9B}.mini em.trend.down{background:rgba(240,168,119,.16);color:#F0A877}}
+/* Booking links (25 Oct): one button with a menu instead of a row of chips */
+.pbl{display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:13px;font-weight:600;color:var(--deep);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer}
+.pbl:hover{background:var(--paper)}
+.pbl .chev{color:var(--muted)}
+.bmenu button{justify-content:space-between;gap:16px}
+.bmenu .bn{font-weight:600}
+.bmenu small{color:var(--muted);font-size:12.5px;white-space:nowrap}
 /* Dashboard (25 Oct): both columns end at the same height */
 .dgrid{align-items:stretch}
 .dmain,.dside{display:flex;flex-direction:column}
@@ -4823,7 +4841,7 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .pedit label.pev{display:flex;align-items:center;gap:8px;margin-top:14px;color:var(--deep);font-size:14px}
 .pedit input[type=checkbox]{width:18px;height:18px;accent-color:#0A2029}
 .pedit .pact{display:flex;gap:8px;margin-top:16px}
-.pedit .pchips{padding:0;margin:0;gap:6px;flex-wrap:wrap;overflow:visible}
+.pedit .mchips{gap:6px}
 @media (max-width:760px){.people .pedit{padding-left:2px}.pedit .pgrid{grid-template-columns:1fr}}
 /* Support (25 Oct): empty state across the page, centred */
 #supp .empty-card{max-width:none;align-items:center;text-align:center;padding:40px 24px}
@@ -5233,7 +5251,7 @@ function zoneClient(cfg) {
         (d.needsYou ? '<span class="tag need">' + t("Needs you") + "</span>" : "") +
         ((d.bookings || []).filter(function (b) { return !/cancel|refund/i.test(b.status); }).length > 1 ? '<span class="tag ret">' + t("Returning diver") + "</span>" : "") +
         '<div class="actions">' + actions + "</div></div>" +
-        '<div class="cinfo">' + (facts ? '<div class="facts">' + facts + "</div>" : "") +
+        '<div class="cinfo"><button type="button" class="cimore" id="ciMore" aria-expanded="false">' + t("Diver details") + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>' + (facts ? '<div class="facts">' + facts + "</div>" : "") +
         (d.hasLead ? '<div class="teamrow"><button type="button" class="asg" id="assign" aria-haspopup="menu" aria-expanded="false" title="' + t("Assigned to") + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span id="asgName">' + esc(L.assigned ? (L.assigned === String(cfg.email || "").toLowerCase() ? t("You") : person(L.assigned)) : t("Not assigned")) + '</span><svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>' +
           '<button type="button" class="nbtn' + (L.note ? " has" : "") + '" id="nOpen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>' + (L.note ? esc(L.note.length > 70 ? L.note.slice(0, 70) + "…" : L.note) : t("Add a team note")) + "</button>" +
           '<div class="nbox" id="nBox" hidden><textarea id="nTxt" rows="3" maxlength="2000" placeholder="' + t("Only your team sees this, never the diver. E.g. wants to be in the same group as her friend.") + '">' + esc(L.note) + '</textarea><div class="nact"><span class="nmsg" id="nMsg"></span><button type="button" class="ghost" id="nCancel">' + t("Cancel") + '</button><button type="button" class="btn primary" id="nSave">' + t("Save") + "</button></div></div></div>" : "") +
@@ -5282,6 +5300,7 @@ function zoneClient(cfg) {
           });
         };
       });
+      $("#ciMore").onclick = function () { var c = this.parentNode, o = !c.classList.contains("open"); c.classList.toggle("open", o); this.setAttribute("aria-expanded", String(o)); };
       $(".back").onclick = function () { current = null; document.body.classList.remove("inchat"); $("#convos").classList.remove("open"); document.querySelectorAll(".item").forEach(function (b) { b.classList.remove("on"); }); };
       var box = $("#msgs");
       var place = function () { box.scrollTop = keepTop === null ? box.scrollHeight : keepTop; };
@@ -5345,14 +5364,40 @@ function zoneClient(cfg) {
       };
       var pc = $("#pchips");
       if (pc && d.products.length) {
-        pc.innerHTML = '<span class="pcl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>' + t("Send a booking link") + '</span><div class="pscroll">' + d.products.map(function (x, i) { return '<button type="button" class="pchip" data-pi="' + i + '">' + esc(x.name) + "</button>"; }).join("") + "</div>";
+        pc.innerHTML = '<button type="button" class="pbl" id="pbl" aria-haspopup="menu" aria-expanded="false"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>' + t("Send a booking link") +
+          '<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></button>';
         pc.hidden = false;
-        pc.querySelectorAll("[data-pi]").forEach(function (b) {
-          b.onclick = function () { var x = d.products[Number(b.dataset.pi)]; var t = $("#txt"); t.value = (t.value.trim() ? t.value.trim() + "\n\n" : "") + x.text; t.focus(); };
+        bmenu.innerHTML = d.products.map(function (x, i) {
+          return '<button type="button" role="menuitem" data-pi="' + i + '"><span class="bn">' + esc(x.name) + "</span>" + (x.price ? "<small>" + x.price.toLocaleString(NUM) + " THB</small>" : "") + "</button>";
+        }).join("");
+        bmenu.querySelectorAll("[data-pi]").forEach(function (b) {
+          b.onclick = function () { closeBmenu(); var x = d.products[Number(b.dataset.pi)]; var t = $("#txt"); t.value = (t.value.trim() ? t.value.trim() + "\n\n" : "") + x.text; t.focus(); };
         });
+        $("#pbl").onclick = function (e) {
+          e.stopPropagation();
+          if (!bmenu.hidden) return closeBmenu();
+          bmenu.hidden = false; this.setAttribute("aria-expanded", "true");
+          var r = this.getBoundingClientRect(), w = bmenu.offsetWidth, h = bmenu.offsetHeight;
+          bmenu.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + "px";
+          bmenu.style.top = (r.top - h - 6 > 8 ? r.top - h - 6 : r.bottom + 6) + "px";
+          var f = bmenu.querySelector("button"); if (f) f.focus();
+        };
       }
     }).catch(function () { var p = $("#prod"); if (p) p.remove(); });
   }
+
+  // One menu for the booking links above the composer (opens upwards).
+  var bmenu = document.createElement("div");
+  bmenu.className = "amenu bmenu"; bmenu.setAttribute("role", "menu"); bmenu.hidden = true;
+  document.body.appendChild(bmenu);
+  function closeBmenu() { bmenu.hidden = true; var b = $("#pbl"); if (b) b.setAttribute("aria-expanded", "false"); }
+  document.addEventListener("click", function (e) { if (!bmenu.hidden && !bmenu.contains(e.target)) closeBmenu(); });
+  addEventListener("resize", closeBmenu);
+  bmenu.onkeydown = function (e) {
+    var bs = Array.prototype.slice.call(bmenu.querySelectorAll("button")), i = bs.indexOf(document.activeElement);
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); bs[(i + (e.key === "ArrowDown" ? 1 : bs.length - 1)) % bs.length].focus(); }
+    if (e.key === "Escape" || e.key === "Tab") { closeBmenu(); var b = $("#pbl"); if (b) b.focus(); }
+  };
 
   // Assign and team note (Leads → Assigned to, Team note), only for the team.
   var teamList = null;
@@ -5593,7 +5638,7 @@ function zoneClient(cfg) {
     });
   }
   function chipRow(name, opts, on, multi) {
-    return '<div class="chips pchips" data-n="' + name + '"' + (multi ? ' data-multi="1"' : "") + ">" + opts.map(function (o) {
+    return '<div class="chips mchips" data-n="' + name + '"' + (multi ? ' data-multi="1"' : "") + ">" + opts.map(function (o) {
       return '<button type="button" class="chip' + ((multi ? on.indexOf(o[0]) > -1 : on === o[0]) ? " on" : "") + '" data-v="' + esc(o[0]) + '">' + esc(o[1]) + "</button>";
     }).join("") + "</div>";
   }
@@ -5610,7 +5655,7 @@ function zoneClient(cfg) {
       '<label class="pev"><input type="checkbox" class="pe"' + (on.evenings ? " checked" : "") + "> " + t("Also in the evening and at night") + "</label>" +
       '<div class="pact"><button type="button" class="btn psv">' + t("Save") + '</button><button type="button" class="ghost pcx">' + t("Cancel") + "</button></div>";
     li.after(f);
-    f.querySelectorAll(".pchips").forEach(function (row) {
+    f.querySelectorAll(".mchips").forEach(function (row) {
       row.querySelectorAll(".chip").forEach(function (c) {
         c.onclick = function () {
           if (row.dataset.multi) c.classList.toggle("on");
