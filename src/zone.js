@@ -1664,6 +1664,7 @@ async function settings(env, center) {
       category: String(first(p["Category"]) || ""),
       price: Number(first(p["Price THB"])) || 0, deposit: Number(first(p["Deposit THB"])) || 0,
       pct: Math.round((Number(first(p["Commission pct"])) || 0) * 1000) / 10,
+      fixed: Number(first(p["Deposit fixed THB"])) > 0,
       cutoff: Number(first(p["Cutoff hour"])) || 15, active: !!p["Active"],
     };
   }).sort((a, b) => a.price - b.price);
@@ -1854,9 +1855,10 @@ async function saveProduct(env, center, email, b) {
   });
   if (!up.ok) { console.error("product", up.status, await up.text()); return json({ error: "Could not save. Try again." }, 502); }
   // If Deposit THB is a plain number (not a formula), keep it at price × commission %.
+  // A fixed deposit (Deposit fixed THB) never follows the price.
   // When it is a formula, Airtable refuses this write and the formula does the job.
   const pct = Number(first(p["Commission pct"])) || 0;
-  if (pct > 0) {
+  if (pct > 0 && !(Number(first(p["Deposit fixed THB"])) > 0)) {
     await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Products/${b.id}`, {
       method: "PATCH",
       headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}`, "Content-Type": "application/json" },
@@ -5208,7 +5210,7 @@ header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-sh
     <div class="lock" id="adminNote" hidden>${T("Only an admin of your dive center can change prices, office hours, the alert email and the team. You can still pause {a}.", { a: A })}</div>
     <div class="scard adm">
       <h3>${T("Products and prices")}</h3>
-      <p class="d">${T("What divers pay and until when they can book online. The online deposit is your commission to Talay and follows the price automatically. Changes reach {a} and the booking page within about two minutes.", { a: A })}</p>
+      <p class="d">${T("What divers pay and until when they can book online. The online deposit is your commission to Talay; divers pay the rest at your shop. Changes reach {a} and the booking page within about two minutes.", { a: A })}</p>
       <div class="bscroll"><table class="ptable"><thead><tr><th>${T("Product")}</th><th>${T("Price (THB)")}</th><th>${T("Deposit")}</th><th>${T("Book until (day before)")}</th><th>${T("Bookable online")}</th><th></th></tr></thead><tbody id="prods"></tbody></table></div>
       <div class="smsg" id="pMsg"></div>
     </div>
@@ -6093,9 +6095,9 @@ function zoneClient(cfg) {
       document.querySelectorAll(".scard.adm").forEach(function (c) { c.classList.toggle("ro", !d.admin); });
       $("#prods").innerHTML = d.products.map(function (p) {
         var hours = ""; for (var h = 8; h <= 22; h++) hours += '<option value="' + h + '"' + (h === p.cutoff ? " selected" : "") + ">" + h + ":00</option>";
-        return '<tr class="' + (p.active ? "" : "off") + '" data-id="' + esc(p.id) + '" data-pct="' + p.pct + '"><td class="nm">' + esc(p.name) + '<br><span class="muted">' + esc(p.code) + "</span></td>" +
+        return '<tr class="' + (p.active ? "" : "off") + '" data-id="' + esc(p.id) + '" data-pct="' + (p.fixed ? 0 : p.pct) + '" data-dep="' + Math.round(p.deposit) + '"><td class="nm">' + esc(p.name) + '<br><span class="muted">' + esc(p.code) + "</span></td>" +
           '<td data-l="' + t("Price (THB)") + '"><input type="number" min="100" step="50" value="' + p.price + '" class="pp" inputmode="numeric"></td>' +
-          '<td class="muted dep" data-l="' + t("Deposit") + '">' + Math.round(p.deposit).toLocaleString(NUM) + " THB · " + p.pct + "%</td>" +
+          '<td class="muted dep" data-l="' + t("Deposit") + '">' + Math.round(p.deposit).toLocaleString(NUM) + " THB</td>" +
           '<td data-l="' + t("Book until (day before)") + '"><select class="pc">' + hours + "</select></td>" +
           '<td data-l="' + t("Bookable online") + '"><input type="checkbox" class="pa"' + (p.active ? " checked" : "") + "></td>" +
           '<td class="tlinks"><button class="btn ps" type="button" hidden>' + t("Save") + '</button></td></tr>';
@@ -6103,7 +6105,7 @@ function zoneClient(cfg) {
       $("#prods").querySelectorAll("tr").forEach(function (tr) {
         var pp = tr.querySelector(".pp"), changed = function () { tr.querySelector(".ps").hidden = false; };
         tr.querySelector(".pc").onchange = changed; tr.querySelector(".pa").onchange = changed;
-        pp.oninput = function () { tr.querySelector(".dep").innerHTML = Math.round((Number(pp.value) || 0) * Number(tr.dataset.pct) / 100).toLocaleString(NUM) + " THB · " + tr.dataset.pct + "%"; changed(); };
+        pp.oninput = function () { var pc = Number(tr.dataset.pct); tr.querySelector(".dep").innerHTML = Math.round(pc ? (Number(pp.value) || 0) * pc / 100 : Number(tr.dataset.dep)).toLocaleString(NUM) + " THB"; changed(); };
         tr.querySelector(".ps").onclick = function () {
           var btn = this, name = tr.querySelector(".nm").firstChild.textContent;
           save({ action: "product", id: tr.dataset.id, price: Number(pp.value), cutoff: Number(tr.querySelector(".pc").value), active: tr.querySelector(".pa").checked },
