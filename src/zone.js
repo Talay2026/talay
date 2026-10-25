@@ -4786,6 +4786,12 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .dgrid3{align-items:stretch}
 .dgrid3 > .panel{margin:0;display:flex;flex-direction:column}
 .dgrid3 > .panel .hnote{margin-top:auto;padding-top:12px}
+/* Dashboard (25 Oct): both columns end at the same height */
+.dgrid{align-items:stretch}
+.dmain,.dside{display:flex;flex-direction:column}
+.dmain > .panel,.dside > .panel{margin:0}
+.dmain > .panel:last-child,.dside > .panel:last-child{flex:1;display:flex;flex-direction:column}
+.dmain > .panel:last-child .wchart{flex:1;min-height:180px;height:auto}
 /* Settings (25 Oct): calmer */
 .smsg:empty{min-height:0;margin:0}
 .srow+.smsg:empty+.d{margin-top:18px}
