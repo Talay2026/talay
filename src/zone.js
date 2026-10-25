@@ -4137,9 +4137,17 @@ header .bn small{font-size:12px;color:#93A9AE;font-weight:500}
 header .htools{display:flex;align-items:center;gap:4px}
 header .htools .lnk,header .htools a{display:inline-flex;align-items:center;gap:8px;color:#B7C7CB;font-size:13.5px;font-weight:500;padding:8px 10px;border-radius:9px;text-decoration:none}
 header .htools .lnk:hover,header .htools a:hover{background:rgba(247,243,234,.07);color:#F7F3EA}
-header .hlang{cursor:pointer}
-header .hlang select{appearance:none;-webkit-appearance:none;background:none;border:0;padding:0;margin:0;color:inherit;font:inherit;cursor:pointer;outline-offset:2px}
-header .hlang option{color:#0A2029;background:#fff}
+header .hlang .chev{margin-left:auto;opacity:.6;transition:transform .15s}
+header .hlang[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.lmenu{position:fixed;z-index:60;min-width:200px;padding:6px;border-radius:14px;background:#103540;border:1px solid rgba(247,243,234,.12);box-shadow:0 18px 40px -12px rgba(0,0,0,.45),0 2px 6px rgba(0,0,0,.2);font-size:14px}
+.lmenu[hidden]{display:none}
+.lmenu button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:0;border-radius:9px;background:none;color:#DCE5E7;font:inherit;text-align:left;cursor:pointer}
+.lmenu button:hover,.lmenu button:focus-visible{background:rgba(247,243,234,.08);color:#F7F3EA;outline:none}
+.lmenu button .code{width:24px;font-size:11px;font-weight:700;letter-spacing:.04em;color:#8FA6AB;text-transform:uppercase}
+.lmenu button .ck{margin-left:auto;color:var(--sand);visibility:hidden}
+.lmenu button.on{color:#F7F3EA;font-weight:600}
+.lmenu button.on .code{color:var(--sand)}
+.lmenu button.on .ck{visibility:visible}
 header select{background:var(--side-2);color:#F7F3EA;border:1px solid rgba(247,243,234,.12);border-radius:10px;padding:8px 10px}
 /* nav */
 nav button{gap:10px;font-weight:600;letter-spacing:-.005em}
@@ -4452,6 +4460,15 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .cmeta .sig{display:inline-flex;align-items:center;gap:6px}
 .cmeta .sig input{font:inherit;font-size:12px;font-weight:600;color:var(--deep);border:0;border-bottom:1px dashed var(--line);background:none;padding:2px 0;width:110px;outline:none}
 .cmeta .sig input:focus{border-bottom-color:var(--sand)}
+.cmeta .sig input[type=checkbox]{width:15px;height:15px;margin:0;accent-color:var(--sand);border:0;cursor:pointer}
+.cmeta .sig:has(#sigon:not(:checked)) #sig{opacity:.45}
+.emo{flex:none;width:38px;height:38px;border:0;border-radius:50%;background:none;color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.emo:hover,.emo[aria-expanded="true"]{background:rgba(10,32,41,.06);color:var(--deep)}
+.epick{display:grid;grid-template-columns:repeat(12,1fr);gap:2px;margin-top:8px;padding:6px;border-radius:14px;background:var(--card);border:1px solid var(--line);box-shadow:0 10px 30px -14px rgba(10,32,41,.3)}
+.epick[hidden]{display:none}
+.epick button{border:0;background:none;border-radius:8px;font-size:20px;line-height:1;padding:6px 0;cursor:pointer}
+.epick button:hover{background:var(--paper)}
+@media (max-width:760px){.epick{grid-template-columns:repeat(8,1fr)}}
 .cmeta .sp{flex:1}
 .cmeta .bt.soon{color:var(--warn);font-weight:700}
 .composer .note{background:none;padding:6px 0 0;font-size:11.5px}
@@ -4526,7 +4543,7 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 @media (max-width:760px){.trow1,.trow2{grid-template-columns:1fr}.trow2 #tWeek{grid-column:auto}.tarr{grid-template-columns:1fr}}
 </style></head>
 <body>
-<header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>${T("Customer zone")}</small></span></div><span class="sp"></span>${switcher}<div class="htools">${superadmin ? `<a href="/zone/admin" title="Talay HQ">Talay HQ</a>` : ""}<label class="lnk hlang" title="${T("Language")}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg><select class="zlang" aria-label="${T("Language")}">${langOpts}</select></label><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">${T("Sign out")}</span></a></div></header>
+<header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>${T("Customer zone")}</small></span></div><span class="sp"></span>${switcher}<div class="htools">${superadmin ? `<a href="/zone/admin" title="Talay HQ">Talay HQ</a>` : ""}<button class="lnk hlang" id="hlang" type="button" title="${T("Language")}" aria-haspopup="menu" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg><span class="sl">${(ZONE_LANGS.find(l => l[0] === lang) || ZONE_LANGS[0])[1]}</span><svg class="chev sl" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">${T("Sign out")}</span></a></div></header><div class="lmenu" id="lmenu" role="menu" hidden>${ZONE_LANGS.map(([code, name]) => `<button type="button" role="menuitemradio" aria-checked="${code === lang}" data-l="${code}"${code === lang ? ' class="on"' : ""}><span class="code">${code}</span>${name}<svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7"/></svg></button>`).join("")}</div>
 <nav><button class="on" data-v="today"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></i><span class="nl">${T("Today")}</span></button><button data-v="convos"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg></i><span class="nl"><span class="long">${T("Conversations")}</span><span class="short">${T("Chats")}</span></span><span class="count" id="count" hidden></span></button><button data-v="books"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></i><span class="nl">${T("Bookings")}</span></button><button data-v="dash"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></i><span class="nl">${T("Dashboard")}</span></button><button data-v="sett"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></i><span class="nl">${T("Settings")}</span></button><button data-v="supp"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg></i><span class="nl">${T("Support")}</span><span class="count" id="tcount" hidden></span></button></nav>
 
 <section id="today" class="view on">
@@ -4726,7 +4743,27 @@ function zoneClient(cfg) {
   }
 
   // ---- tabs
-  document.querySelectorAll("select.zlang").forEach(function (zl) { zl.onchange = function () { document.cookie = "talay-zone-lang=" + zl.value + "; path=/zone; max-age=31536000; samesite=lax; secure"; location.reload(); }; });
+  function setLang(l) { document.cookie = "talay-zone-lang=" + l + "; path=/zone; max-age=31536000; samesite=lax; secure"; location.reload(); }
+  document.querySelectorAll("select.zlang").forEach(function (zl) { zl.onchange = function () { setLang(zl.value); }; });
+  var hl = $("#hlang"), lm = $("#lmenu");
+  function closeLang() { lm.hidden = true; hl.setAttribute("aria-expanded", "false"); }
+  hl.onclick = function (e) {
+    e.stopPropagation();
+    if (!lm.hidden) return closeLang();
+    lm.hidden = false; hl.setAttribute("aria-expanded", "true");
+    var r = hl.getBoundingClientRect(), w = lm.offsetWidth, h = lm.offsetHeight;
+    lm.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + "px";
+    lm.style.top = (r.bottom + 6 + h < innerHeight ? r.bottom + 6 : Math.max(8, r.top - h - 6)) + "px";
+    (lm.querySelector("button.on") || lm.querySelector("button")).focus();
+  };
+  lm.querySelectorAll("button").forEach(function (b) { b.onclick = function () { closeLang(); if (b.dataset.l !== cfg.lang) setLang(b.dataset.l); }; });
+  lm.onkeydown = function (e) {
+    var bs = Array.prototype.slice.call(lm.querySelectorAll("button")), i = bs.indexOf(document.activeElement);
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); bs[(i + (e.key === "ArrowDown" ? 1 : bs.length - 1)) % bs.length].focus(); }
+    if (e.key === "Escape" || e.key === "Tab") { closeLang(); hl.focus(); }
+  };
+  document.addEventListener("click", function (e) { if (!lm.hidden && !lm.contains(e.target)) closeLang(); });
+  addEventListener("resize", closeLang);
   var sel = $("#center"); if (sel) sel.onchange = function () { location.href = "/zone?center=" + encodeURIComponent(sel.value); };
   document.querySelectorAll("nav button").forEach(function (b) {
     b.onclick = function () {
@@ -4855,11 +4892,13 @@ function zoneClient(cfg) {
           ? '<div class="composer">' +
             '<div class="pchips" id="pchips" hidden></div>' +
             '<div class="cbox"><textarea id="txt" placeholder="' + t("Reply on {ch}…", { ch: esc((L && L.channel) || "WhatsApp") }) + '" rows="1"></textarea>' +
+            '<button class="emo" id="emo" type="button" title="' + t("Emoji") + '" aria-label="' + t("Emoji") + '" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/></svg></button>' +
             '<button class="send" id="send" aria-label="Send"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>' +
-            '<div class="cmeta"><label class="sig">' + t("Signed as") + ' <input id="sig" maxlength="30" placeholder="' + t("your name") + '"></label>' +
+            '<div class="epick" id="epick" hidden>' + EMOJI.map(function (x) { return '<button type="button">' + x + "</button>"; }).join("") + "</div>" +
+            '<div class="cmeta"><label class="sig"><input type="checkbox" id="sigon"> ' + t("Signed as") + ' <input id="sig" maxlength="30" placeholder="' + t("your name") + '"></label>' +
             '<select id="prod" aria-label="' + t("Booking link") + '" hidden><option value="">' + t("+ Booking link…") + "</option></select>" +
             '<span class="sp"></span><span class="bt' + (l.soon ? " soon" : "") + '">' + esc(l.t) + "</span></div>" +
-            '<div class="note" id="note">' + t("⌘/Ctrl + Enter sends · replying pauses {a} for this diver for 4 hours.", { a: esc(cfg.assistant) }) + "</div></div>"
+            '<div class="note" id="note">' + t("Enter sends · Shift + Enter for a new line · replying pauses {a} for this diver for 4 hours.", { a: esc(cfg.assistant) }) + "</div></div>"
           : '<div class="closed">' + t("More than 24 hours since the diver's last message, so WhatsApp, Instagram and Messenger no longer allow a free reply. Read only.") + "</div>");
 
       document.querySelectorAll("[data-rep]").forEach(function (b) {
@@ -4887,7 +4926,21 @@ function zoneClient(cfg) {
         try { s.value = localStorage.getItem("talay-sig") || ""; } catch (e) {}
         if (!s.value && cfg.email) { var nm = String(cfg.email).split("@")[0].split(/[._-]/)[0]; if (nm && !/^(info|team|hello|contact|admin|dive|office)$/i.test(nm)) s.value = nm.charAt(0).toUpperCase() + nm.slice(1); }
         s.oninput = function () { try { localStorage.setItem("talay-sig", s.value); } catch (e) {} };
-        tx.onkeydown = function (e) { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send(); };
+        // Sign only the team's first message in a chat by default; the box can be ticked for any message.
+        var so = $("#sigon"); so.checked = !d.messages.some(function (m) { return m.dir === "Team"; });
+        // Enter sends, Shift + Enter is a new line. On a phone the keyboard's return key stays a new line.
+        var touch = matchMedia("(pointer:coarse)").matches;
+        tx.onkeydown = function (e) { if (e.key === "Enter" && !e.isComposing && (e.metaKey || e.ctrlKey || (!touch && !e.shiftKey))) { e.preventDefault(); send(); } };
+        var eb = $("#emo"), ep = $("#epick");
+        eb.onclick = function (e) { e.stopPropagation(); ep.hidden = !ep.hidden; eb.setAttribute("aria-expanded", String(!ep.hidden)); };
+        ep.querySelectorAll("button").forEach(function (b) {
+          b.onclick = function (e) {
+            e.stopPropagation();
+            var a = tx.selectionStart == null ? tx.value.length : tx.selectionStart, z = tx.selectionEnd == null ? a : tx.selectionEnd;
+            tx.value = tx.value.slice(0, a) + b.textContent + tx.value.slice(z);
+            tx.focus(); tx.selectionStart = tx.selectionEnd = a + b.textContent.length; grow();
+          };
+        });
         var grow = function () { tx.style.height = "auto"; tx.style.height = Math.min(tx.scrollHeight, 180) + "px"; };
         tx.addEventListener("input", grow); setTimeout(grow, 0);
         $("#send").onclick = send;
@@ -4895,6 +4948,9 @@ function zoneClient(cfg) {
       }
     }).catch(function (e) { if (e.message !== "auth" && id === current) $("#pane").innerHTML = '<div class="placeholder">' + esc(e.message) + "</div>"; });
   }
+
+  document.addEventListener("click", function (e) { var ep = $("#epick"), eb = $("#emo"); if (ep && !ep.hidden && !ep.contains(e.target) && !eb.contains(e.target)) { ep.hidden = true; eb.setAttribute("aria-expanded", "false"); } });
+  var EMOJI = ["😊", "🙂", "😄", "😉", "🙏", "👍", "👋", "🙌", "👌", "🎉", "❤️", "💙", "🤿", "🐠", "🐢", "🦈", "🐋", "🌊", "☀️", "🏝️", "⛵", "📅", "✅", "📍"];
 
   function loadProducts(id) {
     api("products?c=" + encodeURIComponent(id)).then(function (d) {
@@ -4927,7 +4983,7 @@ function zoneClient(cfg) {
   function send() {
     var t = $("#txt"), b = $("#send"), n = $("#note"), v = t.value.trim();
     if (!v || b.disabled) return;
-    var sig = ($("#sig").value || "").trim(); if (sig) v += "\n– " + sig;
+    var sig = ($("#sig").value || "").trim(); if (sig && $("#sigon").checked) v += "\n– " + sig;
     b.disabled = true; b.classList.add("busy");
     post("reply", { c: current, text: v }).then(function () {
       t.value = ""; lastChat = ""; lastList = ""; freshNext = true; freshList = true; loadChat(true); loadList();
