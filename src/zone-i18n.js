@@ -452,6 +452,9 @@ export const ZONE_ROWS = [
   ["Undo translation", "Deshacer traducción", "Annuler la traduction", "Übersetzung rückgängig", "Vertaling ongedaan maken"],
   ["Translating didn't work. Try again.", "La traducción no funcionó. Inténtalo de nuevo.", "La traduction n’a pas fonctionné. Réessayez.", "Die Übersetzung hat nicht geklappt. Versuch es noch einmal.", "Vertalen lukte niet. Probeer opnieuw."],
   ["Translation isn't switched on yet.", "La traducción aún no está activada.", "La traduction n’est pas encore activée.", "Die Übersetzung ist noch nicht eingeschaltet.", "Vertalen staat nog niet aan."],
+  ["Diver since {d}", "Buceador desde {d}", "Plongeur depuis {d}", "Taucher seit {d}", "Duiker sinds {d}"],
+  ["No booking yet", "Aún sin reserva", "Pas encore de réservation", "Noch keine Buchung", "Nog geen boeking"],
+  ["Earlier note", "Nota anterior", "Note précédente", "Frühere Notiz", "Eerdere notitie"],
 ];
 
 // { es: { English: Spanish, … }, fr: …, de: …, nl: …, th: … }
@@ -898,5 +901,8 @@ export const ZONE_TH = {
   "Undo translation": "ยกเลิกการแปล",
   "Translating didn't work. Try again.": "แปลไม่สำเร็จ ลองอีกครั้ง",
   "Translation isn't switched on yet.": "ยังไม่ได้เปิดการแปล",
+  "Diver since {d}": "ลูกค้าตั้งแต่ {d}",
+  "No booking yet": "ยังไม่มีการจอง",
+  "Earlier note": "บันทึกก่อนหน้า",
 };
 ZONE_TEXT.th = ZONE_TH;
