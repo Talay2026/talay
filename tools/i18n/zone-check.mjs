@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ZONE_ROWS } from "../../src/zone-i18n.js";
+import { ZONE_ROWS, ZONE_TH } from "../../src/zone-i18n.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const src = readFileSync(join(ROOT, "src/zone.js"), "utf8");
@@ -18,18 +18,25 @@ for (const m of zone.matchAll(new RegExp(`\\btn\\([^"]*?,\\s*${str},\\s*${str}`,
 
 let failed = false;
 const fail = (msg) => { console.error(msg); failed = true; };
+const holes = (x) => [...new Set(x.match(/\{\w+\}/g) || [])].sort().join(); // the same {placeholder} may be used twice
 const rows = new Map();
 for (const r of ZONE_ROWS) {
   if (rows.has(r[0])) fail(`Twice: ${r[0]}`);
   rows.set(r[0], r);
-  const want = (r[0].match(/\{\w+\}/g) || []).sort().join();
+  const want = holes(r[0]);
   ["es", "fr", "de", "nl"].forEach((l, i) => {
     const x = r[i + 1];
     if (!x) return fail(`Missing ${l}: ${r[0]}`);
     if (x.includes('"')) fail(`Straight " in ${l}: ${x}`);
-    if ((x.match(/\{\w+\}/g) || []).sort().join() !== want) fail(`Placeholders differ in ${l}: ${x}`);
+    if (holes(x) !== want) fail(`Placeholders differ in ${l}: ${x}`);
   });
 }
+for (const [en, x] of Object.entries(ZONE_TH)) {
+  if (!rows.has(en)) fail(`Thai for a text that has no row: ${en}`);
+  if (x.includes('"')) fail(`Straight " in th: ${x}`);
+  if (holes(x) !== holes(en)) fail(`Placeholders differ in th: ${x}`);
+}
+for (const k of rows.keys()) if (!ZONE_TH[k]) fail(`Missing th: ${k}`);
 for (const k of used) if (!rows.has(k)) fail(`No translation: ${k}`);
 if (failed) process.exit(1);
-console.log(`OK: ${used.size} texts in the zone, ${rows.size} translated rows (es, fr, de, nl).`);
+console.log(`OK: ${used.size} texts in the zone, ${rows.size} translated rows (es, fr, de, nl, th).`);
