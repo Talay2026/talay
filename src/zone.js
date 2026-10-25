@@ -3914,7 +3914,7 @@ main{max-width:440px;text-align:center}a{color:#0A2029;font-weight:700}</style><
 
 function app(center, centers, email, superadmin = false, lang = "en") {
   const T = zoneT(lang), A = esc(center.assistant);
-  const langOpts = ZONE_LANGS.map(([code, name]) => `<option value="${code}"${code === lang ? " selected" : ""}>${name}</option>`).join("");
+  const langOpts = ZONE_LANGS.map(([code, name]) => `<button type="button" class="chip zl${code === lang ? " on" : ""}" data-l="${code}">${name}</button>`).join("");
   const switcher = centers.length > 1
     ? `<button class="csw" id="center" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Dive center"><span>${esc(center.name)}</span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><div class="lmenu" id="cmenu" role="menu" hidden>${centers.map((c) =>
       `<button type="button" role="menuitemradio" aria-checked="${c.slug === center.slug}" data-c="${esc(c.slug)}"${c.slug === center.slug ? ' class="on"' : ""}>${esc(c.name)}<svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7"/></svg></button>`).join("")}</div>` : "";
@@ -4713,6 +4713,21 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .chip .count{line-height:18px}
 .th{align-items:baseline}
 .th .tag{align-self:center}
+/* Settings (25 Oct): calmer */
+.smsg:empty{min-height:0;margin:0}
+.srow+.smsg:empty+.d{margin-top:18px}
+.scard .d a{color:var(--deep);font-weight:600}
+.ptable td.nm{min-width:170px}
+.ptable td.dep{white-space:nowrap}
+.ptable th{vertical-align:bottom}
+.ptable input[type=checkbox]{width:18px;height:18px;accent-color:#0A2029;cursor:pointer}
+.ptable td.tlinks{min-width:84px}
+.ptable .ps{padding:6px 14px;font-size:13px}
+.ptable .ps[hidden]{display:none}
+.people{gap:0;margin-bottom:14px;border-top:1px solid var(--line)}
+.people li{border:0;border-bottom:1px solid var(--line);border-radius:0;background:none;padding:10px 2px}
+.people button{color:var(--muted);font-weight:600}
+.people button:hover{color:var(--warn)}
 @media (max-width:760px){#books .btable.bday tr.grp{background:none;border:0;padding:12px 2px 4px;margin:0}#books .btable.bday tr.grp td{background:none;padding:0;justify-content:flex-start;text-align:left}#books .btable.bday .tname{flex-direction:column;align-items:flex-start;gap:0}}
 .minis.strip{gap:0;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
 .minis.strip .mini{background:none;border:0;border-radius:0;box-shadow:none;padding:14px 20px}
@@ -4847,7 +4862,7 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
     <div class="scard">
       <h3>${T("Language")}</h3>
       <p class="d">${T("The language of the zone on this device. Every colleague can choose their own. The messages to divers don't change: {a} always answers in the diver's language.", { a: A })}</p>
-      <div class="srow"><select class="zlang" aria-label="${T("Language")}">${langOpts}</select></div>
+      <div class="chips zlangs" role="group" aria-label="${T("Language")}">${langOpts}</div>
     </div>
   </div>
 </section>
@@ -4944,7 +4959,7 @@ function zoneClient(cfg) {
 
   // ---- tabs
   function setLang(l) { document.cookie = "talay-zone-lang=" + l + "; path=/zone; max-age=31536000; samesite=lax; secure"; location.reload(); }
-  document.querySelectorAll("select.zlang").forEach(function (zl) { zl.onchange = function () { setLang(zl.value); }; });
+  document.querySelectorAll(".chip.zl").forEach(function (zl) { zl.onclick = function () { if (zl.dataset.l !== cfg.lang) setLang(zl.dataset.l); }; });
   // A small dropdown in Talay style: opens under (or above) its button, arrow keys, Escape, click outside.
   function dropMenu(btn, menu, pick) {
     if (!btn || !menu) return;
@@ -5439,14 +5454,15 @@ function zoneClient(cfg) {
         var hours = ""; for (var h = 8; h <= 22; h++) hours += '<option value="' + h + '"' + (h === p.cutoff ? " selected" : "") + ">" + h + ":00</option>";
         return '<tr class="' + (p.active ? "" : "off") + '" data-id="' + esc(p.id) + '" data-pct="' + p.pct + '"><td class="nm">' + esc(p.name) + '<br><span class="muted">' + esc(p.code) + "</span></td>" +
           '<td data-l="' + t("Price (THB)") + '"><input type="number" min="100" step="50" value="' + p.price + '" class="pp" inputmode="numeric"></td>' +
-          '<td class="muted dep" data-l="' + t("Deposit") + '">' + Math.round(p.deposit).toLocaleString(NUM) + " THB<br>" + p.pct + "%</td>" +
+          '<td class="muted dep" data-l="' + t("Deposit") + '">' + Math.round(p.deposit).toLocaleString(NUM) + " THB · " + p.pct + "%</td>" +
           '<td data-l="' + t("Book until (day before)") + '"><select class="pc">' + hours + "</select></td>" +
           '<td data-l="' + t("Bookable online") + '"><input type="checkbox" class="pa"' + (p.active ? " checked" : "") + "></td>" +
-          '<td class="tlinks"><button class="ghost ps" type="button">' + t("Save") + '</button></td></tr>';
+          '<td class="tlinks"><button class="btn ps" type="button" hidden>' + t("Save") + '</button></td></tr>';
       }).join("");
       $("#prods").querySelectorAll("tr").forEach(function (tr) {
-        var pp = tr.querySelector(".pp");
-        pp.oninput = function () { tr.querySelector(".dep").innerHTML = Math.round((Number(pp.value) || 0) * Number(tr.dataset.pct) / 100).toLocaleString(NUM) + " THB<br>" + tr.dataset.pct + "%"; };
+        var pp = tr.querySelector(".pp"), changed = function () { tr.querySelector(".ps").hidden = false; };
+        tr.querySelector(".pc").onchange = changed; tr.querySelector(".pa").onchange = changed;
+        pp.oninput = function () { tr.querySelector(".dep").innerHTML = Math.round((Number(pp.value) || 0) * Number(tr.dataset.pct) / 100).toLocaleString(NUM) + " THB · " + tr.dataset.pct + "%"; changed(); };
         tr.querySelector(".ps").onclick = function () {
           var btn = this, name = tr.querySelector(".nm").firstChild.textContent;
           save({ action: "product", id: tr.dataset.id, price: Number(pp.value), cutoff: Number(tr.querySelector(".pc").value), active: tr.querySelector(".pa").checked },
