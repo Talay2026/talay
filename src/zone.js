@@ -4668,6 +4668,11 @@ header .hlang[aria-expanded="true"] .chev{transform:rotate(180deg)}
 .lmenu button.on{color:#F7F3EA;font-weight:600}
 .lmenu button.on .code{color:var(--sand)}
 .lmenu button.on .ck{visibility:visible}
+/* Talay's own Instagram and Facebook: small and quiet, under Sign out (desktop) or at the bottom of Support (phone) */
+header .htools .soc{display:flex;gap:2px;margin-top:6px;padding:8px 2px 0;border-top:1px solid rgba(247,243,234,.06)}
+header .htools .soc a{width:auto;padding:7px;color:#7F979C}
+header .htools .soc a:hover{color:var(--sand)}
+.msoc{display:none}
 header select{background:var(--side-2);color:#F7F3EA;border:1px solid rgba(247,243,234,.12);border-radius:10px;padding:8px 10px}
 /* nav */
 nav button{gap:10px;font-weight:600;letter-spacing:-.005em}
@@ -4766,6 +4771,10 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
  header .bn small{display:none}
  header .htools .sl{display:none}
  header .htools .lnk,header .htools a{padding:8px}
+ header .htools .soc{display:none}
+ .msoc{display:flex;justify-content:center;gap:6px;padding:28px 0 8px}
+ .msoc a{display:inline-flex;padding:8px;border-radius:9px;color:var(--muted)}
+ .msoc a:hover{color:var(--sand)}
  nav{background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:saturate(1.4) blur(12px);-webkit-backdrop-filter:saturate(1.4) blur(12px);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px))}
  nav button{font-size:10px;letter-spacing:-.01em;font-weight:600;padding:6px 1px 5px;border-radius:12px;color:var(--muted);gap:3px}
  nav button.on{background:var(--paper);color:var(--deep)}
@@ -4900,6 +4909,7 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .twrap{width:100%;max-width:1120px;margin:0 auto;padding:28px 20px calc(40px + env(safe-area-inset-bottom,0px))}
 .thead h1{margin:0;font-size:28px;letter-spacing:-.025em}
 .thead p{margin:4px 0 18px;color:var(--muted);font-size:14px}
+.thead .tclock{font-variant-numeric:tabular-nums}
 .tgrid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:14px;align-items:start}
 .tcol{display:grid;gap:14px;min-width:0;grid-template-columns:minmax(0,1fr)}
 .tcard{min-width:0}
@@ -5316,7 +5326,7 @@ header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-sh
 @media (max-width:760px){.pane .head{padding:12px 16px 4px}.cinfo{padding:0 16px 12px}.cinfo .facts{flex-wrap:wrap;overflow:visible;white-space:normal}}
 </style></head>
 <body>
-<header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>${T("Customer zone")}</small></span></div><span class="sp"></span>${switcher}<div class="htools">${superadmin ? `<a href="/zone/admin" title="Talay HQ">Talay HQ</a>` : ""}<button class="lnk hlang" id="hlang" type="button" title="${T("Language")}" aria-haspopup="menu" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg><span class="sl">${(ZONE_LANGS.find(l => l[0] === lang) || ZONE_LANGS[0])[1]}</span><svg class="chev sl" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">${T("Sign out")}</span></a></div></header><div class="lmenu" id="lmenu" role="menu" hidden>${ZONE_LANGS.map(([code, name]) => `<button type="button" role="menuitemradio" aria-checked="${code === lang}" data-l="${code}"${code === lang ? ' class="on"' : ""}><span class="code">${code}</span>${name}<svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7"/></svg></button>`).join("")}</div>
+<header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>${T("Customer zone")}</small></span></div><span class="sp"></span>${switcher}<div class="htools">${superadmin ? `<a href="/zone/admin" title="Talay HQ">Talay HQ</a>` : ""}<button class="lnk hlang" id="hlang" type="button" title="${T("Language")}" aria-haspopup="menu" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg><span class="sl">${(ZONE_LANGS.find(l => l[0] === lang) || ZONE_LANGS[0])[1]}</span><svg class="chev sl" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">${T("Sign out")}</span></a><div class="soc"><a href="https://www.instagram.com/talay.io/" target="_blank" rel="noopener" title="${T("Talay on Instagram")}" aria-label="${T("Talay on Instagram")}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.5 6.5h.01"/></svg></a><a href="https://www.facebook.com/profile.php?id=61594947457744" target="_blank" rel="noopener" title="${T("Talay on Facebook")}" aria-label="${T("Talay on Facebook")}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg></a></div></div></header><div class="lmenu" id="lmenu" role="menu" hidden>${ZONE_LANGS.map(([code, name]) => `<button type="button" role="menuitemradio" aria-checked="${code === lang}" data-l="${code}"${code === lang ? ' class="on"' : ""}><span class="code">${code}</span>${name}<svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7"/></svg></button>`).join("")}</div>
 <nav><button class="on" data-v="today"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></i><span class="nl">${T("Today")}</span></button><button data-v="convos"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg></i><span class="nl"><span class="long">${T("Conversations")}</span><span class="short">${T("Chats")}</span></span><span class="count" id="count" hidden></span></button><button data-v="books"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h3M4 12h3M4 18h3M10 6h10M10 12h10M10 18h10"/></svg></i><span class="nl">${T("Bookings")}</span></button><button data-v="cal"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></i><span class="nl">${T("Calendar")}</span></button><button data-v="dash"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></i><span class="nl"><span class="long">${T("Dashboard")}</span><span class="short">${T("Stats")}</span></span></button><button data-v="sett"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></i><span class="nl"><span class="long">${T("Settings")}</span><span class="short">${T("Options")}</span></span></button><button data-v="supp"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg></i><span class="nl">${T("Support")}</span><span class="count" id="tcount" hidden></span></button></nav>
 
 <section id="today" class="view on">
@@ -5453,6 +5463,7 @@ header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-sh
       <button class="ghost" id="tNew" type="button">+ ${T("New ticket")}</button>
     </div>
     <div id="tbody"><div class="skel"><i></i><i></i><i></i></div></div>
+    <div class="msoc"><a href="https://www.instagram.com/talay.io/" target="_blank" rel="noopener" title="${T("Talay on Instagram")}" aria-label="${T("Talay on Instagram")}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.5 6.5h.01"/></svg></a><a href="https://www.facebook.com/profile.php?id=61594947457744" target="_blank" rel="noopener" title="${T("Talay on Facebook")}" aria-label="${T("Talay on Facebook")}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg></a></div>
   </div>
 </section>
 
@@ -6575,9 +6586,16 @@ function zoneClient(cfg) {
     document.querySelector('nav button[data-v="books"]').click();
     var c = document.querySelector('.chip[data-r="' + r + '"]'); if (c) c.click();
   }
+  // Date and current time at the centre (Koh Tao), under the greeting. Ticks every 20 s.
+  function showDate() {
+    var now = new Date(), el = $("#tDate");
+    el.innerHTML = esc(now.toLocaleDateString(LOC, { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Bangkok" })) +
+      ' · <span class="tclock" title="' + esc(t("Local time at the centre")) + '">' + esc(now.toLocaleTimeString(LOC, { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Bangkok" })) + "</span> · " + esc(cfg.center);
+  }
+  setInterval(function () { if ($("#tDate").textContent) showDate(); }, 20000);
   function loadToday() {
     $("#tGreet").textContent = greet();
-    $("#tDate").textContent = new Date().toLocaleDateString(LOC, { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Bangkok" }) + " · " + cfg.center;
+    showDate();
     loadDay();
     api("conversations?view=open").then(function (d) {
       var need = d.conversations.filter(function (c) { return c.needsYou || c.waitingMin > 0; });

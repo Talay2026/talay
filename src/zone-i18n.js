@@ -47,6 +47,9 @@ export const ZONE_ROWS = [
   ["{n} h left to reply", "Quedan {n} h para responder", "Encore {n} h pour répondre", "Noch {n} Std. zum Antworten", "Nog {n} u om te antwoorden"],
   ["In {n} days", "En {n} días", "Dans {n} jours", "In {n} Tagen", "Over {n} dagen"],
   ["since 00:00", "desde las 00:00", "depuis 00:00", "seit 00:00", "sinds 00:00"],
+  ["Local time at the centre", "Hora local en el centro", "Heure locale au centre", "Ortszeit an der Basis", "Lokale tijd in het centrum"],
+  ["Talay on Instagram", "Talay en Instagram", "Talay sur Instagram", "Talay auf Instagram", "Talay op Instagram"],
+  ["Talay on Facebook", "Talay en Facebook", "Talay sur Facebook", "Talay auf Facebook", "Talay op Facebook"],
 
   // Today
   ["Good morning", "Buenos días", "Bonjour", "Guten Morgen", "Goedemorgen"],
@@ -566,6 +569,9 @@ export const ZONE_TH = {
   "{n} h left to reply": "เหลือเวลาตอบ {n} ชม.",
   "In {n} days": "อีก {n} วัน",
   "since 00:00": "ตั้งแต่ 00:00",
+  "Local time at the centre": "เวลาท้องถิ่นที่ศูนย์",
+  "Talay on Instagram": "Talay บน Instagram",
+  "Talay on Facebook": "Talay บน Facebook",
   "Good morning": "อรุณสวัสดิ์",
   "Good afternoon": "สวัสดีตอนบ่าย",
   "Good evening": "สวัสดีตอนเย็น",
