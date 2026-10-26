@@ -339,6 +339,8 @@ const T_BOOK = {
     chooseActivity: "Choose an activity first.",
     chooseSlot: "Choose morning or afternoon.",
     notOpen: "This day is not available.",
+    dayFull: "This day is fully booked. Choose another day.",
+    slotFull: "full",
     done: "Done", edit: "Change", remove: "Remove",
     another: "Book another one",
     bookingN: (n) => `Booking ${n}`,
@@ -377,6 +379,8 @@ const T_BOOK = {
     chooseActivity: "Choisissez d'abord une activité.",
     chooseSlot: "Choisissez le matin ou l'après-midi.",
     notOpen: "Ce jour n'est pas disponible.",
+    dayFull: "Ce jour est complet. Choisissez un autre jour.",
+    slotFull: "complet",
     done: "Valider", edit: "Modifier", remove: "Supprimer",
     another: "Réserver autre chose",
     bookingN: (n) => `Réservation ${n}`,
@@ -415,6 +419,8 @@ const T_BOOK = {
     chooseActivity: "Wähle zuerst eine Aktivität.",
     chooseSlot: "Wähle Vormittag oder Nachmittag.",
     notOpen: "Dieser Tag ist nicht verfügbar.",
+    dayFull: "Dieser Tag ist ausgebucht. Wähle einen anderen Tag.",
+    slotFull: "ausgebucht",
     done: "Fertig", edit: "Ändern", remove: "Entfernen",
     another: "Noch etwas buchen",
     bookingN: (n) => `Buchung ${n}`,
@@ -453,6 +459,8 @@ const T_BOOK = {
     chooseActivity: "Elige primero una actividad.",
     chooseSlot: "Elige mañana o tarde.",
     notOpen: "Este día no está disponible.",
+    dayFull: "Este día está completo. Elige otro día.",
+    slotFull: "completo",
     done: "Listo", edit: "Cambiar", remove: "Quitar",
     another: "Reservar otra cosa",
     bookingN: (n) => `Reserva ${n}`,
@@ -491,6 +499,8 @@ const T_BOOK = {
     chooseActivity: "Kies eerst een activiteit.",
     chooseSlot: "Kies voormiddag of namiddag.",
     notOpen: "Deze dag is niet beschikbaar.",
+    dayFull: "Deze dag is volgeboekt. Kies een andere dag.",
+    slotFull: "vol",
     done: "Klaar", edit: "Aanpassen", remove: "Verwijderen",
     another: "Nog iets boeken",
     bookingN: (n) => `Boeking ${n}`,
@@ -623,8 +633,9 @@ export default {
       const found = await loadCenter(env, ctx, slug);
       if (!found) return page(notFound(lang), 404, lang);
       const ref = (url.searchParams.get("c") || "").slice(0, 64);
+      const taken = await takenSeats(env, ctx, found.center, found.products.filter((p) => p["Active"]));
       return page(bookingPage(found.center, found.products, slug, env, lang,
-        /^[A-Za-z0-9_-]{1,64}$/.test(ref) ? ref : "", linkItems(url)), 200, lang, T[lang].pageTitle, true);
+        /^[A-Za-z0-9_-]{1,64}$/.test(ref) ? ref : "", linkItems(url), taken), 200, lang, T[lang].pageTitle, true);
     } catch (err) {
       console.error(err);
       return page(problem(T[lang].loadFail, lang), 502, lang);
@@ -712,6 +723,8 @@ async function checkout(request, env, ctx, url) {
   if (!key) return json({ error: t.notAvailable }, 503);
   const tz = centerTz(center);
   const closed = closedDates(center);
+  const full = fullDates(center);
+  const taken = await takenSeats(env, ctx, center, products.filter((p) => p["Active"]));
   const centerName = first(center["Name"]) || "Dive center";
 
   const items = [];
@@ -735,6 +748,9 @@ async function checkout(request, env, ctx, url) {
     const kind = slotKind(product, days);
     const slot = kind === "CHOOSE" ? String(w.slot || "").toUpperCase() : kind;
     if (kind === "CHOOSE" && slot !== "AM" && slot !== "PM") return json({ error: t.chooseSlot }, 400);
+    if (seatProblem({ code, days, slot: kind, maxDay: num(product["Max per day"]) }, full, taken, date, slot, divers)) {
+      return json({ error: t.dayFull }, 409);
+    }
     items.push({
       code, date, divers, slot: slot === "AM" || slot === "PM" || slot === "DAY" ? slot : "",
       name: first(product["Name"]) || code, // English name: used in Airtable, Make and mails
@@ -1132,13 +1148,19 @@ async function airtableList(env, ctx, table, formula) {
   const hit = await cache.match(cacheKey);
   if (hit) return ((await hit.json()).records || []).map((r) => r.fields);
 
-  const res = await fetch(api, { headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` } });
-  if (!res.ok) throw new Error(`Airtable ${table}: ${res.status} ${await res.text()}`);
-  const body = await res.text();
-  ctx.waitUntil(cache.put(cacheKey, new Response(body, {
+  const records = [];
+  for (let page = 0; page < 10; page++) { // at most 1,000 rows
+    const res = await fetch(api, { headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` } });
+    if (!res.ok) throw new Error(`Airtable ${table}: ${res.status} ${await res.text()}`);
+    const data = await res.json();
+    records.push(...(data.records || []));
+    if (!data.offset) break;
+    api.searchParams.set("offset", data.offset);
+  }
+  ctx.waitUntil(cache.put(cacheKey, new Response(JSON.stringify({ records }), {
     headers: { "Content-Type": "application/json", "Cache-Control": `max-age=${CACHE_SECONDS}` },
   })));
-  return (JSON.parse(body).records || []).map((r) => r.fields);
+  return records.map((r) => r.fields);
 }
 
 // ---------- Helpers ----------
@@ -1214,6 +1236,54 @@ function centerTz(c) {
 function closedDates(c) {
   return [...new Set(String(first(c["Closed dates"]) || "").match(/\d{4}-\d{2}-\d{2}/g) || [])];
 }
+// Days the center marked as full in the zone: Centers → "Full dates", one line per day:
+// "2026-11-26" (whole day), "2026-11-26 AM" or "2026-11-26 PM". Same format as parseFull in src/zone.js.
+function fullDates(c, from = "") {
+  const out = {};
+  for (const m of String(first(c["Full dates"]) || "").matchAll(/(\d{4}-\d{2}-\d{2})(?:[ \t]+(AM|PM|DAY))?/gi)) {
+    if (m[1] < from) continue;
+    const part = (m[2] || "DAY").toUpperCase(), had = out[m[1]];
+    out[m[1]] = !had || had === part ? part : "DAY";
+  }
+  return out;
+}
+// Divers already booked per product and day (and per morning/afternoon when the diver chooses),
+// only for products with Products → "Max per day": { FUN: { "2026-11-26|AM": 6 }, OW: { "2026-11-26|": 3 } }.
+async function takenSeats(env, ctx, c, products) {
+  const capped = products.filter((p) => num(p["Max per day"]) > 0);
+  if (!capped.length) return {};
+  const name = String(first(c["Name"]) || "").replace(/'/g, "\\'");
+  const from = plusDays(earliestDate(99, centerTz(c)), -30); // multi-day courses that started earlier still count
+  let rows = [];
+  try {
+    rows = await airtableList(env, ctx, "Bookings",
+      `AND(ARRAYJOIN({Center}) & '' = '${name}', IS_AFTER({Activity date}, DATETIME_PARSE('${from}', 'YYYY-MM-DD')), NOT(REGEX_MATCH(LOWER({Status} & ''), 'cancel|refund')))`);
+  } catch (e) { console.error("taken seats", e); return {}; }
+  const out = {};
+  for (const b of rows) {
+    const code = String(first(b["P code"]) || "").toUpperCase();
+    const p = capped.find((x) => String(first(x["Code"]) || "").toUpperCase() === code);
+    const date = String(first(b["Activity date"]) || "").slice(0, 10);
+    if (!p || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    const days = productDays(p);
+    const v = String(first(b["Time slot"]) || "").toLowerCase();
+    const part = slotKind(p, days) !== "CHOOSE" ? "" : /afternoon|\bpm\b/.test(v) ? "PM" : "AM";
+    const n = num(b["Group size"]) || 1;
+    const m = (out[code] = out[code] || {});
+    for (let k = 0; k < days; k++) { const key = `${plusDays(date, k)}|${part}`; m[key] = (m[key] || 0) + n; }
+  }
+  return out;
+}
+// Can n more divers book this product on this day (and morning/afternoon)? Same rules as the page.
+function seatProblem(view, full, taken, date, slot, n) {
+  for (let k = 0; k < view.days; k++) {
+    const day = plusDays(date, k), f = full[day];
+    if (f === "DAY" || (f && (slot === f || view.slot === f))) return true;
+    const part = view.slot === "CHOOSE" ? slot : "";
+    if (view.maxDay && ((taken[view.code] || {})[`${day}|${part}`] || 0) + n > view.maxDay) return true;
+  }
+  return false;
+}
 
 function productView(p, c, lang) {
   const t = T[lang];
@@ -1230,6 +1300,7 @@ function productView(p, c, lang) {
     deposit: num(p["Deposit THB"]),
     slot, days,
     maxGroup: num(p["Max group"]) || 0,
+    maxDay: num(p["Max per day"]) || 0,
     minDate: earliestDate(num(p["Cutoff hour"]) || 15, centerTz(c)),
     short: String(first(p["Short"]) || code).slice(0, 8),
     info: {
@@ -1270,7 +1341,7 @@ async function loadCenter(env, ctx, slug) {
   return { center, products: own };
 }
 
-function bookingPage(c, products, slug, env, lang, ref, wanted) {
+function bookingPage(c, products, slug, env, lang, ref, wanted, taken = {}) {
   const t = T[lang];
   const centerName = first(c["Name"]) || "Dive center";
   const island = first(c["Island"]) || "";
@@ -1301,10 +1372,10 @@ function bookingPage(c, products, slug, env, lang, ref, wanted) {
   const data = {
     lang, locale: LOCALES[lang], sep: SEP[lang] ?? ",", max: MAX_DIVERS, maxItems: MAX_ITEMS,
     payments: !!key, multi, slug, ref, init, products: views,
-    maxDate: plusDays(today, 180), closed: closedDates(c),
+    maxDate: plusDays(today, 180), closed: closedDates(c), full: fullDates(c, today), taken,
     s: {
       diver: t.diver, divers: t.divers, chooseDate: t.chooseDate, chooseActivity: t.chooseActivity, chooseSlot: t.chooseSlot,
-      tooSoon: t.tooSoon("{d}"), tooFar: t.tooFar(assistant), notOpen: t.notOpen, noPay: t.noPay(assistant),
+      tooSoon: t.tooSoon("{d}"), tooFar: t.tooFar(assistant), notOpen: t.notOpen, dayFull: t.dayFull, slotFull: t.slotFull, noPay: t.noPay(assistant),
       opening: t.opening, wrong: t.wrong, noConn: t.noConn, fixFirst: t.fixFirst, tooMany: t.tooMany,
       groups: t.groups, perDiver: t.perDiver, infoTitle: t.infoTitle,
       info: { dives: t.infoDives, depth: t.infoDepth, duration: t.infoDuration, level: t.infoFor, inc: t.infoInc, not: t.infoNot, bring: t.infoBring, checkIn: t.checkIn },
@@ -1436,6 +1507,19 @@ const BOOK_JS = String.raw`
     for (let k = 0; k < p.days; k++) if (d.closed.indexOf(addDays(date, k)) >= 0) return true;
     return false;
   }
+  // Full: the center closed the day (or the morning/afternoon) in its zone, or the product reached its maximum.
+  function slotFull(p, date, slot, n) {
+    for (let k = 0; k < p.days; k++) {
+      const day = addDays(date, k), f = d.full[day];
+      if (f === "DAY" || (f && (slot === f || p.slot === f))) return true;
+      const part = p.slot === "CHOOSE" ? slot : "";
+      if (p.maxDay && (((d.taken[p.code] || {})[day + "|" + part]) || 0) + n > p.maxDay) return true;
+    }
+    return false;
+  }
+  function dayFull(p, date, n) {
+    return p.slot === "CHOOSE" ? slotFull(p, date, "AM", n) && slotFull(p, date, "PM", n) : slotFull(p, date, "", n);
+  }
   function problem(it) {
     const p = P[it.code];
     if (!p) return s.chooseActivity;
@@ -1444,7 +1528,9 @@ const BOOK_JS = String.raw`
     if (it.date < p.minDate) return fill(s.tooSoon, "d", fmt(p.minDate, { weekday: "long", day: "numeric", month: "long" }));
     if (it.date > d.maxDate) return s.tooFar;
     if (blocked(p, it.date)) return s.notOpen;
+    if (dayFull(p, it.date, it.n)) return s.dayFull;
     if (p.slot === "CHOOSE" && it.slot !== "AM" && it.slot !== "PM") return s.chooseSlot;
+    if (p.slot === "CHOOSE" && slotFull(p, it.date, it.slot, it.n)) return s.dayFull;
     return "";
   }
   const slotWord = (k) => ({ AM: s.am, PM: s.pm, DAY: s.day }[k] || "");
@@ -1478,7 +1564,7 @@ const BOOK_JS = String.raw`
     const span = it.date && p.days > 1 ? addDays(it.date, p.days - 1) : it.date;
     for (let day = 1; day <= daysIn; day++) {
       const iso = first + "-" + String(day).padStart(2, "0");
-      const off = iso < p.minDate || iso > d.maxDate || blocked(p, iso);
+      const off = iso < p.minDate || iso > d.maxDate || blocked(p, iso) || dayFull(p, iso, it.n);
       const cls = (iso === it.date ? " sel" : it.date && iso > it.date && iso <= span ? " in" : "") + (off ? " off" : "");
       h += '<button type="button" class="day' + cls + '" data-day="' + iso + '"' + (off ? ' disabled aria-disabled="true"' : "") + ' aria-label="' + esc(fmt(iso, { weekday: "long", day: "numeric", month: "long" })) + '">' + day + "</button>";
     }
@@ -1505,7 +1591,10 @@ const BOOK_JS = String.raw`
         (it.date ? ' <span class="chosen">' + esc(fmt(it.date, { weekday: "long", day: "numeric", month: "long" })) + (p.days > 1 ? " → " + esc(fmt(addDays(it.date, p.days - 1))) : "") + "</span>" : "") + "</span>" + calHtml(it, p) + "</div>";
       if (p.slot === "CHOOSE") {
         h += '<div class="field"><span class="lbl">' + esc(s.slotLabel) + '</span><div class="slots">' +
-          ["AM", "PM"].map((k) => '<button type="button" data-slot="' + k + '" aria-pressed="' + (it.slot === k) + '" class="' + (it.slot === k ? "on" : "") + '">' + esc(slotWord(k)) + "</button>").join("") + "</div></div>";
+          ["AM", "PM"].map((k) => {
+            const no = !!it.date && slotFull(p, it.date, k, it.n);
+            return '<button type="button" data-slot="' + k + '" aria-pressed="' + (it.slot === k) + '" class="' + (it.slot === k ? "on" : "") + '"' + (no ? " disabled" : "") + ">" + esc(slotWord(k)) + (no ? " · " + esc(s.slotFull) : "") + "</button>";
+          }).join("") + "</div></div>";
       } else if (p.slot) {
         h += '<p class="hint slotfix">' + esc(slotWord(p.slot)) + (p.days > 1 ? " · " + esc(fill(s.daysN, "n", p.days)) : "") + "</p>";
       }
@@ -1892,6 +1981,7 @@ a.book.chat{display:flex;align-items:center;justify-content:center;text-decorati
 .slots{display:flex;gap:.5rem;flex-wrap:wrap}
 .slots button{min-height:2.6rem;padding:0 1.1rem;border:1px solid var(--line);border-radius:999px;background:#fff;font:inherit;font-weight:600;color:var(--ink);cursor:pointer}
 .slots button.on{background:var(--deep);border-color:var(--deep);color:var(--shore)}
+.slots button:disabled{opacity:.45;cursor:not-allowed;text-decoration:line-through}
 .slotfix{margin-top:.8rem}
 .done{margin-top:1.2rem;min-height:2.8rem;padding:0 1.6rem;border:0;border-radius:999px;background:var(--deep);color:var(--shore);font:inherit;font-weight:700;cursor:pointer}
 .done:hover{background:var(--ridge)}

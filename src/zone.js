@@ -123,6 +123,7 @@ export async function handleZone(request, env, ctx) {
       if (p === "/zone/api/lead-team") return await leadTeam(request, env, center);
       if (p === "/zone/api/translate") return await translate(request, env);
       if (p === "/zone/api/suggest") return await suggest(request, env, center);
+      if (p === "/zone/api/full") return await saveFull(request, env, center, email);
     }
     return json({ error: "Not found" }, 404);
   } catch (err) {
@@ -812,7 +813,7 @@ const thaiDate = (ms) => new Date(ms + 7 * 3600 * 1000).toISOString().slice(0, 1
 async function bookings(env, center) {
   const now = Date.now();
   const from = thaiDate(now - 31 * DAY), to = thaiDate(now + 91 * DAY);
-  const recs = await at(env, "Bookings", {
+  const [recs, cf] = await Promise.all([at(env, "Bookings", {
     formula: `AND(${ofCenter(center)}, ` +
       `IS_AFTER({Activity date}, DATETIME_PARSE('${from}', 'YYYY-MM-DD')), ` +
       `IS_BEFORE({Activity date}, DATETIME_PARSE('${to}', 'YYYY-MM-DD')))`,
@@ -821,7 +822,7 @@ async function bookings(env, center) {
       "Time slot", "Note", "Stripe session ID"],
     sort: [{ field: "Activity date", direction: "asc" }],
     max: 1000,
-  });
+  }), centerRecord(env, center).catch(() => ({}))]);
 
   // Link each booking to its WhatsApp conversation via the phone number.
   const phones = [...new Set(recs.map((r) => String(first(r.fields["Payer phone"]) || "")).filter((p) => /^\+?[0-9 ]{6,20}$/.test(p)))];
@@ -841,6 +842,7 @@ async function bookings(env, center) {
   const n = (v) => Number(first(v)) || 0;
   return {
     today: thaiDate(now), tomorrow: thaiDate(now + DAY),
+    full: parseFull(cf["Full dates"], thaiDate(now)),
     bookings: recs.map((r) => {
       const f = r.fields;
       const phone = String(first(f["Payer phone"]) || "");
@@ -862,6 +864,42 @@ async function bookings(env, center) {
 
 
 
+
+// Days the center marked as full: Centers → "Full dates" (long text), one line per day:
+// "2026-11-26" (whole day), "2026-11-26 AM" or "2026-11-26 PM". The booking page (src/index.js) reads the same field.
+function parseFull(text, from = "") {
+  const out = {};
+  for (const m of String(text || "").matchAll(/(\d{4}-\d{2}-\d{2})(?:[ \t]+(AM|PM|DAY))?/gi)) {
+    if (m[1] < from) continue;
+    const part = (m[2] || "DAY").toUpperCase(), had = out[m[1]];
+    out[m[1]] = !had || had === part ? part : "DAY"; // morning + afternoon = whole day
+  }
+  return out;
+}
+async function saveFull(request, env, center, email) {
+  const body = await readBody(request);
+  const date = String(body?.date || ""), part = String(body?.part || "").toUpperCase();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !["", "AM", "PM", "DAY"].includes(part)) return json({ error: "Bad request" }, 400);
+  const today = thaiDate(Date.now());
+  if (date < today) return json({ error: "This day is already over." }, 400);
+  const full = parseFull((await centerRecord(env, center))["Full dates"], today);
+  if (part) full[date] = part; else delete full[date];
+  const text = Object.keys(full).sort().map((d) => (full[d] === "DAY" ? d : `${d} ${full[d]}`)).join("\n");
+  const res = await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Centers/${center.id}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ fields: { "Full dates": text } }),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    console.error("full", res.status, t);
+    if (/UNKNOWN_FIELD_NAME/.test(t)) return json({ error: "This setting isn't available yet. Ask Jonas to finish the setup." }, 500);
+    return json({ error: "Could not save. Try again." }, 502);
+  }
+  await forget(env, [`book/${center.slug}`]);
+  await logChange(env, center, email, `${date}: ${{ "": "open for online booking", AM: "morning full", PM: "afternoon full", DAY: "day full" }[part]}`);
+  return json({ ok: true, full });
+}
 
 // ---------- Dashboard ----------
 // Leads fields used: Status, Response seconds, Outside hours (1/0), Handed over (1/0),
@@ -1669,6 +1707,7 @@ async function settings(env, center) {
       pct: Math.round((Number(first(p["Commission pct"])) || 0) * 1000) / 10,
       fixed: Number(first(p["Deposit fixed THB"])) > 0,
       cutoff: Number(first(p["Cutoff hour"])) || 15, active: !!p["Active"],
+      maxDay: Number(first(p["Max per day"])) || 0,
     };
   }).sort((a, b) => a.price - b.price);
   const staff = splitEmails(f["Staff emails"]);
@@ -1857,6 +1896,22 @@ async function saveProduct(env, center, email, b) {
     body: JSON.stringify({ fields }),
   });
   if (!up.ok) { console.error("product", up.status, await up.text()); return json({ error: "Could not save. Try again." }, 502); }
+  // Max divers per day (empty = no limit): its own write, so a missing field never blocks the price.
+  const oldMax = Number(first(p["Max per day"])) || 0;
+  const maxDay = b.maxDay == null || b.maxDay === "" ? oldMax : Math.round(Number(b.maxDay)) || 0;
+  if (maxDay < 0 || maxDay > 500) return json({ error: "Enter a maximum between 1 and 500 divers, or leave it empty." }, 400);
+  if (maxDay !== oldMax) {
+    const mx = await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Products/${b.id}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ fields: { "Max per day": maxDay || null } }),
+    });
+    if (!mx.ok) {
+      const t = await mx.text();
+      console.error("max per day", mx.status, t);
+      return json({ error: /UNKNOWN_FIELD_NAME/.test(t) ? "This setting isn't available yet. Ask Jonas to finish the setup." : "Could not save. Try again." }, 502);
+    }
+  }
   // If Deposit THB is a plain number (not a formula), keep it at price × commission %.
   // A fixed deposit (Deposit fixed THB) never follows the price.
   // When it is a formula, Airtable refuses this write and the formula does the job.
@@ -1881,6 +1936,7 @@ async function saveProduct(env, center, email, b) {
   if (old !== price) parts.push(`price ${old.toLocaleString("en-US")} → ${price.toLocaleString("en-US")} THB`);
   if (oldCut !== cutoff) parts.push(`deadline ${oldCut}:00 → ${cutoff}:00`);
   if (oldAct !== !!b.active) parts.push(b.active ? "bookable online" : "online booking closed");
+  if (oldMax !== maxDay) parts.push(`max per day ${oldMax || "none"} → ${maxDay || "none"}`);
   if (parts.length) await logChange(env, center, email, `${first(p["Name"]) || code}: ${parts.join(", ")}`);
   return json({ ok: true });
 }
@@ -4828,6 +4884,14 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .cblk b{font-size:12.5px;line-height:1.3}
 .cblk small{font-size:11.5px;color:var(--muted)}
 .cnone{color:var(--line);font-size:13px}
+.cday.isfull{background:repeating-linear-gradient(135deg,var(--card),var(--card) 8px,var(--paper-2) 8px,var(--paper-2) 16px)}
+.cfull{margin-top:auto;font:inherit;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:4px 6px;background:var(--paper-2);color:var(--deep);width:100%}
+.cfull.on{border-color:var(--warn);color:var(--warn);font-weight:700}
+.fullbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px;font-size:13px}
+.fullbar input,.fullbar select{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:var(--paper-2);color:var(--deep)}
+.fullbar .muted{flex-basis:100%}
+.fulltag{font-size:12px;font-weight:700;color:var(--warn);border:1px solid var(--warn);border-radius:999px;padding:1px 8px}
+.fulltag button{border:0;background:none;color:inherit;font:inherit;cursor:pointer;padding:0 0 0 4px}
 @media (max-width:760px){.cal{grid-template-columns:repeat(2,minmax(0,1fr))}.cday{min-height:0}}
 @media print{#today{display:none !important}}
 
@@ -5214,7 +5278,7 @@ header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-sh
     <div class="scard adm">
       <h3>${T("Products and prices")}</h3>
       <p class="d">${T("What divers pay and until when they can book online. The online deposit is your commission to Talay; divers pay the rest at your shop. Changes reach {a} and the booking page within about two minutes.", { a: A })}</p>
-      <div class="bscroll"><table class="ptable"><thead><tr><th>${T("Product")}</th><th>${T("Price (THB)")}</th><th>${T("Deposit")}</th><th>${T("Book until (day before)")}</th><th>${T("Bookable online")}</th><th></th></tr></thead><tbody id="prods"></tbody></table></div>
+      <div class="bscroll"><table class="ptable"><thead><tr><th>${T("Product")}</th><th>${T("Price (THB)")}</th><th>${T("Deposit")}</th><th>${T("Book until (day before)")}</th><th>${T("Max divers per day")}</th><th>${T("Bookable online")}</th><th></th></tr></thead><tbody id="prods"></tbody></table></div>
       <div class="smsg" id="pMsg"></div>
     </div>
     <div class="scard adm">
@@ -5916,7 +5980,7 @@ function zoneClient(cfg) {
       var rows = days[day], dl = rows.filter(function (b) { return !isCx(b); });
       var divers = dl.reduce(function (a, b) { return a + b.divers; }, 0);
       html += '<div class="dayh">' + esc(dayLabel(day)) + "<span>" + tn(divers, "1 diver", "{n} divers") + " · " +
-        tn(dl.length, "1 booking", "{n} bookings") + "</span></div>";
+        tn(dl.length, "1 booking", "{n} bookings") + "</span>" + (bdata.full && bdata.full[day] ? '<span class="fulltag">' + esc(FULL_T[bdata.full[day]]) + "</span>" : "") + "</div>";
       var prods = {};
       rows.forEach(function (b) { var pk = b.product || t("Other"); (prods[pk] = prods[pk] || []).push(b); });
       // One table per day with the products as group rows, so the columns line up.
@@ -6106,16 +6170,17 @@ function zoneClient(cfg) {
           '<td data-l="' + t("Price (THB)") + '"><input type="number" min="100" step="50" value="' + p.price + '" class="pp" inputmode="numeric"></td>' +
           '<td class="muted dep" data-l="' + t("Deposit") + '">' + Math.round(p.deposit).toLocaleString(NUM) + " THB</td>" +
           '<td data-l="' + t("Book until (day before)") + '"><select class="pc">' + hours + "</select></td>" +
+          '<td data-l="' + t("Max divers per day") + '"><input type="number" min="1" max="500" step="1" value="' + (p.maxDay || "") + '" placeholder="' + t("No limit") + '" class="pm" inputmode="numeric"></td>' +
           '<td data-l="' + t("Bookable online") + '"><input type="checkbox" class="pa"' + (p.active ? " checked" : "") + "></td>" +
           '<td class="tlinks"><button class="btn ps" type="button" hidden>' + t("Save") + '</button></td></tr>';
       }).join("");
       $("#prods").querySelectorAll("tr").forEach(function (tr) {
         var pp = tr.querySelector(".pp"), changed = function () { tr.querySelector(".ps").hidden = false; };
-        tr.querySelector(".pc").onchange = changed; tr.querySelector(".pa").onchange = changed;
+        tr.querySelector(".pc").onchange = changed; tr.querySelector(".pa").onchange = changed; tr.querySelector(".pm").oninput = changed;
         pp.oninput = function () { var pc = Number(tr.dataset.pct); tr.querySelector(".dep").innerHTML = Math.round(pc ? (Number(pp.value) || 0) * pc / 100 : Number(tr.dataset.dep)).toLocaleString(NUM) + " THB"; changed(); };
         tr.querySelector(".ps").onclick = function () {
           var btn = this, name = tr.querySelector(".nm").firstChild.textContent;
-          save({ action: "product", id: tr.dataset.id, price: Number(pp.value), cutoff: Number(tr.querySelector(".pc").value), active: tr.querySelector(".pa").checked },
+          save({ action: "product", id: tr.dataset.id, price: Number(pp.value), cutoff: Number(tr.querySelector(".pc").value), active: tr.querySelector(".pa").checked, maxDay: Number(tr.querySelector(".pm").value) || 0 },
             "#pMsg", t("{x} saved.", { x: name }), btn);
         };
       });
@@ -6451,15 +6516,36 @@ function zoneClient(cfg) {
     var total = live.filter(function (b) { return b.date >= days[0] && b.date <= days[13]; }).reduce(function (a, b) { return a + b.divers; }, 0);
     $("#bcards").innerHTML = '<div class="cardn"><small>' + t("Divers next 14 days") + "</small><b>" + total + "</b></div>" +
       '<div class="cardn"><small>' + t("Busiest day") + "</small><b>" + (function () { var best = null; days.forEach(function (dd) { var v = live.filter(function (b) { return b.date === dd; }).reduce(function (a, b) { return a + b.divers; }, 0); if (!best || v > best[1]) best = [dd, v]; }); return best && best[1] ? esc(new Date(best[0] + "T12:00:00Z").toLocaleDateString(LOC, { weekday: "short", day: "numeric", month: "short" })) : "–"; })() + "</b></div>";
-    $("#blist").innerHTML = '<div class="cal">' + days.map(function (dd, idx) {
+    var full = bdata.full || {};
+    var later = Object.keys(full).filter(function (dd) { return dd > days[13]; }).sort();
+    $("#blist").innerHTML = '<div class="fullbar"><span class="muted">' + t("Mark a day as full: divers can't book it online anymore. Your bookings stay as they are.") + "</span>" +
+      '<input type="date" id="fDate" min="' + bdata.today + '" value="' + addDays(bdata.today, 14) + '">' + fullSelect("", "fPart") + '<button class="btn" type="button" id="fSave">' + t("Save") + "</button>" +
+      later.map(function (dd) { return '<span class="fulltag">' + esc(shortDay(dd)) + " · " + esc(FULL_T[full[dd]]) + '<button type="button" data-unfull="' + dd + '" aria-label="' + t("Remove") + '">×</button></span>'; }).join("") +
+      '<span class="smsg" id="fMsg"></span></div>' +
+      '<div class="cal">' + days.map(function (dd, idx) {
       var g = {};
       live.filter(function (b) { return b.date === dd; }).forEach(function (b) { g[b.product] = g[b.product] || { divers: 0, n: 0 }; g[b.product].divers += b.divers; g[b.product].n++; });
       var keys = Object.keys(g).sort(function (a, b) { return g[b].divers - g[a].divers; });
       var tot = keys.reduce(function (a, k2) { return a + g[k2].divers; }, 0);
       var dt = new Date(dd + "T12:00:00Z");
-      return '<div class="cday' + (idx === 0 ? " today" : "") + (dt.getUTCDay() === 0 || dt.getUTCDay() === 6 ? " wk" : "") + '"><div class="cdh"><small>' + dt.toLocaleDateString(LOC, { weekday: "short" }) + "</small><b>" + dt.getUTCDate() + "</b>" + (tot ? '<span class="ctot">' + tot + "</span>" : "") + "</div>" +
-        (keys.length ? keys.map(function (k2) { return '<div class="cblk"><b>' + esc(k2) + "</b><small>" + tn(g[k2].divers, "1 diver", "{n} divers") + "</small></div>"; }).join("") : '<div class="cnone">–</div>') + "</div>";
+      return '<div class="cday' + (idx === 0 ? " today" : "") + (dt.getUTCDay() === 0 || dt.getUTCDay() === 6 ? " wk" : "") + (full[dd] ? " isfull" : "") + '"><div class="cdh"><small>' + dt.toLocaleDateString(LOC, { weekday: "short" }) + "</small><b>" + dt.getUTCDate() + "</b>" + (tot ? '<span class="ctot">' + tot + "</span>" : "") + "</div>" +
+        (keys.length ? keys.map(function (k2) { return '<div class="cblk"><b>' + esc(k2) + "</b><small>" + tn(g[k2].divers, "1 diver", "{n} divers") + "</small></div>"; }).join("") : '<div class="cnone">–</div>') +
+        fullSelect(full[dd] || "", "", dd) + "</div>";
     }).join("") + "</div>";
+    $("#blist").querySelectorAll("select[data-day]").forEach(function (sel) { sel.onchange = function () { setFull(sel.dataset.day, sel.value, sel); }; });
+    $("#blist").querySelectorAll("[data-unfull]").forEach(function (b) { b.onclick = function () { setFull(b.dataset.unfull, "", b); }; });
+    $("#fSave").onclick = function () { if ($("#fDate").value) setFull($("#fDate").value, $("#fPart").value || "DAY", this); };
+  }
+  function shortDay(iso) { return new Date(iso + "T12:00:00Z").toLocaleDateString(LOC, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }); }
+  var FULL_T = { "": t("Open for booking"), AM: t("Morning full"), PM: t("Afternoon full"), DAY: t("Day full") };
+  function fullSelect(v, id, day) {
+    return '<select class="cfull' + (v ? " on" : "") + '"' + (id ? ' id="' + id + '"' : "") + (day ? ' data-day="' + day + '" aria-label="' + esc(dayLabel(day)) + '"' : "") + ">" +
+      (id ? ["DAY", "AM", "PM"] : ["", "AM", "PM", "DAY"]).map(function (k) { return '<option value="' + k + '"' + (k === v ? " selected" : "") + ">" + esc(FULL_T[k]) + "</option>"; }).join("") + "</select>";
+  }
+  function setFull(day, part, el) {
+    if (el) el.disabled = true;
+    post("full", { date: day, part: part }).then(function (d) { bdata.full = d.full; renderBookings(); say("#fMsg", t("Saved.")); })
+      .catch(function (e) { if (el) el.disabled = false; if ($("#fMsg")) say("#fMsg", e.message, true); });
   }
 
   // ---- Milestones
