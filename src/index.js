@@ -886,6 +886,7 @@ async function orderInfo(env, ctx, url) {
     order_ref: ref, lead_ref: m.lead_ref || "", lang, note: m.note || "", payer_name: payer, payer_phone: s.customer_details?.phone || "",
     count: items.length, total_thb: total, deposit_thb: paid, balance_thb: total - paid,
     items: items.map(({ shown, ...x }) => x), confirm, center_text: centerText,
+    ref_line: `${t.bookingNo}: ${ref}`, // for the single-booking WhatsApp (Make adds it under Confirm text)
   });
 }
 
