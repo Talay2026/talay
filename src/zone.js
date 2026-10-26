@@ -355,6 +355,19 @@ const forgetConversation = (env, center, id) => forget(env, [
   `conv/${center.slug}/open`, `conv/${center.slug}/all`, `chat/${center.slug}/${id}`, `lead/${center.slug}/${id}`,
 ]);
 
+// Leads stay 5 minutes in the cache, so a lead deleted (and made again by the next message) in that
+// time still has its old record id here. When the PATCH fails, read the lead fresh and try once more.
+async function patchLead(env, center, id, rec, fields) {
+  try {
+    return await atWrite(env, "Leads", "PATCH", [{ id: rec.id, fields }]);
+  } catch (e) {
+    await forgetConversation(env, center, id);
+    const fresh = (await leadsFetch(env, center, [id]))[id];
+    if (!fresh || fresh.id === rec.id) throw e;
+    return atWrite(env, "Leads", "PATCH", [{ id: fresh.id, fields }]);
+  }
+}
+
 // ---------- API ----------
 
 const DAY = 24 * 3600 * 1000;
@@ -621,9 +634,7 @@ async function reply(request, env, center) {
   if (c._leadRec) {
     // Same effect as a staff message in respond.io: Mia goes quiet until the team
     // hands back, Close in respond.io, or "release handovers" gives it back to her.
-    writes.push(atWrite(env, "Leads", "PATCH", [{
-      id: c._leadRec.id, fields: { "Human took over": true, "Human took over at": now },
-    }]));
+    writes.push(patchLead(env, center, id, c._leadRec, { "Human took over": true, "Human took over at": now }));
   }
   await Promise.all(writes);
   await forgetConversation(env, center, id);
@@ -642,7 +653,7 @@ async function leadAction(request, env, center, action) {
   if (!c._leadRec) return json({ error: "No lead found for this conversation." }, 404);
   const fields = { "Human took over at": new Date().toISOString() };
   if (action === "handback") fields["Human took over"] = false;
-  await atWrite(env, "Leads", "PATCH", [{ id: c._leadRec.id, fields }]);
+  await patchLead(env, center, id, c._leadRec, fields);
   await forgetConversation(env, center, id);
   return json({ ok: true });
 }
