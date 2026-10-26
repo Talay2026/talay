@@ -1,4 +1,4 @@
-// Builds the translated homepages public/fr/, de/, es/, nl/ and th/ from public/index.html.
+// Builds the translated homepages public/fr/, de/, es/, nl/, th/, zh/, ru/, it/ and ko/ from public/index.html.
 // Run after every change to the English homepage or to home.mjs: node tools/i18n/build.mjs
 // The script stops with an error when an English piece is no longer found, so nothing goes out half translated.
 
@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import STRINGS from "./home.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const LANGS = ["fr", "de", "es", "nl", "th"];
+const LANGS = ["fr", "de", "es", "nl", "th", "zh", "ru", "it", "ko"];
 // Thousands separator per language in the example prices (12,500 THB)
 const SEP = { fr: " ", de: ".", es: ".", nl: ".", th: "," };
 const THAI_FONT = '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">';

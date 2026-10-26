@@ -16,6 +16,10 @@
 <link rel="alternate" hreflang="es" href="https://talay.io/es/">
 <link rel="alternate" hreflang="nl" href="https://talay.io/nl/">
 <link rel="alternate" hreflang="th" href="https://talay.io/th/">
+<link rel="alternate" hreflang="zh" href="https://talay.io/zh/">
+<link rel="alternate" hreflang="ru" href="https://talay.io/ru/">
+<link rel="alternate" hreflang="it" href="https://talay.io/it/">
+<link rel="alternate" hreflang="ko" href="https://talay.io/ko/">
 <link rel="alternate" hreflang="x-default" href="https://talay.io/">
 <!-- /i18n:alternates -->
 <!-- i18n:redirect -->
@@ -24,7 +28,7 @@
 (function () {
   try {
     if (/[?&]l=en\b/.test(location.search)) { localStorage.setItem("talay-lang", "en"); return; }
-    var other = ["fr", "de", "es", "nl", "th"];
+    var other = ["fr", "de", "es", "nl", "th", "zh", "ru", "it", "ko"];
     var l = localStorage.getItem("talay-lang") || (navigator.languages || [navigator.language]).map(function (x) { return String(x).slice(0, 2).toLowerCase(); }).filter(function (x) { return x === "en" || other.indexOf(x) > -1; })[0];
     if (other.indexOf(l) > -1) location.replace("/" + l + "/" + location.hash);
   } catch (e) {}
@@ -517,7 +521,7 @@ footer a:hover{text-decoration:underline}
       <a href="#pricing">Pricing</a>
       <a href="#faq">FAQ</a>
       <label class="lang"><span class="sr-only">Language</span><select id="lang">
-        <option value="en" selected>EN</option><option value="fr">FR</option><option value="de">DE</option><option value="es">ES</option><option value="nl">NL</option><option value="th">TH</option>
+        <option value="en" selected>EN</option><option value="fr">FR</option><option value="de">DE</option><option value="es">ES</option><option value="nl">NL</option><option value="th">TH</option><option value="zh">ZH</option><option value="ru">RU</option><option value="it">IT</option><option value="ko">KO</option>
       </select></label>
       <a class="login" href="/zone" aria-label="Log in to the customer zone"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span class="lbl">Log in</span></a>
       <a class="cta" href="#demo">Book a demo</a>
