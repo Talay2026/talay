@@ -137,6 +137,40 @@ export async function handleNotify(request, env, ctx) {
   return out({ ok: true, night, people: people.length, sent });
 }
 
+// Messages to a diver (Make "Talay - reminder en review"): talay.io/api/diver, POST JSON
+//   { key: PUSH_KEY, template: "dive_reminder" | "review_request", contact: <respond.io Contact ID>,
+//     channel: <respond.io channel of the center>, params: ["Jonas", "Fun dive trip", ...] }
+// respond.io wants the template text with {{1}} {{2}} next to the values, and Make reads {{1}} as
+// its own field, so the text lives here. It must match the approved template in WhatsApp Manager.
+const DIVER_TEMPLATES = {
+  dive_reminder: { n: 4, text: "Hi {{1}}, see you tomorrow for your {{2}} with {{3}}! 🤿 Meeting point: {{4}}. Bring swimwear, a towel and sunscreen. Any questions? Just reply to this message." },
+  review_request: { n: 3, text: "Hi {{1}}, thanks for diving with {{2}}! 🐠 We hope you had an amazing time underwater. Would you leave us a short review? It really helps a small dive shop like ours: {{3}} Thank you and see you next time!" },
+};
+export async function handleDiver(request, env) {
+  const out = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+  let p = {};
+  try { p = await request.json(); } catch { return out({ error: "send JSON" }, 400); }
+  if (!env.PUSH_KEY || p.key !== env.PUSH_KEY) return out({ error: "forbidden" }, 403);
+  const t = DIVER_TEMPLATES[p.template];
+  if (!t) return out({ error: "unknown template" }, 400);
+  const contact = String(p.contact || "").replace(/[^0-9]/g, "");
+  const channel = Number(p.channel);
+  if (!contact || !channel) return out({ error: "contact and channel needed" }, 400);
+  const values = (Array.isArray(p.params) ? p.params : []).slice(0, t.n);
+  if (values.length !== t.n) return out({ error: `${p.template} needs ${t.n} params` }, 400);
+  const message = { type: "whatsapp_template", template: { name: p.template, languageCode: "en",
+    components: [{ type: "body", text: t.text, parameters: values.map((v) => ({ type: "text", text: param(v) })) }] } };
+  const res = await fetch(`https://api.respond.io/v2/contact/id:${contact}/message`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.RESPONDIO_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ channelId: channel, message }),
+  });
+  const body = (await res.text()).slice(0, 300);
+  if (!res.ok) console.error("diver message", res.status, body);
+  // Make stops on an error status, so the booking is not marked as sent.
+  return out(res.ok ? { ok: true } : { error: `respond.io ${res.status}: ${body}` }, res.ok ? 200 : 502);
+}
+
 // The people of one center who want this topic (Needs you, Bookings, Morning summary, Escalation).
 // Exact match on the linked Center's name (a link field reads as the primary field, Name).
 export async function teamFor(env, centerName, topic) {
