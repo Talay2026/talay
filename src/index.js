@@ -339,7 +339,7 @@ const T_BOOK = {
     minAge: (n) => `from ${n} years`,
     groupNote: "You'll probably dive in more than one group; we'll try to put you on the same boat.",
     slotLabel: "Morning or afternoon",
-    am: "Morning", pm: "Afternoon", day: "Full day",
+    amS: "AM", pmS: "PM", am: "Morning", pm: "Afternoon", day: "Full day",
     days: (n) => `${n} days`,
     chooseActivity: "Choose an activity first.",
     chooseSlot: "Choose morning or afternoon.",
@@ -384,7 +384,7 @@ const T_BOOK = {
     minAge: (n) => `à partir de ${n} ans`,
     groupNote: "Vous plongerez probablement en plusieurs groupes ; nous essaierons de vous mettre sur le même bateau.",
     slotLabel: "Matin ou après-midi",
-    am: "Matin", pm: "Après-midi", day: "Journée entière",
+    amS: "mat.", pmS: "ap.-m.", am: "Matin", pm: "Après-midi", day: "Journée entière",
     days: (n) => `${n} jours`,
     chooseActivity: "Choisissez d'abord une activité.",
     chooseSlot: "Choisissez le matin ou l'après-midi.",
@@ -429,7 +429,7 @@ const T_BOOK = {
     minAge: (n) => `ab ${n} Jahren`,
     groupNote: "Ihr taucht wahrscheinlich in mehreren Gruppen; wir versuchen, euch auf dasselbe Boot zu setzen.",
     slotLabel: "Vormittag oder Nachmittag",
-    am: "Vormittag", pm: "Nachmittag", day: "Ganzer Tag",
+    amS: "Vorm.", pmS: "Nachm.", am: "Vormittag", pm: "Nachmittag", day: "Ganzer Tag",
     days: (n) => `${n} Tage`,
     chooseActivity: "Wähle zuerst eine Aktivität.",
     chooseSlot: "Wähle Vormittag oder Nachmittag.",
@@ -474,7 +474,7 @@ const T_BOOK = {
     minAge: (n) => `desde ${n} años`,
     groupNote: "Probablemente buceéis en más de un grupo; intentaremos poneros en el mismo barco.",
     slotLabel: "Mañana o tarde",
-    am: "Mañana", pm: "Tarde", day: "Día completo",
+    amS: "mañ.", pmS: "tarde", am: "Mañana", pm: "Tarde", day: "Día completo",
     days: (n) => `${n} días`,
     chooseActivity: "Elige primero una actividad.",
     chooseSlot: "Elige mañana o tarde.",
@@ -519,7 +519,7 @@ const T_BOOK = {
     minAge: (n) => `vanaf ${n} jaar`,
     groupNote: "Jullie duiken waarschijnlijk in meerdere groepen; we proberen jullie wel op dezelfde boot te zetten.",
     slotLabel: "Voormiddag of namiddag",
-    am: "Voormiddag", pm: "Namiddag", day: "Hele dag",
+    amS: "VM", pmS: "NM", am: "Voormiddag", pm: "Namiddag", day: "Hele dag",
     days: (n) => `${n} dagen`,
     chooseActivity: "Kies eerst een activiteit.",
     chooseSlot: "Kies voormiddag of namiddag.",
@@ -1415,7 +1415,7 @@ function bookingPage(c, products, slug, env, lang, ref, wanted, taken = {}) {
       diver: t.diver, divers: t.divers, chooseDate: t.chooseDate, chooseActivity: t.chooseActivity, chooseSlot: t.chooseSlot,
       tooSoon: t.tooSoon("{d}"), tooFar: t.tooFar(assistant), notOpen: t.notOpen, dayFull: t.dayFull, slotFull: t.slotFull, noPay: t.noPay(assistant),
       opening: t.opening, wrong: t.wrong, noConn: t.noConn, fixFirst: t.fixFirst, tooMany: t.tooMany,
-      groups: t.groups, refreshTip: t.refreshTip, clash: t.clash("{d}", "{a}"), prevWeek: t.prevWeek, nextWeek: t.nextWeek,
+      groups: t.groups, refreshTip: t.refreshTip, clash: t.clash("{d}", "{a}"), amS: t.amS, pmS: t.pmS,
       choosePrice: t.choosePrice, perDiver: t.perDiver, infoTitle: t.infoTitle,
       info: { dives: t.infoDives, depth: t.infoDepth, duration: t.infoDuration, level: t.infoFor, inc: t.infoInc, not: t.infoNot, bring: t.infoBring, checkIn: t.checkIn },
       bringDefault: t.bringText, groupNote: t.groupNote, group: t.group(assistant),
@@ -1452,11 +1452,6 @@ ${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
   <div id="items"></div>
   <button type="button" id="another" class="another" hidden><span aria-hidden="true">＋</span> ${esc(t.another)}</button>
 </div>
-
-<aside class="plan" aria-label="${esc(t.overview)}">
-  <h2>${esc(t.overview)}</h2>
-  <div id="plan"></div>
-</aside>
 
 <div class="bottom">
   <p id="choose" class="hint choose">${esc(t.choosePrice)}</p>
@@ -1522,8 +1517,6 @@ const BOOK_JS = String.raw`
   const mk = (x) => ({ id: ++uid, code: x.code || "", n: x.n || 1, date: x.date || "", slot: x.slot || "", open: true, pick: !x.code, err: "", month: "",
     grp: x.code && P[x.code] ? P[x.code].groups[0] : "" });
   const GROUPS = ["new", "cert", "up"].filter((g) => d.products.some((p) => p.groups.indexOf(g) >= 0));
-  const monday = (iso) => addDays(iso, -((new Date(iso + "T00:00:00Z").getUTCDay() + 6) % 7));
-  let planStart = monday(d.now);
 
   // The plan on this phone (same chat link, last 3 days) plus what the link brings, without doubles.
   let items = [], note = "";
@@ -1608,11 +1601,15 @@ const BOOK_JS = String.raw`
     for (let w = 0; w < 7; w++) h += '<span class="wd">' + esc(fmt(addDays("2024-01-01", w), { weekday: "narrow" })) + "</span>";
     for (let k = 0; k < lead; k++) h += "<span></span>";
     const span = it.date && p.days > 1 ? addDays(it.date, p.days - 1) : it.date;
+    // The other bookings sit in the same calendar; the day this one clashes on gets an orange border.
+    const occ = occupancy(it), hot = clash(it) ? clash(it).day : "";
     for (let day = 1; day <= daysIn; day++) {
       const iso = first + "-" + String(day).padStart(2, "0");
       const off = iso < p.minDate || iso > d.maxDate || blocked(p, iso) || dayFull(p, iso, it.n);
-      const cls = (iso === it.date ? " sel" : it.date && iso > it.date && iso <= span ? " in" : "") + (off ? " off" : "");
-      h += '<button type="button" class="day' + cls + '" data-day="' + iso + '"' + (off ? ' disabled aria-disabled="true"' : "") + ' aria-label="' + esc(fmt(iso, { weekday: "long", day: "numeric", month: "long" })) + '">' + day + "</button>";
+      const e = occ[iso] || [];
+      const cls = (iso === it.date ? " sel" : it.date && iso > it.date && iso <= span ? " in" : "") + (off ? " off" : "") + (iso === hot ? " hot" : "");
+      h += '<button type="button" class="day' + cls + '" data-day="' + iso + '"' + (off ? ' disabled aria-disabled="true"' : "") + ' aria-label="' + esc(fmt(iso, { weekday: "long", day: "numeric", month: "long" }) + e.map((x) => ", " + x.lbl).join("")) + '"><b>' + day + "</b>" +
+        e.map((x) => '<i class="' + x.part + '" aria-hidden="true">' + esc(x.lbl) + "</i>").join("") + "</button>";
     }
     return h + "</div></div>";
   }
@@ -1697,45 +1694,22 @@ const BOOK_JS = String.raw`
   function lineHtml(it) {
     return '<section class="item line' + (it.err ? " bad" : "") + '" data-id="' + it.id + '"><button type="button" class="lbtn" data-edit><span>' + esc(lineText(it)) + '</span><span class="pen">' + esc(s.edit) + "</span></button>" +
       '<button type="button" class="x" data-remove aria-label="' + esc(s.remove) + '">×</button>' + (it.err ? '<p class="error">' + esc(it.err) + "</p>" : "") +
-      (!it.err && clash(it) ? '<p class="lwarn">' + esc(clashText(clash(it))) + "</p>" : "") + "</section>";
+      (!it.err && clash(it) && !clash(it).other.open ? '<p class="lwarn">' + esc(clashText(clash(it))) + "</p>" : "") + "</section>";
   }
 
-  // ---- plan on the right: mornings and afternoons per day ----
-  function occupancy() {
+  // ---- the other bookings per day, for the calendar of the open one ----
+  function occupancy(skip) {
     const occ = {};
     items.forEach((it) => {
       const p = P[it.code];
-      if (!p || !it.date) return;
-      const k = slotOf(it), lbl = it.n + "p " + p.short;
+      if (it === skip || !p || !it.date) return;
+      const k = slotOf(it), lbl = p.short + (p.days > 1 ? "" : k === "AM" ? " " + s.amS : k === "PM" ? " " + s.pmS : "");
       for (let j = 0; j < p.days; j++) {
         const day = addDays(it.date, j);
-        (occ[day] = occ[day] || []).push({ lbl: lbl, part: p.days > 1 || k === "DAY" ? "day" : k === "AM" ? "am" : k === "PM" ? "pm" : "any" });
+        (occ[day] = occ[day] || []).push({ lbl: lbl, part: p.days > 1 || k === "DAY" ? "full" : k === "AM" ? "am" : k === "PM" ? "pm" : "any" });
       }
     });
     return occ;
-  }
-  // Three weeks from this week (Monday first), with arrows per week. While a booking is open,
-  // the day it clashes on gets an orange border.
-  function renderPlan(occ) {
-    const open = items.find((x) => x.open);
-    const hot = open && clash(open) ? clash(open).day : "";
-    const last = addDays(planStart, 20);
-    let h = '<div class="pnav"><button type="button" data-week="-1" aria-label="' + esc(s.prevWeek) + '"' + (planStart <= monday(d.now) ? " disabled" : "") + ">‹</button><b>" +
-      esc(fmt(planStart, { day: "numeric", month: "short" }) + " – " + fmt(last, { day: "numeric", month: "short" })) +
-      '</b><button type="button" data-week="1" aria-label="' + esc(s.nextWeek) + '"' + (last >= d.maxDate ? " disabled" : "") + ">›</button></div>";
-    h += '<div class="pgrid">';
-    for (let w = 0; w < 7; w++) h += '<span class="wd">' + esc(fmt(addDays("2024-01-01", w), { weekday: "short" })) + "</span>";
-    for (let day = planStart; day <= last; day = addDays(day, 1)) {
-      const e = occ[day] || [];
-      const chip = (x) => '<i class="' + x.part + '">' + esc(x.lbl) + "</i>";
-      const full = e.filter((x) => x.part === "day");
-      const am = e.filter((x) => x.part === "am" || x.part === "any"), pm = e.filter((x) => x.part === "pm");
-      h += '<div class="pday' + (e.length ? " busy" : "") + (day === hot ? " hot" : "") + (day < d.now ? " past" : "") + '"><b>' +
-        esc(fmt(day, { day: "numeric", month: day.slice(8) === "01" || day === planStart ? "short" : undefined })) + "</b>" +
-        (full.length ? '<div class="pfull">' + full.map(chip).join("") + "</div>" : "") +
-        (am.length || pm.length || !full.length ? '<div class="pam">' + am.map(chip).join("") + '</div><div class="ppm">' + pm.map(chip).join("") + "</div>" : "") + "</div>";
-    }
-    $("plan").innerHTML = h + "</div>";
   }
   // Every clash once, for the bottom of the page (after "Done").
   function clashes() {
@@ -1778,7 +1752,6 @@ const BOOK_JS = String.raw`
 
   function render() {
     $("items").innerHTML = items.map((it, i) => (it.open ? openHtml(it, i) : lineHtml(it))).join("");
-    renderPlan(occupancy());
     const ov = clashes();
     $("overlap").hidden = !ov.length;
     $("overlap").innerHTML = ov.map((x) => "<p>" + esc(x) + "</p>").join("");
@@ -1824,8 +1797,6 @@ const BOOK_JS = String.raw`
     else if (b.dataset.month) { it.month = b.dataset.month; }
     else if (b.dataset.day) {
       it.date = b.dataset.day; it.err = "";
-      // Keep the chosen day in sight in the plan.
-      if (it.date < planStart || it.date > addDays(planStart, 20)) planStart = monday(it.date) < monday(d.now) ? monday(d.now) : monday(it.date);
     }
     else if (b.dataset.slot) { it.slot = b.dataset.slot; it.err = ""; }
     else if (b.hasAttribute("data-done")) {
@@ -1841,12 +1812,6 @@ const BOOK_JS = String.raw`
     } else return;
     render();
     if (b.hasAttribute("data-edit") || b.hasAttribute("data-done")) focusItem(it);
-  });
-  $("plan").addEventListener("click", (e) => {
-    const b = e.target.closest("[data-week]");
-    if (!b || b.disabled) return;
-    planStart = addDays(planStart, 7 * Number(b.dataset.week));
-    render();
   });
   $("another").onclick = () => {
     const bad = settle(true);
@@ -2042,7 +2007,7 @@ a.book.chat{display:flex;align-items:center;justify-content:center;text-decorati
 .booked li+li{margin-top:.3rem}
 .booked li::marker{color:var(--sand)}
 /* Booking page with several bookings (talay.io/b/[slug]) */
-.wrap.wide{max-width:64rem}
+.wrap.wide{max-width:38rem}
 .center{flex-wrap:wrap;position:relative;overflow:hidden}
 .center .hrow{display:flex;align-items:center;gap:.85rem;width:100%;position:relative}
 .center.has-photo{padding-top:7.5rem}
@@ -2054,11 +2019,6 @@ a.book.chat{display:flex;align-items:center;justify-content:center;text-decorati
 .rating a:hover{color:var(--shore)}
 .via{margin:.7rem 0 0;width:100%;font-size:.78rem;color:var(--on-deep);position:relative}
 .layout{display:grid;grid-template-columns:minmax(0,1fr);gap:0 2.5rem}
-@media (min-width:900px){
-  .layout{grid-template-columns:minmax(0,1fr) 22rem;grid-template-areas:"top plan" "bottom plan"}
-  .layout>.top{grid-area:top}.layout>.bottom{grid-area:bottom}
-  .layout>.plan{grid-area:plan;align-self:start;position:sticky;top:1rem;margin-top:3.2rem}
-}
 .item{border:1px solid var(--line);border-radius:16px;background:#fff;margin-bottom:.8rem}
 .item.open{padding:1rem 1.1rem 1.2rem}
 .item.bad{border-color:#B3261E}
@@ -2121,22 +2081,6 @@ a.book.chat{display:flex;align-items:center;justify-content:center;text-decorati
 #overlap{margin-top:.8rem}
 #overlap p{margin:0}
 #overlap p+p{margin-top:.35rem}
-.plan{margin:1.8rem 0 0;padding:1rem;border:1px solid var(--line);border-radius:16px;background:#fff}
-.plan h2{font-size:1rem;margin:0 0 .6rem}
-.plan .hint{margin:0}
-.pgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
-.pgrid .wd{font-size:.68rem;color:var(--muted);text-align:center;text-transform:uppercase}
-.pday{min-height:3.6rem;border-radius:6px;background:var(--shore);padding:2px;display:flex;flex-direction:column;gap:1px;font-size:.66rem;line-height:1.25;min-width:0}
-.pday b{font-weight:600;color:var(--muted);font-size:.68rem;padding:0 2px;white-space:nowrap}
-.pday.busy b{color:var(--ink)}
-.pam,.ppm,.pfull{display:flex;flex-direction:column;gap:1px;min-height:1rem}
-.pfull{min-height:0}
-.pam{border-bottom:1px dashed var(--line)}
-.pday i{display:block;font-style:normal;font-size:.66rem;font-weight:600;border-radius:3px;padding:0 2px;line-height:1.25;overflow-wrap:anywhere}
-.pday i.am,.pday i.any{background:var(--sand-wash);color:#6B4A00}
-.pday i.pm{background:#DCEBEE;color:var(--deep)}
-.pday i.day{background:var(--deep);color:var(--shore)}
-.pday i.any{opacity:.75}
 .row.sub{font-size:.88rem;color:var(--muted);padding:.1rem 0}
 textarea{display:block;width:100%;font:inherit;color:inherit;padding:.7rem .9rem;border:1px solid var(--line);border-radius:10px;background:#fff;resize:vertical}
 textarea:focus-visible{outline:3px solid var(--sand);outline-offset:2px}
@@ -2158,21 +2102,13 @@ textarea:focus-visible{outline:3px solid var(--sand);outline-offset:2px}
 .oref{margin:-.2rem 0 1rem;color:var(--muted)}
 .oref b{color:var(--ink);letter-spacing:.04em}
 .bottom #overlap{margin:0 0 1rem}
-.pnav{display:flex;justify-content:space-between;align-items:center;margin:0 0 .5rem}
-.pnav b{font-size:.85rem;font-weight:600}
-.pnav button{width:2.2rem;height:2.2rem;border:0;border-radius:999px;background:none;font:inherit;font-size:1.3rem;color:inherit;cursor:pointer}
-.pnav button:disabled{opacity:.3;cursor:default}
-.pgrid{gap:4px}
-.pday{min-height:5.4rem;padding:3px;font-size:.72rem;border-radius:8px}
-.pday b{font-size:.74rem}
-.pday i{font-size:.7rem;padding:1px 3px}
-.pam,.ppm{min-height:1.6rem}
-.pday.past{opacity:.45}
-.pday.hot{box-shadow:inset 0 0 0 2px #E8963A}
-@media (min-width:900px){
-  .wrap.wide{max-width:72rem}
-  .layout{grid-template-columns:minmax(0,1fr) 27rem}
-}
+.cal{max-width:32rem}
+.day{height:auto;min-height:3.3rem;padding:4px 2px;display:flex;flex-direction:column;align-items:stretch;gap:2px;min-width:0}
+.day b{font-weight:inherit}
+.day i{display:block;font-style:normal;font-size:.62rem;font-weight:600;line-height:1.3;border-radius:3px;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#DCEBEE;color:var(--deep)}
+.day i.full{background:var(--deep);color:var(--shore)}
+.day.hot{box-shadow:inset 0 0 0 2px #E8963A}
+@media (min-width:600px){.day i{font-size:.68rem}}
 @media (max-width:480px){.grps{gap:.35rem}.grp{padding:.65rem .6rem;min-height:4.8rem}.grp b{font-size:.88rem}.grp span{font-size:.74rem}}
 
 /* Underwater style (booking page and thanks page): teal at the top, navy at the bottom, so the page gets
@@ -2212,6 +2148,10 @@ body.sea::after{content:"";position:absolute;left:0;right:0;top:0;height:12px;po
 .sea .day.off{color:rgba(247,243,234,.32);background:repeating-linear-gradient(135deg,transparent 0 5px,rgba(247,243,234,.08) 5px 6px)}
 .sea .day.sel,.sea .day.sel:hover:not(:disabled){background:#DCA44A;color:#09262F}
 .sea .day.in,.sea .day.in:hover:not(:disabled){background:rgba(220,164,74,.38);color:#F7F3EA}
+.sea .day i{background:#8FD0D4;color:#09262F}
+.sea .day i.full{background:#F7F3EA;color:#09262F}
+.sea .day.off i{opacity:.7}
+.sea .day.hot{box-shadow:inset 0 0 0 2px #F0A040}
 .sea .slots button{background:transparent;border-color:rgba(247,243,234,.32);color:#F7F3EA}
 .sea .slots button.on{background:#DCA44A;border-color:#DCA44A;color:#09262F}
 .sea .done{background:#F7F3EA;color:#09262F}
@@ -2225,16 +2165,6 @@ body.sea::after{content:"";position:absolute;left:0;right:0;top:0;height:12px;po
 .sea .error{color:#FFB4AB}
 .sea .note-orange,.sea .warn{background:rgba(220,164,74,.16);border:1px solid rgba(220,164,74,.55);color:#F6DDB0}
 .sea .lwarn{color:#F6DDB0}
-.sea .plan{background:rgba(247,243,234,.08);border-color:rgba(247,243,234,.16)}
-.sea .pgrid .wd{color:#C9D6D9}
-.sea .pday{background:rgba(9,38,47,.32)}
-.sea .pday b{color:#C9D6D9}
-.sea .pday.busy b{color:#F7F3EA}
-.sea .pam{border-bottom-color:rgba(247,243,234,.18)}
-.sea .pday i.am,.sea .pday i.any{background:#DCA44A;color:#09262F}
-.sea .pday i.pm{background:#8FD0D4;color:#09262F}
-.sea .pday i.day{background:#F7F3EA;color:#09262F}
-.sea .pday.hot{box-shadow:inset 0 0 0 2px #F0A040}
 .sea .slate{border-color:rgba(247,243,234,.16)}
 .sea .slate .above{background:#11505E;color:#F7F3EA}
 .sea .waterline{background:#11505E}
