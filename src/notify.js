@@ -139,13 +139,42 @@ export async function handleNotify(request, env, ctx) {
 
 // Messages to a diver (Make "Talay - reminder en review"): talay.io/api/diver, POST JSON
 //   { key: PUSH_KEY, template: "dive_reminder" | "review_request", contact: <respond.io Contact ID>,
-//     channel: <respond.io channel of the center>, params: ["Jonas", "Fun dive trip", ...] }
+//     channel: <respond.io channel of the center>, params: ["Jonas", "Fun dive trip", ...], lang: "th" }
 // respond.io wants the template text with {{1}} {{2}} next to the values, and Make reads {{1}} as
 // its own field, so the text lives here. It must match the approved template in WhatsApp Manager.
+// lang (optional, the diver's language: Leads → Language) picks the translation; a translation that
+// Meta has not approved yet, or a missing lang, sends the English one.
 const DIVER_TEMPLATES = {
-  dive_reminder: { n: 4, text: "Hi {{1}}, see you tomorrow for your {{2}} with {{3}}! 🤿 Meeting point: {{4}}. Bring swimwear, a towel and sunscreen. Any questions? Just reply to this message." },
-  review_request: { n: 3, text: "Hi {{1}}, thanks for diving with {{2}}! 🐠 We hope you had an amazing time underwater. Would you leave us a short review? It really helps a small dive shop like ours: {{3}} Thank you and see you next time!" },
+  dive_reminder: { n: 4,
+    en: "Hi {{1}}, see you tomorrow for your {{2}} with {{3}}! 🤿 Meeting point: {{4}}. Bring swimwear, a towel and sunscreen. Any questions? Just reply to this message.",
+    fr: "Bonjour {{1}}, à demain pour votre {{2}} avec {{3}} ! 🤿 Point de rendez-vous : {{4}}. Prenez un maillot de bain, une serviette et de la crème solaire. Une question ? Répondez simplement à ce message.",
+    de: "Hallo {{1}}, bis morgen zu deinem {{2}} mit {{3}}! 🤿 Treffpunkt: {{4}}. Bring Badesachen, ein Handtuch und Sonnencreme mit. Fragen? Antworte einfach auf diese Nachricht.",
+    es: "¡Hola {{1}}! Nos vemos mañana para tu {{2}} con {{3}} 🤿 Punto de encuentro: {{4}}. Trae bañador, toalla y protector solar. ¿Alguna pregunta? Responde a este mensaje.",
+    nl: "Hoi {{1}}, tot morgen voor je {{2}} bij {{3}}! 🤿 Verzamelpunt: {{4}}. Breng zwemkledij, een handdoek en zonnecrème mee. Vragen? Antwoord gewoon op dit bericht.",
+    th: "สวัสดีค่ะ {{1}} พรุ่งนี้พบกันที่ {{3}} สำหรับ {{2}} นะคะ 🤿 จุดนัดพบ: {{4}} อย่าลืมชุดว่ายน้ำ ผ้าเช็ดตัว และครีมกันแดด มีคำถามไหมคะ ตอบกลับข้อความนี้ได้เลย",
+    zh: "你好 {{1}}，明天 {{3}} 的 {{2}} 见！🤿 集合地点：{{4}}。请带上泳衣、毛巾和防晒霜。有问题吗？直接回复这条消息即可。",
+    ru: "Привет, {{1}}! До встречи завтра на {{2}} в {{3}} 🤿 Место встречи: {{4}}. Возьмите купальник, полотенце и солнцезащитный крем. Есть вопросы? Просто ответьте на это сообщение.",
+    it: "Ciao {{1}}, a domani per il tuo {{2}} con {{3}}! 🤿 Punto d’incontro: {{4}}. Porta costume, asciugamano e crema solare. Domande? Rispondi pure a questo messaggio.",
+    ko: "안녕하세요 {{1}}님, 내일 {{3}}에서 {{2}} 때 만나요! 🤿 미팅 장소: {{4}}. 수영복, 수건, 선크림을 챙겨 오세요. 궁금한 점이 있으면 이 메시지에 답장해 주세요." },
+  review_request: { n: 3,
+    en: "Hi {{1}}, thanks for diving with {{2}}! 🐠 We hope you had an amazing time underwater. Would you leave us a short review? It really helps a small dive shop like ours: {{3}} Thank you and see you next time!",
+    fr: "Bonjour {{1}}, merci d’avoir plongé avec {{2}} ! 🐠 Nous espérons que vous avez passé un moment génial sous l’eau. Pourriez-vous nous laisser un petit avis ? Cela aide vraiment un petit centre comme le nôtre : {{3}} Merci et à bientôt !",
+    de: "Hallo {{1}}, danke, dass du mit {{2}} getaucht bist! 🐠 Wir hoffen, du hattest eine tolle Zeit unter Wasser. Hinterlässt du uns eine kurze Bewertung? Das hilft einer kleinen Tauchbasis wie unserer sehr: {{3}} Danke und bis zum nächsten Mal!",
+    es: "¡Hola {{1}}! Gracias por bucear con {{2}} 🐠 Esperamos que lo hayas pasado genial bajo el agua. ¿Nos dejarías una reseña corta? Ayuda mucho a un centro pequeño como el nuestro: {{3}} ¡Gracias y hasta la próxima!",
+    nl: "Hoi {{1}}, bedankt om te duiken met {{2}}! 🐠 We hopen dat je het geweldig had onder water. Laat je een korte review achter? Dat helpt een kleine duikschool zoals de onze echt: {{3}} Bedankt en tot de volgende keer!",
+    th: "สวัสดีค่ะ {{1}} ขอบคุณที่มาดำน้ำกับ {{2}} นะคะ 🐠 หวังว่าคุณจะสนุกกับโลกใต้น้ำ ช่วยเขียนรีวิวสั้น ๆ ให้เราหน่อยได้ไหมคะ ช่วยร้านดำน้ำเล็ก ๆ อย่างเราได้มากจริง ๆ: {{3}} ขอบคุณและแล้วพบกันใหม่ค่ะ",
+    zh: "你好 {{1}}，感谢你和 {{2}} 一起潜水！🐠 希望你在水下玩得开心。能给我们留一条简短的评价吗？这对我们这样的小潜店帮助很大：{{3}} 谢谢，下次见！",
+    ru: "Привет, {{1}}! Спасибо, что ныряли с {{2}} 🐠 Надеемся, под водой было здорово. Оставите нам короткий отзыв? Это очень помогает небольшому дайв-центру, как наш: {{3}} Спасибо и до встречи!",
+    it: "Ciao {{1}}, grazie per esserti immerso con {{2}}! 🐠 Speriamo che tu ti sia divertito sott’acqua. Ci lasceresti una breve recensione? Aiuta davvero un piccolo diving come il nostro: {{3}} Grazie e alla prossima!",
+    ko: "안녕하세요 {{1}}님, {{2}}와(과) 함께 다이빙해 주셔서 감사합니다! 🐠 물속에서 즐거운 시간 보내셨길 바라요. 짧은 리뷰를 남겨 주시겠어요? 저희 같은 작은 다이브 숍에 정말 큰 도움이 됩니다: {{3}} 감사합니다, 다음에 또 만나요!" },
 };
+// Meta's language codes for the template translations (Chinese is filed as zh_CN).
+const META_LANG = { zh: "zh_CN" };
+// Leads → Language holds a code ("th") or a name ("Thai", "Deutsch"); both become the two-letter code.
+const LANG_NAMES = { english: "en", french: "fr", "français": "fr", german: "de", deutsch: "de", spanish: "es", "español": "es",
+  dutch: "nl", nederlands: "nl", thai: "th", "ไทย": "th", chinese: "zh", "中文": "zh", russian: "ru", "русский": "ru",
+  italian: "it", italiano: "it", korean: "ko", "한국어": "ko" };
+const diverLang = (v) => { const s = String(v || "").trim().toLowerCase(); return LANG_NAMES[s] || s.slice(0, 2); };
 export async function handleDiver(request, env) {
   const out = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
   let p = {};
@@ -158,13 +187,17 @@ export async function handleDiver(request, env) {
   if (!contact || !channel) return out({ error: "contact and channel needed" }, 400);
   const values = (Array.isArray(p.params) ? p.params : []).slice(0, t.n);
   if (values.length !== t.n) return out({ error: `${p.template} needs ${t.n} params` }, 400);
-  const message = { type: "whatsapp_template", template: { name: p.template, languageCode: "en",
-    components: [{ type: "body", text: t.text, parameters: values.map((v) => ({ type: "text", text: param(v) })) }] } };
-  const res = await fetch(`https://api.respond.io/v2/contact/id:${contact}/message`, {
+  const build = (l) => ({ type: "whatsapp_template", template: { name: p.template, languageCode: META_LANG[l] || l,
+    components: [{ type: "body", text: t[l], parameters: values.map((v) => ({ type: "text", text: param(v) })) }] } });
+  const send = (message) => fetch(`https://api.respond.io/v2/contact/id:${contact}/message`, {
     method: "POST",
     headers: { Authorization: `Bearer ${env.RESPONDIO_TOKEN}`, "Content-Type": "application/json" },
     body: JSON.stringify({ channelId: channel, message }),
   });
+  const lang = diverLang(p.lang);
+  let res = await send(build(t[lang] ? lang : "en"));
+  // A translation Meta has not approved yet: send the English one instead of nothing.
+  if (!res.ok && t[lang] && lang !== "en") res = await send(build("en"));
   const body = (await res.text()).slice(0, 300);
   if (!res.ok) console.error("diver message", res.status, body);
   // Make stops on an error status, so the booking is not marked as sent.

@@ -1,7 +1,7 @@
 // Booking page texts in Thai, Chinese (simplified), Russian, Italian and Korean (added 26 Oct).
 // Same keys as T.en + T_BOOK.en in index.js; index.js merges them in. Product fields per language
 // ("Name TH", "Duration ZH", …) fall back to English when empty, like the other languages.
-// The booking terms only exist in en/fr/de/es/nl, so these languages link to the English terms.
+// The booking terms exist in all ten languages (public/terms/<lang>/), so Stripe links to the terms in the diver's language.
 
 export const MORE_LANGS = ["th", "zh", "ru", "it", "ko"];
 
@@ -36,7 +36,7 @@ export const moreTexts = (MAX) => ({
     payShop: "ชำระที่ร้านในวันดำน้ำ",
     never: "คุณไม่ต้องจ่ายเกินราคาที่ร้าน",
     terms: ["จองและชำระเงินผ่าน Talay ", "เงื่อนไขการจอง"],
-    termsStripe: "เมื่อชำระเงิน คุณยอมรับ[เงื่อนไขการจอง](https://talay.io/terms/)",
+    termsStripe: "เมื่อชำระเงิน คุณยอมรับ[เงื่อนไขการจอง](https://talay.io/terms/th/)",
     btn: ["ชำระ ", " บาท และจอง"],
     checkIn: "เช็คอิน",
     meeting: "จุดนัดพบ",
@@ -138,7 +138,7 @@ export const moreTexts = (MAX) => ({
     payShop: "当天在潜店支付",
     never: "您支付的价格永远不会高于潜店价格。",
     terms: ["通过 Talay 预订和付款。", "预订条款"],
-    termsStripe: "付款即表示您接受[预订条款](https://talay.io/terms/)。",
+    termsStripe: "付款即表示您接受[预订条款](https://talay.io/terms/zh/)。",
     btn: ["支付 ", " 泰铢并预订"],
     checkIn: "报到",
     meeting: "集合地点",
@@ -240,7 +240,7 @@ export const moreTexts = (MAX) => ({
     payShop: "Оплата в дайв-центре в день погружения",
     never: "Вы никогда не платите больше цены дайв-центра.",
     terms: ["Бронирование и оплата через Talay. ", "Условия бронирования"],
-    termsStripe: "Оплачивая, вы принимаете [условия бронирования](https://talay.io/terms/).",
+    termsStripe: "Оплачивая, вы принимаете [условия бронирования](https://talay.io/terms/ru/).",
     btn: ["Оплатить ", " THB и забронировать"],
     checkIn: "Сбор",
     meeting: "Место встречи",
@@ -342,7 +342,7 @@ export const moreTexts = (MAX) => ({
     payShop: "Da pagare al diving il giorno stesso",
     never: "Non paghi mai più del prezzo del diving.",
     terms: ["Prenotazione e pagamento tramite Talay. ", "Condizioni di prenotazione"],
-    termsStripe: "Pagando accetti le [condizioni di prenotazione](https://talay.io/terms/).",
+    termsStripe: "Pagando accetti le [condizioni di prenotazione](https://talay.io/terms/it/).",
     btn: ["Paga ", " THB e prenota"],
     checkIn: "Check-in",
     meeting: "Punto d'incontro",
@@ -444,7 +444,7 @@ export const moreTexts = (MAX) => ({
     payShop: "당일 다이빙 숍에서 결제",
     never: "다이빙 숍 가격보다 더 내는 일은 없어요.",
     terms: ["Talay를 통한 예약 및 결제. ", "예약 약관"],
-    termsStripe: "결제하면 [예약 약관](https://talay.io/terms/)에 동의하는 것입니다.",
+    termsStripe: "결제하면 [예약 약관](https://talay.io/terms/ko/)에 동의하는 것입니다.",
     btn: ["", " THB 결제하고 예약"],
     checkIn: "체크인",
     meeting: "만나는 장소",

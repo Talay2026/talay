@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ZONE_ROWS, ZONE_TH } from "../../src/zone-i18n.js";
+import { ZONE_ROWS, ZONE_TH, ZONE_MORE } from "../../src/zone-i18n.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const src = readFileSync(join(ROOT, "src/zone.js"), "utf8");
@@ -37,6 +37,14 @@ for (const [en, x] of Object.entries(ZONE_TH)) {
   if (holes(x) !== holes(en)) fail(`Placeholders differ in th: ${x}`);
 }
 for (const k of rows.keys()) if (!ZONE_TH[k]) fail(`Missing th: ${k}`);
+for (const [l, dict] of Object.entries(ZONE_MORE)) {
+  for (const [en, x] of Object.entries(dict)) {
+    if (!rows.has(en)) fail(`${l} for a text that has no row: ${en}`);
+    if (x.includes('"')) fail(`Straight " in ${l}: ${x}`);
+    if (holes(x) !== holes(en)) fail(`Placeholders differ in ${l}: ${x}`);
+  }
+  for (const k of rows.keys()) if (!dict[k]) fail(`Missing ${l}: ${k}`);
+}
 for (const k of used) if (!rows.has(k)) fail(`No translation: ${k}`);
 if (failed) process.exit(1);
-console.log(`OK: ${used.size} texts in the zone, ${rows.size} translated rows (es, fr, de, nl, th).`);
+console.log(`OK: ${used.size} texts in the zone, ${rows.size} translated rows (es, fr, de, nl, th, ${Object.keys(ZONE_MORE).join(", ")}).`);

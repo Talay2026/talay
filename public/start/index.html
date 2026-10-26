@@ -157,6 +157,7 @@ footer{color:var(--muted);font-size:14px;padding:16px 0 40px;display:flex;justif
 </footer>
 
 <script src="/start/i18n.js"></script>
+<script src="/start/i18n-more.js"></script>
 <script>
 const TURNSTILE_SITEKEY = "0x4AAAAAAFXZnn0VWocS_nWR";  // Cloudflare Turnstile site key (public, same as the homepage)
 const STORE = "talay-intake-v1";
@@ -324,7 +325,7 @@ const PRODUCTS = [
 
 // Language of the form: ?l=xx, then the choice saved on the homepage (talay-lang), then the browser.
 // Only the text people see is translated: the answers keep their English values, so Airtable gets the same data.
-const LANGS = [["en", "English"], ["es", "Español"], ["fr", "Français"], ["de", "Deutsch"], ["nl", "Nederlands"], ["th", "ไทย"]];
+const LANGS = [["en", "English"], ["es", "Español"], ["fr", "Français"], ["de", "Deutsch"], ["nl", "Nederlands"], ["th", "ไทย"], ["zh", "中文"], ["ru", "Русский"], ["it", "Italiano"], ["ko", "한국어"]];
 const I18N = window.TALAY_START_I18N || {};
 const LANG = (() => {
   const ok = l => LANGS.some(x => x[0] === l);

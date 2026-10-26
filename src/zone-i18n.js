@@ -1,13 +1,18 @@
-// Languages of the customer zone (talay.io/zone): English plus Spanish, French, German, Dutch and Thai.
-// Thai lives in ZONE_TH at the bottom (same English keys), still to be proofread by a native speaker.
+// Languages of the customer zone (talay.io/zone): English plus Spanish, French, German, Dutch, Thai,
+// and since 26 Oct Chinese (simplified), Russian, Italian and Korean (the same ten languages as Mia).
+// Thai lives in ZONE_TH at the bottom, the other four in zone-i18n-more.js (same English keys), all still to be proofread by a native speaker.
 // Each row: the English text exactly as it is in src/zone.js, then es, fr, de, nl.
 // {a} is the assistant's name (Mia), {n} a number, other {x} values are filled in by the code.
 // A text without a row (or with an empty cell) stays English, so nothing ever breaks.
 // Check after every change: node tools/i18n/zone-check.mjs
 // No straight double quotes in a translation: the texts also go into HTML attributes.
 
-export const ZONE_LANGS = [["en", "English"], ["es", "Español"], ["fr", "Français"], ["de", "Deutsch"], ["nl", "Nederlands"], ["th", "ไทย"]];
-export const ZONE_LOCALE = { en: "en-GB", es: "es-ES", fr: "fr-FR", de: "de-DE", nl: "nl-BE", th: "th-TH" };
+import { ZONE_ZH, ZONE_RU, ZONE_IT, ZONE_KO } from "./zone-i18n-more.js";
+
+export const ZONE_LANGS = [["en", "English"], ["es", "Español"], ["fr", "Français"], ["de", "Deutsch"], ["nl", "Nederlands"], ["th", "ไทย"],
+  ["zh", "中文"], ["ru", "Русский"], ["it", "Italiano"], ["ko", "한국어"]];
+export const ZONE_LOCALE = { en: "en-GB", es: "es-ES", fr: "fr-FR", de: "de-DE", nl: "nl-BE", th: "th-TH", zh: "zh-CN", ru: "ru-RU", it: "it-IT", ko: "ko-KR" };
+export const ZONE_MORE = { zh: ZONE_ZH, ru: ZONE_RU, it: ZONE_IT, ko: ZONE_KO };
 const ORDER = ["es", "fr", "de", "nl"];
 
 export const ZONE_ROWS = [
@@ -419,6 +424,9 @@ export const ZONE_ROWS = [
   ["Italian", "Italiano", "Italien", "Italienisch", "Italiaans"],
   ["Portuguese", "Portugués", "Portugais", "Portugiesisch", "Portugees"],
   ["Thai", "Tailandés", "Thaï", "Thailändisch", "Thai"],
+  ["Chinese", "Chino", "Chinois", "Chinesisch", "Chinees"],
+  ["Russian", "Ruso", "Russe", "Russisch", "Russisch"],
+  ["Korean", "Coreano", "Coréen", "Koreanisch", "Koreaans"],
 
   // Messages from the server (zone API errors)
   ["Error", "Error", "Erreur", "Fehler", "Fout"],
@@ -916,6 +924,9 @@ export const ZONE_TH = {
   "Italian": "อิตาลี",
   "Portuguese": "โปรตุเกส",
   "Thai": "ไทย",
+  "Chinese": "จีน",
+  "Russian": "รัสเซีย",
+  "Korean": "เกาหลี",
   "Error": "ข้อผิดพลาด",
   "Unknown conversation": "ไม่พบบทสนทนา",
   "Replies are not set up yet.": "ยังไม่ได้ตั้งค่าการตอบกลับ",
@@ -998,3 +1009,4 @@ export const ZONE_TH = {
   "Earlier note": "บันทึกก่อนหน้า",
 };
 ZONE_TEXT.th = ZONE_TH;
+Object.assign(ZONE_TEXT, ZONE_MORE);

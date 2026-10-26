@@ -20,7 +20,7 @@ const CACHE_SECONDS = 120; // limits Airtable API calls; logo links stay valid
 const MAX_DIVERS = 10; // more than 10 goes to a person (rule from the conversation flow)
 const LANGS = ["en", "fr", "de", "es", "nl", ...MORE_LANGS];
 const LOCALES = { en: "en-GB", fr: "fr-FR", de: "de-DE", es: "es-ES", nl: "nl-BE", ...MORE_LOCALES };
-const TERMS_LANGS = ["fr", "de", "es", "nl"]; // public/terms/<lang>/ exists; the rest gets the English terms
+const TERMS_LANGS = ["fr", "de", "es", "nl", "th", "zh", "ru", "it", "ko"]; // public/terms/<lang>/ exists; the rest gets the English terms
 const DAY_LAST = ["zh", "ko"]; // dates like "10月30日" / "10월 30일": no "30–31 October" shortening
 
 // ---------- Texts ----------
