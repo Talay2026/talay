@@ -144,6 +144,7 @@ export async function handleNotify(request, env, ctx) {
 // its own field, so the text lives here. It must match the approved template in WhatsApp Manager.
 const DIVER_TEMPLATES = {
   dive_reminder: { n: 4, text: "Hi {{1}}, see you tomorrow for your {{2}} with {{3}}! 🤿 Meeting point: {{4}}. Bring swimwear, a towel and sunscreen. Any questions? Just reply to this message." },
+  review_request: { n: 3, text: "Hi {{1}}, thanks for diving with {{2}}! 🐠 We hope you had an amazing time underwater. Would you leave us a short review? It really helps a small dive shop like ours: {{3}} Thank you and see you next time!" },
 };
 export async function handleDiver(request, env) {
   const out = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
