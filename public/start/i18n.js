@@ -134,6 +134,8 @@
   ["Thai", "Tailandés", "Thaï", "Thailändisch", "Thai", "ไทย"],
   ["Chinese", "Chino", "Chinois", "Chinesisch", "Chinees", "จีน"],
   ["Portuguese", "Portugués", "Portugais", "Portugiesisch", "Portugees", "โปรตุเกส"],
+  ["Russian", "Ruso", "Russe", "Russisch", "Russisch", "รัสเซีย"],
+  ["Korean", "Coreano", "Coréen", "Koreanisch", "Koreaans", "เกาหลี"],
   ["Swedish", "Sueco", "Suédois", "Schwedisch", "Zweeds", "สวีเดน"],
   ["Languages your team teaches in", "Idiomas en los que enseña tu equipo", "Langues dans lesquelles votre équipe enseigne", "Sprachen, in denen Ihr Team unterrichtet", "Talen waarin je team lesgeeft", "ภาษาที่ทีมของคุณใช้สอน"],
   ["Where are your instructors from?", "¿De dónde son tus instructores?", "D’où viennent vos instructeurs ?", "Woher kommen Ihre Instruktoren?", "Waar komen je instructeurs vandaan?", "ครูสอนดำน้ำของคุณมาจากประเทศไหน?"],
