@@ -3,21 +3,25 @@
 // white-label page: the diver sees the dive center; Talay only appears in the fine print and on Stripe.
 // Everything outside /b/ is served from /public by the assets binding.
 //
-// Languages: English, French, German, Spanish, Dutch. The page follows ?l=fr|de|es|nl|en
+// Languages: English, French, German, Spanish, Dutch, and since 26 Oct Thai, Chinese, Russian, Italian, Korean
+// (texts in booking-langs.js). The page follows ?l=fr|de|es|nl|th|zh|ru|it|ko|en
 // if present, otherwise the language of the diver's phone or browser. The diver can switch in the menu at the top.
 // Optional Airtable fields per language (fallback to English when empty):
-//   Products: "Name FR", "Duration FR", "Included FR", "Check-in FR" (also DE, ES, NL)
+//   Products: "Name FR", "Duration FR", "Included FR", "Check-in FR" (also DE, ES, NL, TH, ZH, RU, IT, KO)
 //   Centers:  "Meeting point FR" (also DE, ES, NL)
 
 import { handleZone, runHqAlerts, runOutreachSync, handlePush, handleWeekly } from "./zone.js"; // customer zone for dive centers: talay.io/zone (+ alerts for Talay HQ)
 import { handleDemo } from "./demo.js"; // demo requests from the homepage form: talay.io/api/demo
 import { handleIntake } from "./intake.js"; // onboarding form for a new centre: talay.io/start -> talay.io/api/intake
 import { handleNotify, handleDiver } from "./notify.js"; // WhatsApp and push to dive center staff, called by Make: talay.io/api/notify
+import { MORE_LANGS, MORE_LOCALES, MORE_SEP, MORE_LABEL, MORE_CLOSED, moreTexts } from "./booking-langs.js"; // th, zh, ru, it, ko
 
 const CACHE_SECONDS = 120; // limits Airtable API calls; logo links stay valid
 const MAX_DIVERS = 10; // more than 10 goes to a person (rule from the conversation flow)
-const LANGS = ["en", "fr", "de", "es", "nl"];
-const LOCALES = { en: "en-GB", fr: "fr-FR", de: "de-DE", es: "es-ES", nl: "nl-BE" };
+const LANGS = ["en", "fr", "de", "es", "nl", ...MORE_LANGS];
+const LOCALES = { en: "en-GB", fr: "fr-FR", de: "de-DE", es: "es-ES", nl: "nl-BE", ...MORE_LOCALES };
+const TERMS_LANGS = ["fr", "de", "es", "nl"]; // public/terms/<lang>/ exists; the rest gets the English terms
+const DAY_LAST = ["zh", "ko"]; // dates like "10月30日" / "10월 30일": no "30–31 October" shortening
 
 // ---------- Texts ----------
 
@@ -547,7 +551,8 @@ const T_BOOK = {
     confirmEnd: "Vragen? Antwoord gewoon hier.",
   },
 };
-for (const l of LANGS) Object.assign(T[l], T_BOOK[l]);
+Object.assign(T, moreTexts(MAX_DIVERS));
+for (const l of LANGS) Object.assign(T[l], T_BOOK[l] || {});
 
 const okLang = (l) => (LANGS.includes(String(l || "").toLowerCase()) ? String(l).toLowerCase() : "");
 
@@ -572,7 +577,7 @@ const diversLabel = (n, lang) => `${n} ${n === 1 ? T[lang].diver : T[lang].diver
 // Airtable field in the diver's language, falling back to the English field.
 // Booking terms in the diver's language (public/terms/ is English, the rest in a subfolder).
 function termsUrl(lang) {
-  return lang === "en" ? "/terms/" : `/terms/${lang}/`;
+  return TERMS_LANGS.includes(lang) ? `/terms/${lang}/` : "/terms/";
 }
 
 // Link back to the chat the diver came from: WhatsApp number first, then Instagram handle.
@@ -1224,7 +1229,7 @@ const first = (v) => (Array.isArray(v) ? v[0] : v);
 const num = (v) => Number(first(v)) || 0;
 const cap = (t) => String(t).charAt(0).toUpperCase() + String(t).slice(1);
 // Thousands separator per language: 12,500 (en), 12.500 (nl/de/es), 12 500 (fr).
-const SEP = { en: ",", nl: ".", de: ".", es: ".", fr: "\u00A0" };
+const SEP = { en: ",", nl: ".", de: ".", es: ".", fr: "\u00A0", ...MORE_SEP };
 const thb = (n, lang = "en") => Math.round(n).toLocaleString("en-US").replace(/,/g, SEP[lang] ?? ",");
 
 function earliestDate(cutoffHour, tz = "Asia/Bangkok") {
@@ -1462,7 +1467,7 @@ ${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
     <div>
       <p class="center-name">${esc(centerName)}</p>
       ${island ? `<p class="island">${esc(island)}</p>` : ""}
-      ${rating ? `<p class="rating"><a href="${esc(mapUrl(c, centerName, island))}" target="_blank" rel="noopener"><span aria-hidden="true">★</span> ${esc(String(rating).replace(".", lang === "en" ? "." : ","))}${reviews ? ` · ${esc(t.reviews(thb(reviews, lang)))}` : ""}</a></p>` : ""}
+      ${rating ? `<p class="rating"><a href="${esc(mapUrl(c, centerName, island))}" target="_blank" rel="noopener"><span aria-hidden="true">★</span> ${esc(String(rating).replace(".", ["en", "th", "zh", "ko"].includes(lang) ? "." : ","))}${reviews ? ` · ${esc(t.reviews(thb(reviews, lang)))}` : ""}</a></p>` : ""}
     </div>
     ${langMenu(lang)}
   </div>
@@ -1698,7 +1703,7 @@ const BOOK_JS = String.raw`
     const dm = (x) => fmt(x, { day: "numeric", month: "short" });
     if (!(days > 1)) return dm(iso);
     const end = addDays(iso, days - 1);
-    return iso.slice(0, 7) === end.slice(0, 7) && /^\d/.test(dm(iso)) ? String(Number(iso.slice(8))) + (d.lang === "de" ? "." : "") + "–" + dm(end) : dm(iso) + " – " + dm(end);
+    return iso.slice(0, 7) === end.slice(0, 7) && /^\d/.test(dm(iso)) && d.lang !== "zh" && d.lang !== "ko" ? String(Number(iso.slice(8))) + (d.lang === "de" ? "." : "") + "–" + dm(end) : dm(iso) + " – " + dm(end);
   }
   // Two bookings on the same day and the same part of it (or one takes the whole day).
   function parts(it) {
@@ -1907,7 +1912,7 @@ function fmtDays(iso, days, lang = "en") {
   const end = plusDays(iso, days - 1);
   const dm = (x) => new Date(x + "T00:00:00Z").toLocaleDateString(LOCALES[lang] || "en-GB", { day: "numeric", month: "long", timeZone: "UTC" });
   const day = (x) => String(Number(x.slice(8)));
-  return iso.slice(0, 7) === end.slice(0, 7) && /^\d/.test(dm(iso)) ? `${day(iso)}${lang === "de" ? "." : ""}–${dm(end)}` : `${dm(iso)} – ${dm(end)}`;
+  return iso.slice(0, 7) === end.slice(0, 7) && /^\d/.test(dm(iso)) && !DAY_LAST.includes(lang) ? `${day(iso)}${lang === "de" ? "." : ""}–${dm(end)}` : `${dm(iso)} – ${dm(end)}`;
 }
 // Booking number of one order (one Stripe payment), the same everywhere: "T-7K4M2Q".
 async function orderRef(sessionId) {
@@ -1923,6 +1928,7 @@ const CLOSED = {
   fr: { title: "La réservation en ligne est fermée pour le moment", text: (a) => `Envoyez un message à ${a} dans votre conversation et nous vous aiderons.` },
   de: { title: "Online-Buchung ist gerade geschlossen", text: (a) => `Schreib ${a} eine Nachricht im Chat, dann helfen wir dir weiter.` },
   es: { title: "La reserva online está cerrada por ahora", text: (a) => `Envía un mensaje a ${a} en el chat y te ayudamos.` },
+  ...MORE_CLOSED,
 };
 function closedPage(c, p, lang) {
   const t = CLOSED[lang] || CLOSED.en;
@@ -1933,7 +1939,7 @@ function closedPage(c, p, lang) {
 
 // Language menu on the booking page: reloads the same page with ?l=, so product, ref and checkout follow it
 // (window.URL: inside an inline handler, plain URL means document.URL)
-const LANG_LABEL = { en: "Language", fr: "Langue", de: "Sprache", es: "Idioma", nl: "Taal" };
+const LANG_LABEL = { en: "Language", fr: "Langue", de: "Sprache", es: "Idioma", nl: "Taal", ...MORE_LABEL };
 function langMenu(lang) {
   const opts = LANGS.map((l) => `<option value="${l}"${l === lang ? " selected" : ""}>${l.toUpperCase()}</option>`).join("");
   return `<select class="lang" aria-label="${LANG_LABEL[lang]}" onchange="var u=new window.URL(location.href);u.searchParams.set('l',this.value);location.href=u">${opts}</select>`;
