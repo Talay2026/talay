@@ -1541,21 +1541,23 @@ const BOOK_JS = String.raw`
     grp: x.code && P[x.code] ? P[x.code].groups[0] : "" });
   const GROUPS = ["new", "cert", "up"].filter((g) => d.products.some((p) => p.groups.indexOf(g) >= 0));
 
-  // The plan on this phone (same chat link, last 3 days) plus what the link brings, without doubles.
-  let items = [], note = "";
+  // The plan on this phone (same chat link, last 3 days). A link with products is the plan Mia sent:
+  // it replaces the saved one, keeping a date or time the diver already picked for the same product.
+  let saved = [], note = "";
   if (d.multi) {
     try {
-      const saved = JSON.parse(localStorage.getItem(KEY) || "null");
-      if (saved && Date.now() - saved.at < 3 * 864e5) {
-        items = (saved.items || []).filter((x) => P[x.code]).slice(0, d.maxItems).map(mk);
-        note = saved.note || "";
+      const s = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (s && Date.now() - s.at < 3 * 864e5) {
+        saved = (s.items || []).filter((x) => P[x.code]).slice(0, d.maxItems);
+        note = s.note || "";
       }
     } catch (e) { /* private mode */ }
   }
+  let items = d.init.length ? [] : saved.map(mk);
   d.init.forEach((x) => {
-    const twin = items.find((y) => y.code === x.code && (y.date === x.date || !x.date || !y.date));
-    if (twin) { if (!twin.date && x.date) twin.date = x.date; return; }
-    if (items.length < d.maxItems) items.push(mk(x));
+    if (items.some((y) => y.code === x.code && y.date === x.date) || items.length >= d.maxItems) return;
+    const was = !x.date && saved.find((y) => y.code === x.code && !items.some((z) => z.code === y.code && z.date === y.date));
+    items.push(mk(was ? Object.assign({}, x, { date: was.date, slot: x.slot || was.slot }) : x));
   });
   if (!items.length) items.push(mk({}));
   // Finished bookings start folded; the first unfinished one is open.
