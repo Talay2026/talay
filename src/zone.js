@@ -1683,7 +1683,7 @@ async function ticketAction(request, env, center, email, kind) {
 }
 
 // ---------- Settings ----------
-// Centers fields: Staff emails, Alert Email, Escalation hours (+ FR/DE/ES/NL), Mia paused,
+// Centers fields: Staff emails, Alert Email, Escalation hours (+ NL/FR/DE/ES/TH/ZH/RU/IT/KO), Mia paused,
 // Outside hours only (checkbox: the assistant stays silent during office hours, checked in Make)
 // (checkbox), and read-only info shown to the team.
 
@@ -1694,6 +1694,11 @@ const HOURS_TEXT = {
   FR: (a, b) => `tous les jours de ${a.replace(":", "h")} à ${b.replace(":", "h")} (heure thaïlandaise)`,
   DE: (a, b) => `täglich von ${a} bis ${b} Uhr (thailändische Zeit)`,
   ES: (a, b) => `todos los días de ${a} a ${b} (hora de Tailandia)`,
+  TH: (a, b) => `ทุกวัน ${a} ถึง ${b} น. (เวลาไทย)`,
+  ZH: (a, b) => `每天 ${a} 至 ${b}（泰国时间）`,
+  RU: (a, b) => `ежедневно с ${a} до ${b} (по тайскому времени)`,
+  IT: (a, b) => `tutti i giorni dalle ${a} alle ${b} (ora thailandese)`,
+  KO: (a, b) => `매일 ${a}~${b} (태국 시간)`,
 };
 const hhmm = (v) => { const m = String(v || "").match(/^(\d{1,2}):(\d{2})$/); return m && +m[1] < 24 && +m[2] < 60 ? `${+m[1]}:${m[2]}` : null; };
 
@@ -6312,7 +6317,7 @@ function zoneClient(cfg) {
     var only = !sdata.outsideOnly;
     save({ action: "mode", outsideOnly: only }, "#modeMsg", only ? t("{a} now only answers outside office hours.", { a: cfg.assistant }) : t("{a} answers day and night again.", { a: cfg.assistant }), this);
   };
-  $("#hSave").onclick = function () { save({ action: "hours", from: $("#hFrom").value, to: $("#hTo").value }, "#hMsg", t("Saved in all five languages."), this); };
+  $("#hSave").onclick = function () { save({ action: "hours", from: $("#hFrom").value, to: $("#hTo").value }, "#hMsg", t("Saved in all ten languages."), this); };
   $("#aSave").onclick = function () { save({ action: "alert", email: $("#aEmail").value }, "#aMsg", t("Saved."), this); };
   $("#tAdd").onclick = function () {
     var e = ($("#tEmail").value || "").trim().toLowerCase(); if (!e || !sdata) return;
