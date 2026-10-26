@@ -4885,7 +4885,8 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .cblk small{font-size:11.5px;color:var(--muted)}
 .cnone{color:var(--line);font-size:13px}
 .cday.isfull{background:repeating-linear-gradient(135deg,var(--card),var(--card) 8px,var(--paper-2) 8px,var(--paper-2) 16px)}
-.cfull{margin-top:auto;font:inherit;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:4px 6px;background:var(--paper-2);color:var(--deep);width:100%}
+.cfull{margin-top:auto;font:inherit;font-size:11.5px;border:1px solid var(--line);border-radius:8px;padding:4px 2px;background:var(--paper-2);color:var(--deep);width:100%;min-width:0;align-self:stretch;box-sizing:border-box;-webkit-appearance:none;appearance:none;text-align:center;text-align-last:center;cursor:pointer}
+.fullbar .cfull{width:auto;margin-top:0;-webkit-appearance:auto;appearance:auto;text-align:left;text-align-last:auto;font-size:13px;padding:5px 8px}
 .cfull.on{border-color:var(--warn);color:var(--warn);font-weight:700}
 .fullbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px;font-size:13px}
 .fullbar input,.fullbar select{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:var(--paper-2);color:var(--deep)}
@@ -6537,10 +6538,12 @@ function zoneClient(cfg) {
     $("#fSave").onclick = function () { if ($("#fDate").value) setFull($("#fDate").value, $("#fPart").value || "DAY", this); };
   }
   function shortDay(iso) { return new Date(iso + "T12:00:00Z").toLocaleDateString(LOC, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }); }
-  var FULL_T = { "": t("Open for booking"), AM: t("Morning full"), PM: t("Afternoon full"), DAY: t("Day full") };
+  var FULL_T = { "": t("Bookable"), AM: t("Morning full"), PM: t("Afternoon full"), DAY: t("Day full") };
+  var FULL_S = { "": t("Bookable"), AM: t("AM full"), PM: t("PM full"), DAY: t("Full") }; // narrow day cards
   function fullSelect(v, id, day) {
-    return '<select class="cfull' + (v ? " on" : "") + '"' + (id ? ' id="' + id + '"' : "") + (day ? ' data-day="' + day + '" aria-label="' + esc(dayLabel(day)) + '"' : "") + ">" +
-      (id ? ["DAY", "AM", "PM"] : ["", "AM", "PM", "DAY"]).map(function (k) { return '<option value="' + k + '"' + (k === v ? " selected" : "") + ">" + esc(FULL_T[k]) + "</option>"; }).join("") + "</select>";
+    var L = id ? FULL_T : FULL_S;
+    return '<select class="cfull' + (v ? " on" : "") + '"' + (id ? ' id="' + id + '"' : "") + (day ? ' data-day="' + day + '" aria-label="' + esc(dayLabel(day)) + '" title="' + esc(FULL_T[v]) + '"' : "") + ">" +
+      (id ? ["DAY", "AM", "PM"] : ["", "AM", "PM", "DAY"]).map(function (k) { return '<option value="' + k + '"' + (k === v ? " selected" : "") + ">" + esc(L[k]) + "</option>"; }).join("") + "</select>";
   }
   function setFull(day, part, el) {
     if (el) el.disabled = true;
