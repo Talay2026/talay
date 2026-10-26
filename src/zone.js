@@ -372,12 +372,14 @@ async function patchLead(env, center, id, rec, fields) {
 
 const DAY = 24 * 3600 * 1000;
 const LANG_WORDS = { english: "en", dutch: "nl", nederlands: "nl", french: "fr", francais: "fr", "français": "fr",
-  german: "de", deutsch: "de", spanish: "es", "español": "es", espanol: "es" };
+  german: "de", deutsch: "de", spanish: "es", "español": "es", espanol: "es", thai: "th", "ไทย": "th",
+  chinese: "zh", "中文": "zh", russian: "ru", "русский": "ru", italian: "it", italiano: "it", korean: "ko", "한국어": "ko" };
+const DIVER_LANGS = ["en", "fr", "de", "es", "nl", "th", "zh", "ru", "it", "ko"]; // the languages Mia and the booking page speak
 function langCode(v) {
   const s = String(v || "").trim().toLowerCase();
   if (LANG_WORDS[s]) return LANG_WORDS[s];
   const two = s.slice(0, 2);
-  return ["en", "fr", "de", "es", "nl"].includes(two) ? two : "en";
+  return DIVER_LANGS.includes(two) ? two : "en";
 }
 
 async function leadsFor(env, center, ids) {
@@ -786,6 +788,11 @@ const LINK_TEXT = {
   fr: (n, l) => `Voici le lien pour réserver ${n} 👇\n${l}`,
   de: (n, l) => `Hier ist der Link, um ${n} zu buchen 👇\n${l}`,
   es: (n, l) => `Aquí tienes el enlace para reservar ${n} 👇\n${l}`,
+  th: (n, l) => `นี่คือลิงก์สำหรับจอง ${n} 👇\n${l}`,
+  zh: (n, l) => `这是预订 ${n} 的链接 👇\n${l}`,
+  ru: (n, l) => `Вот ссылка, чтобы забронировать ${n} 👇\n${l}`,
+  it: (n, l) => `Ecco il link per prenotare ${n} 👇\n${l}`,
+  ko: (n, l) => `${n} 예약 링크입니다 👇\n${l}`,
 };
 
 // Products of this center, each with a ready message (in the diver's language)
@@ -1500,8 +1507,14 @@ const REMIND = {
   fr: (p, d, l) => `Bonjour ! J'ai vu que vous avez choisi *${p}* pour le ${d}, mais la réservation n'a pas abouti : votre place n'est donc pas encore réservée. Vous pouvez la finaliser ici 👇\n${l}`,
   de: (p, d, l) => `Hi! Ich habe gesehen, dass du *${p}* für ${d} ausgewählt hast, aber die Buchung wurde nicht abgeschlossen, dein Platz ist also noch nicht reserviert. Hier kannst du sie abschließen 👇\n${l}`,
   es: (p, d, l) => `¡Hola! Vi que elegiste *${p}* para el ${d}, pero la reserva no se completó, así que tu plaza aún no está reservada. Puedes terminarla aquí 👇\n${l}`,
+  th: (p, d, l) => `สวัสดีค่ะ! เห็นว่าคุณเลือก *${p}* วันที่ ${d} ไว้ แต่การจองยังไม่เสร็จ ที่นั่งของคุณจึงยังไม่ได้ถูกจองไว้ คุณจองต่อให้เสร็จได้ที่นี่ 👇\n${l}`,
+  zh: (p, d, l) => `你好！我看到你选择了 ${d} 的 *${p}*，但预订没有完成，所以你的名额还没有保留。你可以在这里完成预订 👇\n${l}`,
+  ru: (p, d, l) => `Привет! Я вижу, вы выбрали *${p}* на ${d}, но бронирование не завершилось, поэтому место ещё не зарезервировано. Завершить его можно здесь 👇\n${l}`,
+  it: (p, d, l) => `Ciao! Ho visto che hai scelto *${p}* per ${d}, ma la prenotazione non è andata a buon fine, quindi il tuo posto non è ancora riservato. Puoi completarla qui 👇\n${l}`,
+  ko: (p, d, l) => `안녕하세요! ${d}에 *${p}*을(를) 선택하신 것을 봤는데 예약이 완료되지 않아 아직 자리가 확보되지 않았어요. 여기에서 예약을 마무리하실 수 있어요 👇\n${l}`,
 };
-const LOCALE = { en: "en-GB", nl: "nl-BE", fr: "fr-FR", de: "de-DE", es: "es-ES" };
+const LOCALE = { en: "en-GB", nl: "nl-BE", fr: "fr-FR", de: "de-DE", es: "es-ES",
+  th: "th-TH-u-ca-gregory", zh: "zh-CN", ru: "ru-RU", it: "it-IT", ko: "ko-KR" };
 
 async function unfinished(env, center) {
   const key = stripeKeyOf(env, center);
@@ -1543,7 +1556,7 @@ async function unfinished(env, center) {
       code: String(m.product_code || ""), product: String(m.product_name || m.product_code || ""),
       date: m.activity_date, divers: Number(m.divers) || 1,
       total: Number(m.total_thb) || 0, deposit: Number(m.deposit_thb) || 0,
-      lang: ["en", "nl", "fr", "de", "es"].includes(m.lang) ? m.lang : "en",
+      lang: DIVER_LANGS.includes(m.lang) ? m.lang : "en",
     });
   }
 
@@ -6525,7 +6538,7 @@ function zoneClient(cfg) {
     return (cc ? "+" + cc + " " : "") + rest.replace(/(\d{3})(?=\d)/g, "$1 ").trim();
   }
   function dname(name, contact) { var n = name || contact || t("Diver"); return isPhone(n) ? prettyPhone(n) : n; }
-  var LANGN = { en: "English", nl: "Dutch", fr: "French", de: "German", es: "Spanish", it: "Italian", pt: "Portuguese", th: "Thai" };
+  var LANGN = { en: "English", nl: "Dutch", fr: "French", de: "German", es: "Spanish", it: "Italian", pt: "Portuguese", th: "Thai", zh: "Chinese", ru: "Russian", ko: "Korean" };
   // Leads store the language as a code or a name ("es", "Spanish"); both give "es".
   function langCode(v) { var s = String(v || "").trim().toLowerCase(); if (LANGN[s]) return s; for (var k in LANGN) if (LANGN[k].toLowerCase() === s) return k; return s; }
   var SPARK_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.9L19 9.7l-5.2 1.8L12 16.4l-1.8-4.9L5 9.7l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>';
