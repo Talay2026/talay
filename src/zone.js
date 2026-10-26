@@ -4705,7 +4705,7 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
  header .htools .sl{display:none}
  header .htools .lnk,header .htools a{padding:8px}
  nav{background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:saturate(1.4) blur(12px);-webkit-backdrop-filter:saturate(1.4) blur(12px);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px))}
- nav button{font-size:10.5px;font-weight:600;padding:6px 2px 5px;border-radius:12px;color:var(--muted);gap:3px}
+ nav button{font-size:10px;letter-spacing:-.01em;font-weight:600;padding:6px 1px 5px;border-radius:12px;color:var(--muted);gap:3px}
  nav button.on{background:var(--paper);color:var(--deep)}
  nav button.on i{color:var(--sand)}
  nav i{font-size:inherit}
@@ -4870,30 +4870,76 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .tb small{font-size:11.5px;color:var(--muted)}
 @media (max-width:900px){.tgrid{grid-template-columns:1fr}}
 @media (max-width:760px){.twrap{padding:18px 12px 20px}.thead h1{font-size:23px}}
-/* Calendar */
-.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
-.cday{min-height:120px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:6px}
-.cday.wk{background:var(--paper-2)}
-.cday.today{border-color:var(--sand);box-shadow:0 0 0 2px rgba(220,164,74,.25)}
-.cdh{display:flex;align-items:baseline;gap:6px}
-.cdh small{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
-.cdh b{font-size:18px}
+/* Calendar (own menu item) */
+#cal{flex-direction:column;overflow-y:auto}
+.calwrap{width:100%;max-width:1180px;margin:0 auto;padding:16px 20px calc(40px + env(safe-area-inset-bottom,0px))}
+.calbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.calbar h2{margin:0;font-size:22px;letter-spacing:-.02em}
+.calnav{display:flex;gap:6px}
+.calnav .ghost{min-width:40px;font-size:15px}
+.calnav .ghost:disabled{opacity:.35;cursor:default}
+.calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.cwd{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:0 4px 2px}
+.cd{min-height:118px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;align-items:stretch;gap:4px;font:inherit;color:inherit;text-align:left;cursor:pointer;min-width:0}
+.cd:hover{border-color:var(--sand)}
+.cd.wk{background:var(--paper-2)}
+.cd.past{opacity:.55}
+.cd.today{border-color:var(--sand);box-shadow:0 0 0 2px rgba(220,164,74,.28)}
+.cd.full{background:repeating-linear-gradient(135deg,var(--card),var(--card) 8px,var(--paper-2) 8px,var(--paper-2) 16px)}
+.cdh{display:flex;align-items:center;gap:6px}
+.cdh b{font-size:15px;font-weight:700}
+.cd.today .cdh b{color:var(--sand)}
 .ctot{margin-left:auto;font-size:11px;font-weight:700;background:var(--side);color:#F7F3EA;border-radius:999px;padding:1px 7px}
 @media (prefers-color-scheme:dark){.ctot{background:var(--sand);color:#09262F}}
-.cblk{background:rgba(220,164,74,.16);border-left:3px solid var(--sand);border-radius:8px;padding:6px 8px;display:flex;flex-direction:column}
-.cblk b{font-size:12.5px;line-height:1.3}
-.cblk small{font-size:11.5px;color:var(--muted)}
-.cnone{color:var(--line);font-size:13px}
-.cday.isfull{background:repeating-linear-gradient(135deg,var(--card),var(--card) 8px,var(--paper-2) 8px,var(--paper-2) 16px)}
-.cfull{margin-top:auto;font:inherit;font-size:11.5px;border:1px solid var(--line);border-radius:8px;padding:4px 2px;background:var(--paper-2);color:var(--deep);width:100%;min-width:0;align-self:stretch;box-sizing:border-box;-webkit-appearance:none;appearance:none;text-align:center;text-align-last:center;cursor:pointer}
-.fullbar .cfull{width:auto;margin-top:0;-webkit-appearance:auto;appearance:auto;text-align:left;text-align-last:auto;font-size:13px;padding:5px 8px}
-.cfull.on{border-color:var(--warn);color:var(--warn);font-weight:700}
-.fullbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px;font-size:13px}
-.fullbar input,.fullbar select{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:var(--paper-2);color:var(--deep)}
-.fullbar .muted{flex-basis:100%}
-.fulltag{font-size:12px;font-weight:700;color:var(--warn);border:1px solid var(--warn);border-radius:999px;padding:1px 8px}
-.fulltag button{border:0;background:none;color:inherit;font:inherit;cursor:pointer;padding:0 0 0 4px}
-@media (max-width:760px){.cal{grid-template-columns:repeat(2,minmax(0,1fr))}.cday{min-height:0}}
+.cfl{align-self:flex-start;font-size:10.5px;font-weight:700;color:var(--warn);border:1px solid var(--warn);border-radius:999px;padding:0 6px;white-space:nowrap}
+.cb{display:flex;flex-direction:column;border-radius:7px;padding:4px 7px;border-left:3px solid var(--line);background:var(--paper-2);min-width:0}
+.cb b{font-size:12px;line-height:1.25;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cb small{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cb.sAM,.crow.sAM{border-left-color:var(--sand);background:rgba(220,164,74,.15)}
+.cb.sPM,.crow.sPM{border-left-color:#2E8FA0;background:rgba(46,143,160,.13)}
+.cb.sDAY,.crow.sDAY{border-left-color:var(--deep);background:rgba(127,140,145,.12)}
+.cmore{font-size:11px;color:var(--muted);font-weight:600;padding-left:4px}
+.cnone{color:var(--muted);font-size:13px}
+.calhint{color:var(--muted);font-size:12.5px;margin:12px 2px 0}
+.agenda{display:none}
+.ag{display:flex;flex-direction:column;gap:5px;width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.ag.today{border-color:var(--sand)}
+.agd{display:flex;align-items:center;gap:8px}
+.agd b{font-size:14px}
+.cmodal{position:fixed;inset:0;background:rgba(9,38,47,.45);display:flex;align-items:center;justify-content:center;z-index:60;padding:16px}
+.cmodal[hidden]{display:none}
+.csheet{background:var(--card);color:var(--deep);border-radius:16px;width:100%;max-width:460px;max-height:85vh;overflow-y:auto;padding:16px 18px 18px;box-shadow:0 20px 60px -20px rgba(0,0,0,.45)}
+.csh{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px}
+.csh b{font-size:17px}
+.csh b::first-letter,.agd b::first-letter{text-transform:uppercase}
+.csh .cx{border:0;background:none;font-size:24px;line-height:1;color:var(--muted);cursor:pointer;padding:4px 8px}
+.csec{margin-top:12px}
+.csec>small{display:block;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px}
+.csec .muted{font-size:12.5px;margin:6px 0 0}
+.cseg{display:flex;flex-wrap:wrap;gap:6px}
+.cseg button{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--paper-2);color:var(--deep);border-radius:999px;padding:6px 12px;cursor:pointer}
+.cseg button.on{background:var(--side);border-color:var(--side);color:#F7F3EA}
+.cseg button.f.on{background:var(--warn);border-color:var(--warn);color:#fff}
+.crow{display:flex;justify-content:space-between;align-items:center;gap:10px;border-left:3px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px}
+.crow b{display:block;font-size:14px}
+.crow small{display:block;font-size:12.5px;color:var(--muted)}
+.crow .cnote{font-style:italic;margin-top:2px}
+.crow a{flex:none;font-size:13px;font-weight:700;color:var(--deep);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:4px 12px;background:var(--card)}
+.crow a:hover{border-color:var(--sand)}
+@media (max-width:760px){
+  .calwrap{padding:14px 12px calc(90px + env(safe-area-inset-bottom,0px))}
+  .calbar h2{font-size:17px}
+  #calCards{grid-template-columns:repeat(3,minmax(0,1fr))}
+  #calCards .cardn{padding:10px}
+  #calCards .cardn small{font-size:11px}
+  #calCards .cardn b{font-size:17px}
+  .calgrid{display:none}
+  .agenda{display:block}
+  .calhint{display:none}
+  .cmodal{align-items:flex-end;padding:0}
+  .csheet{max-width:none;border-radius:16px 16px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
+}
+@media print{#cal .calnav,#cal .calhint{display:none !important}}
 @media print{#today{display:none !important}}
 
 /* Chat v3: cleaner header facts, quieter bubbles, modern composer */
@@ -5209,7 +5255,7 @@ header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-sh
 </style></head>
 <body>
 <header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>${T("Customer zone")}</small></span></div><span class="sp"></span>${switcher}<div class="htools">${superadmin ? `<a href="/zone/admin" title="Talay HQ">Talay HQ</a>` : ""}<button class="lnk hlang" id="hlang" type="button" title="${T("Language")}" aria-haspopup="menu" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg><span class="sl">${(ZONE_LANGS.find(l => l[0] === lang) || ZONE_LANGS[0])[1]}</span><svg class="chev sl" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">${T("Sign out")}</span></a></div></header><div class="lmenu" id="lmenu" role="menu" hidden>${ZONE_LANGS.map(([code, name]) => `<button type="button" role="menuitemradio" aria-checked="${code === lang}" data-l="${code}"${code === lang ? ' class="on"' : ""}><span class="code">${code}</span>${name}<svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7"/></svg></button>`).join("")}</div>
-<nav><button class="on" data-v="today"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></i><span class="nl">${T("Today")}</span></button><button data-v="convos"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg></i><span class="nl"><span class="long">${T("Conversations")}</span><span class="short">${T("Chats")}</span></span><span class="count" id="count" hidden></span></button><button data-v="books"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></i><span class="nl">${T("Bookings")}</span></button><button data-v="dash"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></i><span class="nl">${T("Dashboard")}</span></button><button data-v="sett"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></i><span class="nl">${T("Settings")}</span></button><button data-v="supp"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg></i><span class="nl">${T("Support")}</span><span class="count" id="tcount" hidden></span></button></nav>
+<nav><button class="on" data-v="today"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></i><span class="nl">${T("Today")}</span></button><button data-v="convos"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg></i><span class="nl"><span class="long">${T("Conversations")}</span><span class="short">${T("Chats")}</span></span><span class="count" id="count" hidden></span></button><button data-v="books"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h3M4 12h3M4 18h3M10 6h10M10 12h10M10 18h10"/></svg></i><span class="nl">${T("Bookings")}</span></button><button data-v="cal"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></i><span class="nl">${T("Calendar")}</span></button><button data-v="dash"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></i><span class="nl"><span class="long">${T("Dashboard")}</span><span class="short">${T("Stats")}</span></span></button><button data-v="sett"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></i><span class="nl"><span class="long">${T("Settings")}</span><span class="short">${T("Options")}</span></span></button><button data-v="supp"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg></i><span class="nl">${T("Support")}</span><span class="count" id="tcount" hidden></span></button></nav>
 
 <section id="today" class="view on">
   <div class="twrap">
@@ -5250,7 +5296,6 @@ header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-sh
       <button class="chip" data-r="tomorrow">${T("Tomorrow")}</button>
       <button class="chip" data-r="next">${T("Next 30 days")}</button>
       <button class="chip" data-r="past">${T("Past 30 days")}</button>
-      <button class="chip" data-r="calendar">${T("Calendar")}</button>
       <button class="chip" data-r="unfinished">${T("Not paid yet")}<span class="count" id="ucount" hidden></span></button>
       <button class="chip" data-r="arriving">${T("Arriving soon")}<span class="count" id="acount" hidden></span></button>
       <span class="sp"></span>
@@ -5259,6 +5304,18 @@ header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-sh
     <div id="bcards" class="cards"></div>
     <div id="blist"><div class="skel"><i></i><i></i><i></i></div></div>
   </div>
+</section>
+
+<section id="cal" class="view">
+  <div class="calwrap">
+    <div class="calbar">
+      <h2 id="calTitle"></h2>
+      <div class="calnav"><button class="ghost" type="button" data-cw="-4" aria-label="${T("Previous")}">‹</button><button class="ghost" type="button" data-cw="0">${T("Today")}</button><button class="ghost" type="button" data-cw="4" aria-label="${T("Next")}">›</button></div>
+    </div>
+    <div id="calCards" class="cards"></div>
+    <div id="calBody"><div class="skel"><i></i><i></i><i></i></div></div>
+  </div>
+  <div class="cmodal" id="cmodal" hidden></div>
 </section>
 
 <section id="sett" class="view">
@@ -5470,6 +5527,7 @@ function zoneClient(cfg) {
       if (b.dataset.v === "dash") { loadDash(); loadStart(); }
       if (b.dataset.v === "today") loadToday();
       if (b.dataset.v === "books") loadBookings();
+      if (b.dataset.v === "cal") loadCal();
       if (b.dataset.v === "sett") { loadSettings(); try { localStorage.setItem("talay-seen-prices", "1"); } catch (e) {} }
       if (b.dataset.v === "supp") { tview = null; loadTickets(); }
     };
@@ -5952,7 +6010,6 @@ function zoneClient(cfg) {
   function renderBookings() {
     if (brange === "unfinished") { renderUnfinished(); return; }
     if (brange === "arriving") { renderArriving(); return; }
-    if (brange === "calendar") { renderCalendar(); return; }
     if (!bdata) return;
     var td = bdata.today, list = bdata.bookings.filter(function (b) {
       if (brange === "today") return b.date === td;
@@ -6015,6 +6072,7 @@ function zoneClient(cfg) {
     });
   }
   setInterval(function () { if (!document.hidden && $("#books").classList.contains("on")) loadBookings(); }, 60000);
+  setInterval(function () { if (!document.hidden && $("#cal").classList.contains("on") && $("#cmodal").hidden) loadCal(); }, 60000);
 
   // ---- quick replies: type "/" plus the first letters of a name; at most 5 matches show.
   var QUICK = [], qSel = 0, qHits = [];
@@ -6494,7 +6552,7 @@ function zoneClient(cfg) {
       var total = next.reduce(function (a, x) { return a + x[1]; }, 0);
       $("#tWeek").innerHTML = '<div class="th"><b>' + t("Next 7 days") + "</b><small>" + tn(total, "1 diver booked", "{n} divers booked") + '</small><a href="#" class="tlink" id="tCal">' + t("Calendar") + '</a></div><div class="tbars">' +
         next.map(function (x) { return '<div class="tb"><span class="tbv">' + (x[1] || "") + '</span><span class="tbb" style="height:' + Math.max(4, Math.round(x[1] / max * 70)) + 'px"></span><small>' + new Date(x[0] + "T12:00:00Z").toLocaleDateString(LOC, { weekday: "short" }) + "</small></div>"; }).join("") + "</div>";
-      $("#tCal").onclick = function (e) { e.preventDefault(); goBookings("calendar"); };
+      $("#tCal").onclick = function (e) { e.preventDefault(); document.querySelector('nav button[data-v="cal"]').click(); };
     }).catch(function () { $("#tToday").innerHTML = '<div class="th"><b>' + t("On the boat today") + '</b></div><p class="tok">' + t("Couldn't load bookings.") + "</p>"; $("#tTomorrow").innerHTML = ""; $("#tWeek").innerHTML = ""; });
     api("arriving").then(function (d) {
       var n = d.items.length;
@@ -6508,46 +6566,94 @@ function zoneClient(cfg) {
   loadToday();
   setInterval(function () { if (!document.hidden && $("#today").classList.contains("on")) loadToday(); }, 60000);
 
-  // ---- Calendar (next 14 days)
-  function renderCalendar() {
-    if (!bdata) { $("#bcards").innerHTML = ""; $("#blist").innerHTML = '<div class="skel"><i></i><i></i></div>'; return; }
-    var live = bdata.bookings.filter(function (b) { return !isCx(b); });
-    var days = [];
-    for (var i = 0; i < 14; i++) days.push(addDays(bdata.today, i));
-    var total = live.filter(function (b) { return b.date >= days[0] && b.date <= days[13]; }).reduce(function (a, b) { return a + b.divers; }, 0);
-    $("#bcards").innerHTML = '<div class="cardn"><small>' + t("Divers next 14 days") + "</small><b>" + total + "</b></div>" +
-      '<div class="cardn"><small>' + t("Busiest day") + "</small><b>" + (function () { var best = null; days.forEach(function (dd) { var v = live.filter(function (b) { return b.date === dd; }).reduce(function (a, b) { return a + b.divers; }, 0); if (!best || v > best[1]) best = [dd, v]; }); return best && best[1] ? esc(new Date(best[0] + "T12:00:00Z").toLocaleDateString(LOC, { weekday: "short", day: "numeric", month: "short" })) : "–"; })() + "</b></div>";
-    var full = bdata.full || {};
-    var later = Object.keys(full).filter(function (dd) { return dd > days[13]; }).sort();
-    $("#blist").innerHTML = '<div class="fullbar"><span class="muted">' + t("Mark a day as full: divers can't book it online anymore. Your bookings stay as they are.") + "</span>" +
-      '<input type="date" id="fDate" min="' + bdata.today + '" value="' + addDays(bdata.today, 14) + '">' + fullSelect("", "fPart") + '<button class="btn" type="button" id="fSave">' + t("Save") + "</button>" +
-      later.map(function (dd) { return '<span class="fulltag">' + esc(shortDay(dd)) + " · " + esc(FULL_T[full[dd]]) + '<button type="button" data-unfull="' + dd + '" aria-label="' + t("Remove") + '">×</button></span>'; }).join("") +
-      '<span class="smsg" id="fMsg"></span></div>' +
-      '<div class="cal">' + days.map(function (dd, idx) {
-      var g = {};
-      live.filter(function (b) { return b.date === dd; }).forEach(function (b) { g[b.product] = g[b.product] || { divers: 0, n: 0 }; g[b.product].divers += b.divers; g[b.product].n++; });
-      var keys = Object.keys(g).sort(function (a, b) { return g[b].divers - g[a].divers; });
-      var tot = keys.reduce(function (a, k2) { return a + g[k2].divers; }, 0);
-      var dt = new Date(dd + "T12:00:00Z");
-      return '<div class="cday' + (idx === 0 ? " today" : "") + (dt.getUTCDay() === 0 || dt.getUTCDay() === 6 ? " wk" : "") + (full[dd] ? " isfull" : "") + '"><div class="cdh"><small>' + dt.toLocaleDateString(LOC, { weekday: "short" }) + "</small><b>" + dt.getUTCDate() + "</b>" + (tot ? '<span class="ctot">' + tot + "</span>" : "") + "</div>" +
-        (keys.length ? keys.map(function (k2) { return '<div class="cblk"><b>' + esc(k2) + "</b><small>" + tn(g[k2].divers, "1 diver", "{n} divers") + "</small></div>"; }).join("") : '<div class="cnone">–</div>') +
-        fullSelect(full[dd] || "", "", dd) + "</div>";
-    }).join("") + "</div>";
-    $("#blist").querySelectorAll("select[data-day]").forEach(function (sel) { sel.onchange = function () { setFull(sel.dataset.day, sel.value, sel); }; });
-    $("#blist").querySelectorAll("[data-unfull]").forEach(function (b) { b.onclick = function () { setFull(b.dataset.unfull, "", b); }; });
-    $("#fSave").onclick = function () { if ($("#fDate").value) setFull($("#fDate").value, $("#fPart").value || "DAY", this); };
-  }
+  // ---- Calendar: four weeks at a time, Monday first. Click a day for its bookings and to mark it full.
+  var calStart = null, calDay = "";
+  function monday(iso) { return addDays(iso, -((new Date(iso + "T12:00:00Z").getUTCDay() + 6) % 7)); }
   function shortDay(iso) { return new Date(iso + "T12:00:00Z").toLocaleDateString(LOC, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }); }
   var FULL_T = { "": t("Bookable"), AM: t("Morning full"), PM: t("Afternoon full"), DAY: t("Day full") };
-  var FULL_S = { "": t("Bookable"), AM: t("AM full"), PM: t("PM full"), DAY: t("Full") }; // narrow day cards
-  function fullSelect(v, id, day) {
-    var L = id ? FULL_T : FULL_S;
-    return '<select class="cfull' + (v ? " on" : "") + '"' + (id ? ' id="' + id + '"' : "") + (day ? ' data-day="' + day + '" aria-label="' + esc(dayLabel(day)) + '" title="' + esc(FULL_T[v]) + '"' : "") + ">" +
-      (id ? ["DAY", "AM", "PM"] : ["", "AM", "PM", "DAY"]).map(function (k) { return '<option value="' + k + '"' + (k === v ? " selected" : "") + ">" + esc(L[k]) + "</option>"; }).join("") + "</select>";
+  function slotKey(b) { var x = String(b.slot || "").toUpperCase(); return x === "AM" || x === "PM" ? x : "DAY"; }
+  function slotName(k) { return k === "AM" ? t("Morning") : k === "PM" ? t("Afternoon") : ""; }
+  function calByDay() {
+    var by = {};
+    bdata.bookings.forEach(function (b) { if (!isCx(b)) (by[b.date] = by[b.date] || []).push(b); });
+    Object.keys(by).forEach(function (dd) { by[dd].sort(function (x, y) { return "AMPMDAY".indexOf(slotKey(x)) - "AMPMDAY".indexOf(slotKey(y)); }); });
+    return by;
+  }
+  function loadCal() {
+    api("bookings").then(function (d) { bdata = d; renderCalendar(); })
+      .catch(function (e) { if (e.message !== "auth") $("#calBody").innerHTML = '<div class="bempty">' + esc(e.message) + "</div>"; });
+  }
+  document.querySelectorAll("[data-cw]").forEach(function (b) {
+    b.onclick = function () {
+      if (!bdata) return;
+      var w = Number(b.dataset.cw);
+      calStart = w ? addDays(calStart, 7 * w) : monday(bdata.today);
+      renderCalendar();
+    };
+  });
+  function renderCalendar() {
+    if (!bdata) { $("#calCards").innerHTML = ""; $("#calBody").innerHTML = '<div class="skel"><i></i><i></i></div>'; return; }
+    var td = bdata.today, first = monday(addDays(td, -28)), last = monday(addDays(td, 84)); // what /bookings returns
+    if (!calStart) calStart = monday(td);
+    var days = [];
+    for (var i = 0; i < 28; i++) days.push(addDays(calStart, i));
+    var by = calByDay(), full = bdata.full || {};
+    var divers = function (dd) { return (by[dd] || []).reduce(function (a, b) { return a + b.divers; }, 0); };
+    var fmt = function (iso, o) { return new Date(iso + "T12:00:00Z").toLocaleDateString(LOC, Object.assign({ timeZone: "UTC" }, o)); };
+    $("#calTitle").textContent = fmt(days[0], { day: "numeric", month: "short" }) + " – " + fmt(days[27], { day: "numeric", month: "short", year: "numeric" });
+    $('[data-cw="-4"]').disabled = calStart <= first;
+    $('[data-cw="4"]').disabled = addDays(calStart, 28) > last;
+    var best = null, total = 0, nfull = 0;
+    days.forEach(function (dd) { var v = divers(dd); total += v; if (v && (!best || v > best[1])) best = [dd, v]; if (full[dd]) nfull++; });
+    $("#calCards").innerHTML = '<div class="cardn"><small>' + t("Divers in these 4 weeks") + "</small><b>" + total + "</b></div>" +
+      '<div class="cardn"><small>' + t("Busiest day") + "</small><b>" + (best ? esc(shortDay(best[0])) : "–") + "</b></div>" +
+      '<div class="cardn"><small>' + t("Days full") + "</small><b>" + nfull + "</b></div>";
+    var cell = function (dd, idx) {
+      var list = by[dd] || [], tot = divers(dd), dt = new Date(dd + "T12:00:00Z"), wk = dt.getUTCDay() === 0 || dt.getUTCDay() === 6;
+      var num = dd.slice(8) === "01" || idx === 0 ? fmt(dd, { day: "numeric", month: "short" }) : String(dt.getUTCDate());
+      var shown = list.slice(0, 3);
+      return '<button type="button" class="cd' + (dd === td ? " today" : "") + (dd < td ? " past" : "") + (wk ? " wk" : "") + (full[dd] ? " full" : "") + '" data-cday="' + dd + '" aria-label="' + esc(dayLabel(dd)) + '">' +
+        '<span class="cdh"><b>' + esc(num) + "</b>" + (tot ? '<span class="ctot">' + tot + "</span>" : "") + "</span>" +
+        (full[dd] ? '<span class="cfl">' + esc(FULL_T[full[dd]]) + "</span>" : "") +
+        shown.map(function (b) { var k = slotKey(b); return '<span class="cb s' + k + '"><b>' + esc(b.product) + "</b><small>" + tn(b.divers, "1 diver", "{n} divers") + (slotName(k) ? " · " + esc(slotName(k)) : "") + "</small></span>"; }).join("") +
+        (list.length > 3 ? '<span class="cmore">' + t("+{n} more", { n: list.length - 3 }) + "</span>" : "") + "</button>";
+    };
+    var head = "";
+    for (var w = 0; w < 7; w++) head += '<span class="cwd">' + esc(fmt(addDays(calStart, w), { weekday: "short" })) + "</span>";
+    // Phone: the same weeks as a list of days that have something on them.
+    var agenda = days.filter(function (dd) { return dd >= td && ((by[dd] || []).length || full[dd] || dd === td); }).map(function (dd) {
+      var list = by[dd] || [];
+      return '<button type="button" class="ag' + (dd === td ? " today" : "") + '" data-cday="' + dd + '"><span class="agd"><b>' + esc(fmt(dd, { weekday: "short", day: "numeric", month: "short" })) + "</b>" +
+        (full[dd] ? '<span class="cfl">' + esc(FULL_T[full[dd]]) + "</span>" : "") + (divers(dd) ? '<span class="ctot">' + divers(dd) + "</span>" : "") + "</span>" +
+        (list.length ? list.map(function (b) { var k = slotKey(b); return '<span class="cb s' + k + '"><b>' + esc(b.product) + "</b><small>" + tn(b.divers, "1 diver", "{n} divers") + (slotName(k) ? " · " + esc(slotName(k)) : "") + "</small></span>"; }).join("") : '<span class="cnone">' + t("No bookings on this day.") + "</span>") + "</button>";
+    }).join("");
+    $("#calBody").innerHTML = '<div class="calgrid">' + head + days.map(cell).join("") + '</div><div class="agenda">' + (agenda || '<div class="bempty">' + t("No bookings in this period.") + "</div>") + "</div>" +
+      '<p class="calhint">' + t("Click a day to see its bookings or to mark it as full.") + "</p>";
+    $("#calBody").querySelectorAll("[data-cday]").forEach(function (b) { b.onclick = function () { openDay(b.dataset.cday); }; });
+    if (calDay) openDay(calDay);
+  }
+  function openDay(dd) {
+    calDay = dd;
+    var list = calByDay()[dd] || [], v = (bdata.full || {})[dd] || "", past = dd < bdata.today, m = $("#cmodal");
+    m.innerHTML = '<div class="csheet" role="dialog" aria-modal="true" aria-label="' + esc(dayLabel(dd)) + '"><div class="csh"><b>' + esc(dayLabel(dd)) + '</b><button type="button" class="cx" data-close aria-label="' + t("Close") + '">×</button></div>' +
+      (past ? "" : '<div class="csec"><small>' + t("Online booking") + '</small><div class="cseg">' + ["", "AM", "PM", "DAY"].map(function (k) {
+        return '<button type="button" data-full="' + k + '" class="' + (k === v ? "on" : "") + (k ? " f" : "") + '" aria-pressed="' + (k === v) + '">' + esc(FULL_T[k]) + "</button>"; }).join("") +
+        '</div><p class="muted">' + t("Mark a day as full: divers can't book it online anymore. Your bookings stay as they are.") + '</p><span class="smsg" id="fMsg"></span></div>') +
+      '<div class="csec"><small>' + t("Bookings") + "</small>" + (list.length ? list.map(function (b) {
+        var k = slotKey(b);
+        return '<div class="crow s' + k + '"><div><b>' + esc(b.product) + "</b><small>" + esc(b.name || "") + (b.name ? " · " : "") + tn(b.divers, "1 diver", "{n} divers") + (slotName(k) ? " · " + esc(slotName(k)) : "") + "</small>" +
+          (b.note ? '<small class="cnote">' + esc(b.note) + "</small>" : "") + "</div>" + (b.chat ? '<a href="#" class="tlink" data-chat="' + esc(b.chat) + '">' + t("Chat") + "</a>" : "") + "</div>";
+      }).join("") : '<p class="cnone">' + t("No bookings on this day.") + "</p>") + "</div></div>";
+    m.hidden = false;
+    var close = function () { m.hidden = true; calDay = ""; };
+    m.onclick = function (e) { if (e.target === m || e.target.closest("[data-close]")) close(); };
+    m.querySelectorAll("[data-full]").forEach(function (b) { b.onclick = function () { setFull(dd, b.dataset.full, b); }; });
+    m.querySelectorAll("[data-chat]").forEach(function (a) { a.onclick = function (e) { e.preventDefault(); close(); goChat(a.dataset.chat); }; });
+    document.onkeydown = function (e) { if (e.key === "Escape" && !m.hidden) close(); };
   }
   function setFull(day, part, el) {
     if (el) el.disabled = true;
-    post("full", { date: day, part: part }).then(function (d) { bdata.full = d.full; renderBookings(); say("#fMsg", t("Saved.")); })
+    post("full", { date: day, part: part }).then(function (d) { bdata.full = d.full; renderCalendar(); say("#fMsg", t("Saved.")); })
       .catch(function (e) { if (el) el.disabled = false; if ($("#fMsg")) say("#fMsg", e.message, true); });
   }
 
