@@ -886,8 +886,9 @@ async function orderInfo(env, ctx, url) {
     order_ref: ref, lead_ref: m.lead_ref || "", lang, note: m.note || "", payer_name: payer, payer_phone: s.customer_details?.phone || "",
     count: items.length, total_thb: total, deposit_thb: paid, balance_thb: total - paid,
     items: items.map(({ shown, ...x }) => x), confirm, center_text: centerText,
-    // Single booking only (several: the number is already in confirm), so Make can add it under Confirm text as is.
-    ref_line: items.length < 2 ? `${t.bookingNo}: ${ref}` : "",
+    // Always empty now: Bookings → Ref shows Order ref, so Confirm text already holds this number.
+    // Kept so Make modules that still add {{25.data.ref_line}} add nothing.
+    ref_line: "",
   });
 }
 
