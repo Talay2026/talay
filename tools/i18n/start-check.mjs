@@ -10,7 +10,7 @@ import vm from "node:vm";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const html = readFileSync(join(ROOT, "public/start/index.html"), "utf8");
-const LANGS = ["es", "fr", "de", "nl", "th"];
+const LANGS = ["es", "fr", "de", "nl", "th", "zh", "ru", "it", "ko"];
 // Texts that stay the same in every language
 const SAME = new Set(["https://", "@yourcentre", "+66 81 234 5678", "Mia", "WhatsApp", "Instagram", "LINE", "Telegram", "SSI", "PADI", "RAID", "Logo", "Website"]);
 
@@ -33,6 +33,7 @@ if (process.argv.includes("--keys")) { console.log(JSON.stringify([...keys], nul
 
 const ctx = { window: {} };
 vm.runInNewContext(readFileSync(join(ROOT, "public/start/i18n.js"), "utf8"), ctx);
+vm.runInNewContext(readFileSync(join(ROOT, "public/start/i18n-more.js"), "utf8"), ctx);
 const I18N = ctx.window.TALAY_START_I18N;
 const holes = (x) => [...new Set(x.match(/\{\w+\}/g) || [])].sort().join();
 let failed = false;
