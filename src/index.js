@@ -650,6 +650,9 @@ export default {
         return await manageAction(request, env, ctx);
       }
 
+      if (url.pathname === "/b/step" && request.method === "POST") {
+        return await pageStep(request, env, ctx);
+      }
       if (url.pathname === "/b/order") {
         return await orderInfo(env, ctx, url);
       }
@@ -1148,6 +1151,24 @@ async function manageAction(request, env, ctx) {
 
 // ---------- Airtable ----------
 
+// Where divers drop off on the booking page: one row per visit and step in the Airtable table
+// "Page steps" (Slug, Visit, Step, Lead, Lang, plus a Created time field). Talay HQ → Conversie
+// counts the different visits per step. Never blocks the page: errors only go to the log.
+const PAGE_STEPS = ["open", "group", "product", "done", "pay"];
+async function pageStep(request, env, ctx) {
+  let b = null;
+  try { b = JSON.parse((await request.text()).slice(0, 1000)); } catch { /* not JSON */ }
+  if (b && /^[a-z0-9-]{1,60}$/.test(b.s) && /^[A-Za-z0-9]{8,40}$/.test(b.v) && PAGE_STEPS.includes(b.st)) {
+    const fields = { Slug: b.s, Visit: b.v, Step: b.st, Lead: /^[A-Za-z0-9_-]{1,64}$/.test(b.c || "") ? b.c : "", Lang: /^[a-z]{2}$/.test(b.l || "") ? b.l : "" };
+    ctx.waitUntil(fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/${encodeURIComponent("Page steps")}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ records: [{ fields }], typecast: true }),
+    }).then(async (r) => { if (!r.ok) console.error("page step", r.status, (await r.text()).slice(0, 200)); }).catch((e) => console.error("page step", e)));
+  }
+  return new Response(null, { status: 204 });
+}
+
 async function airtableOne(env, ctx, table, formula) {
   const api = new URL(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/${encodeURIComponent(table)}`);
   api.searchParams.set("filterByFormula", formula);
@@ -1541,6 +1562,20 @@ const BOOK_JS = String.raw`
   if (!opened && items.length === 1 && !items[0].code) items[0].open = true;
   $("note").value = note;
 
+  // Steps for the drop-off count in Talay HQ (one visit = this tab).
+  const VISIT = (() => {
+    const make = () => Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
+    try { let v = sessionStorage.getItem("talay-visit"); if (!v) { v = make(); sessionStorage.setItem("talay-visit", v); } return v; } catch (e) { return make(); }
+  })();
+  const stepped = {};
+  function step(st) {
+    if (stepped[st]) return;
+    stepped[st] = 1;
+    try { navigator.sendBeacon("/b/step", JSON.stringify({ s: d.slug, v: VISIT, st: st, c: d.ref || "", l: d.lang })); } catch (e) { /* old browser */ }
+  }
+  step("open");
+  if (items.some((x) => x.code)) { step("group"); step("product"); }
+
   function slotOf(it) { const p = P[it.code]; if (!p) return ""; return p.slot === "CHOOSE" ? it.slot : p.slot; }
   function blocked(p, date) {
     for (let k = 0; k < p.days; k++) if (d.closed.indexOf(addDays(date, k)) >= 0) return true;
@@ -1788,10 +1823,10 @@ const BOOK_JS = String.raw`
     const b = e.target.closest("button");
     if (!it || !b) return;
     $("msg").hidden = true;
-    if (b.dataset.grp) { it.grp = b.dataset.grp; }
+    if (b.dataset.grp) { it.grp = b.dataset.grp; step("group"); }
     else if (b.dataset.act) {
       if (it.code !== b.dataset.act) { it.code = b.dataset.act; it.slot = ""; it.month = ""; if (it.date && it.date < P[it.code].minDate) it.date = ""; }
-      it.pick = false; it.err = "";
+      it.pick = false; it.err = ""; step("product");
     } else if (b.hasAttribute("data-repick")) { it.pick = true; }
     else if (b.dataset.n) { it.n = Math.min(Math.max(it.n + Number(b.dataset.n), 1), d.max); }
     else if (b.dataset.month) { it.month = b.dataset.month; }
@@ -1802,7 +1837,7 @@ const BOOK_JS = String.raw`
     else if (b.hasAttribute("data-done")) {
       const pr = problem(it);
       it.err = pr;
-      if (!pr) { it.open = false; }
+      if (!pr) { it.open = false; step("done"); }
     } else if (b.hasAttribute("data-edit")) {
       settle(false);
       it.open = true;
@@ -1837,6 +1872,7 @@ const BOOK_JS = String.raw`
     if (!d.payments) { msg.textContent = s.noPay; return; }
     const btn = $("book");
     btn.disabled = true;
+    step("pay");
     msg.textContent = s.opening;
     fetch("/b/checkout", {
       method: "POST",

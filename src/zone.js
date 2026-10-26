@@ -2760,15 +2760,35 @@ async function hqCenters(env) {
   return recs.map((r) => ({ ...centerOut(r, true), ...centerMeta(r), outsideOnly: !!r.fields["Outside hours only"], paused: !!r.fields["Mia paused"] }))
     .filter((c) => /^[a-z0-9-]{1,60}$/.test(c.slug));
 }
+// Booking page steps (src/index.js → pageStep): different visits per center and step.
+async function pageSteps(env, start, end) {
+  const recs = await at(env, "Page steps", {
+    formula: `AND(IS_AFTER(CREATED_TIME(), DATETIME_PARSE('${isoT(start - 1000)}')), IS_BEFORE(CREATED_TIME(), DATETIME_PARSE('${isoT(end)}')))`,
+    fields: ["Slug", "Visit", "Step"], max: 20000,
+  }).catch((e) => { console.error("page steps", e); return null; }); // table not made yet: no numbers, no error
+  if (!recs) return null;
+  const seen = {};
+  for (const r of recs) {
+    const f = r.fields, slug = String(f.Slug || ""), st = String(f.Step || "");
+    ((seen[slug] = seen[slug] || {})[st] = seen[slug][st] || new Set()).add(String(f.Visit || ""));
+  }
+  const out = {};
+  for (const slug of Object.keys(seen)) {
+    out[slug] = {};
+    for (const st of ["open", "group", "product", "done", "pay"]) out[slug][st] = seen[slug][st] ? seen[slug][st].size : 0;
+  }
+  return out;
+}
 async function adminConversion(env, per, fresh) {
   const centers = await hqCenters(env);
-  const { label, months } = periodRange(per);
+  const { label, months, start, end } = periodRange(per);
+  const steps = await cached(env, `steps/${per || "30d"}`, 120, async () => (await pageSteps(env, start, end)) || { none: true }, fresh);
   const rows = await Promise.all(centers.map(async (c) => {
     try {
       const d = await cached(env, `dash/v5/${c.slug}/${per || "30d"}`, 120, () => dashboard(env, c, per), fresh);
       const k = d.kpi || {};
       return {
-        slug: c.slug, name: c.name, type: c.type, test: c.test, funnel: d.funnel,
+        slug: c.slug, name: c.name, type: c.type, test: c.test, funnel: d.funnel, steps: steps.none ? null : steps[c.slug] || null,
         conversations: k.conversations || 0, outsideHours: k.outsideHours || 0, handedOver: k.handedOver || 0,
         bookings: k.bookings || 0, divers: k.divers || 0, afterFollowUp: k.afterFollowUp || 0,
         value: k.revenue || 0, commission: k.commission || 0,
@@ -2778,7 +2798,7 @@ async function adminConversion(env, per, fresh) {
       return { slug: c.slug, name: c.name, type: c.type, test: c.test, error: true };
     }
   }));
-  return { period: per || "30d", label: per ? label : "Laatste 30 dagen", months, centers: rows };
+  return { period: per || "30d", label: per ? label : "Laatste 30 dagen", months, centers: rows, stepsReady: !steps.none };
 }
 
 // ---------- Claude costs, from the Log table ----------
@@ -4005,6 +4025,19 @@ function hqClient(cfg) {
         return '<div class="st"><b>' + nf.format(s[1]) + "</b><span>" + s[0] + '</span><i><em style="width:' + (t.conversations ? Math.max(2, Math.round(s[1] / t.conversations * 100)) : 0) + '%"></em></i><small>' +
           (i ? pct(s[1], steps[i - 1][1]) + " van de stap ervoor" : esc(s[2])) + "</small></div>";
       }).join("") + "</div></div>";
+      // Booking page: where divers drop off between opening the page and paying.
+      var ps = { open: 0, group: 0, product: 0, done: 0, pay: 0, paid: 0 }, withSteps = rows.filter(function (c) { return c.steps; });
+      withSteps.forEach(function (c) { ["open", "group", "product", "done", "pay"].forEach(function (k) { ps[k] += c.steps[k]; }); ps.paid += c.funnel.booked; });
+      var psteps = [["Pagina geopend", ps.open, "talay.io/b/ bezocht"], ["Groep gekozen", ps.group], ["Product gekozen", ps.product], ["Klaar geklikt", ps.done, "datum en moment gekozen"], ["Op betalen geklikt", ps.pay], ["Betaald", ps.paid, "voorschot betaald"]];
+      h += '<div class="card sec"><h2>Boekingspagina: waar haken duikers af?</h2>' + (!d.stepsReady ? '<p class="muted">Nog geen metingen: maak in Airtable de tabel <b>Page steps</b> (velden Slug, Visit, Step, Lead, Lang).</p>' : !ps.open ? '<p class="muted">Nog geen bezoeken gemeten in deze periode.</p>' :
+        '<div class="fun">' + psteps.map(function (x, i) {
+          return '<div class="st"><b>' + nf.format(x[1]) + "</b><span>" + x[0] + '</span><i><em style="width:' + Math.max(2, Math.round(x[1] / ps.open * 100)) + '%"></em></i><small>' +
+            (i ? pct(x[1], psteps[i - 1][1]) + " van de stap ervoor" : esc(x[2])) + "</small></div>";
+        }).join("") + "</div>" +
+        '<table class="t" style="margin-top:12px"><thead><tr><th>Center</th><th class="n">Geopend</th><th class="n">Groep</th><th class="n">Product</th><th class="n">Klaar</th><th class="n">Betalen</th><th class="n">Betaald</th></tr></thead><tbody>' +
+        withSteps.filter(function (c) { return c.steps.open; }).map(function (c) {
+          return '<tr><td class="nm"><b>' + esc(c.name) + "</b></td>" + ["open", "group", "product", "done", "pay"].map(function (k) { return '<td class="n">' + nf.format(c.steps[k]) + "</td>"; }).join("") + '<td class="n">' + nf.format(c.funnel.booked) + "</td></tr>";
+        }).join("") + "</tbody></table>") + "</div>";
       h += '<div class="kpis sec">' + kpi("Conversie", pct(t.booked, t.conversations), '<span class="d">gesprek → boeking</span>') +
         kpi("Buiten kantooruren", nf.format(t.outsideHours), '<span class="d">' + pct(t.outsideHours, t.conversations) + " van de gesprekken</span>") +
         kpi("Geboekt na follow-up", nf.format(t.afterFollowUp), '<span class="d">zonder follow-up gemist</span>') +
