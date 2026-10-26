@@ -326,7 +326,12 @@ const T_BOOK = {
     via: "Secure booking via Talay",
     reviews: (n) => `${n} Google reviews`,
     activity: "What would you like to do?",
-    groups: { fun: "Fun dives", course: "Courses", pack: "Packages" },
+    groups: { new: ["New to diving", "Try it or get your first certificate"], cert: ["Certified", "Fun dives and a refresh"], up: ["Level up", "Your next course"] },
+    refreshTip: "Last dive more than a year ago? Start with a Refresh.",
+    clash: (d, a) => `On ${d} you already have ${a}. That's fine if it's for someone else; otherwise choose another day.`,
+    prevWeek: "Previous week", nextWeek: "Next week",
+    bookingNo: "Booking number",
+    choosePrice: "Choose an activity above to see the price.",
     perDiver: "per diver",
     infoTitle: "What's included",
     dives: (n) => `${n} dives`,
@@ -366,7 +371,12 @@ const T_BOOK = {
     via: "Réservation sécurisée via Talay",
     reviews: (n) => `${n} avis Google`,
     activity: "Que souhaitez-vous faire ?",
-    groups: { fun: "Plongées loisir", course: "Formations", pack: "Forfaits" },
+    groups: { new: ["Jamais plongé", "Essayer ou passer un premier niveau"], cert: ["Je suis certifié", "Plongées loisir et remise à niveau"], up: ["Progresser", "Votre prochaine formation"] },
+    refreshTip: "Dernière plongée il y a plus d'un an ? Commencez par un Refresh.",
+    clash: (d, a) => `Le ${d}, vous avez déjà ${a}. Pas de souci si c'est pour quelqu'un d'autre ; sinon, choisissez un autre jour.`,
+    prevWeek: "Semaine précédente", nextWeek: "Semaine suivante",
+    bookingNo: "Numéro de réservation",
+    choosePrice: "Choisissez une activité ci-dessus pour voir le prix.",
     perDiver: "par plongeur",
     infoTitle: "Ce qui est inclus",
     dives: (n) => `${n} plongées`,
@@ -406,7 +416,12 @@ const T_BOOK = {
     via: "Sichere Buchung über Talay",
     reviews: (n) => `${n} Google-Bewertungen`,
     activity: "Was möchtest du machen?",
-    groups: { fun: "Fun Dives", course: "Kurse", pack: "Pakete" },
+    groups: { new: ["Noch nie getaucht", "Ausprobieren oder ersten Tauchschein machen"], cert: ["Ich habe einen Tauchschein", "Fun Dives und Auffrischung"], up: ["Weiterlernen", "Dein nächster Kurs"] },
+    refreshTip: "Letzter Tauchgang vor mehr als einem Jahr? Beginne mit einem Refresh.",
+    clash: (d, a) => `Am ${d} hast du schon ${a}. Kein Problem, wenn es für jemand anderen ist; sonst wähle einen anderen Tag.`,
+    prevWeek: "Vorherige Woche", nextWeek: "Nächste Woche",
+    bookingNo: "Buchungsnummer",
+    choosePrice: "Wähle oben eine Aktivität, um den Preis zu sehen.",
     perDiver: "pro Taucher",
     infoTitle: "Was inklusive ist",
     dives: (n) => `${n} Tauchgänge`,
@@ -446,7 +461,12 @@ const T_BOOK = {
     via: "Reserva segura a través de Talay",
     reviews: (n) => `${n} reseñas de Google`,
     activity: "¿Qué te gustaría hacer?",
-    groups: { fun: "Fun dives", course: "Cursos", pack: "Paquetes" },
+    groups: { new: ["Nunca he buceado", "Pruébalo o saca tu primera titulación"], cert: ["Tengo titulación", "Fun dives y repaso"], up: ["Seguir aprendiendo", "Tu próximo curso"] },
+    refreshTip: "¿Tu última inmersión fue hace más de un año? Empieza con un Refresh.",
+    clash: (d, a) => `El ${d} ya tienes ${a}. No pasa nada si es para otra persona; si no, elige otro día.`,
+    prevWeek: "Semana anterior", nextWeek: "Semana siguiente",
+    bookingNo: "Número de reserva",
+    choosePrice: "Elige una actividad arriba para ver el precio.",
     perDiver: "por buceador",
     infoTitle: "Qué incluye",
     dives: (n) => `${n} inmersiones`,
@@ -486,7 +506,12 @@ const T_BOOK = {
     via: "Veilig boeken via Talay",
     reviews: (n) => `${n} Google-reviews`,
     activity: "Wat wil je doen?",
-    groups: { fun: "Fun dives", course: "Opleidingen", pack: "Pakketten" },
+    groups: { new: ["Nog nooit gedoken", "Probeer het of haal je eerste brevet"], cert: ["Ik heb een brevet", "Duiktrips en een opfrisduik"], up: ["Verder leren", "Je volgende opleiding"] },
+    refreshTip: "Laatste duik meer dan een jaar geleden? Begin met een Refresh.",
+    clash: (d, a) => `Op ${d} heb je al ${a}. Geen probleem als dit voor iemand anders is; anders kies je een andere dag.`,
+    prevWeek: "Vorige week", nextWeek: "Volgende week",
+    bookingNo: "Boekingsnummer",
+    choosePrice: "Kies hierboven een activiteit om de prijs te zien.",
     perDiver: "per duiker",
     infoTitle: "Wat is inbegrepen",
     dives: (n) => `${n} duiken`,
@@ -635,7 +660,7 @@ export default {
       const ref = (url.searchParams.get("c") || "").slice(0, 64);
       const taken = await takenSeats(env, ctx, found.center, found.products.filter((p) => p["Active"]));
       return page(bookingPage(found.center, found.products, slug, env, lang,
-        /^[A-Za-z0-9_-]{1,64}$/.test(ref) ? ref : "", linkItems(url), taken), 200, lang, T[lang].pageTitle, true);
+        /^[A-Za-z0-9_-]{1,64}$/.test(ref) ? ref : "", linkItems(url), taken), 200, lang, T[lang].pageTitle, true, "sea");
     } catch (err) {
       console.error(err);
       return page(problem(T[lang].loadFail, lang), 502, lang);
@@ -826,7 +851,7 @@ async function orderInfo(env, ctx, url) {
     return {
       item: i + 1, product_code: x.code, product_name: first(p["Name"]) || m.product_name || x.code,
       shown: tr(p, "Name", lang).v || first(p["Name"]) || m.product_name || x.code,
-      activity_date: x.date, time_slot: SLOT_EN[x.slot] || "", divers: x.divers,
+      activity_date: x.date, days: productDays(p), time_slot: SLOT_EN[x.slot] || "", divers: x.divers,
       total_thb: x.price * x.divers, deposit_thb: x.deposit * x.divers, balance_thb: (x.price - x.deposit) * x.divers,
     };
   });
@@ -835,18 +860,19 @@ async function orderInfo(env, ctx, url) {
   const firstName = cap(String(payer).trim().split(/\s+/)[0] || "");
   const when = (x, l, lower = false) => {
     const slot = { Morning: T[l].am, Afternoon: T[l].pm, "Full day": T[l].day }[x.time_slot] || "";
-    return [fmtDate(x.activity_date, l), lower ? slot.toLowerCase() : slot].filter(Boolean).join(", ");
+    return [fmtDays(x.activity_date, x.days, l), lower ? slot.toLowerCase() : slot].filter(Boolean).join(", ");
   };
+  const ref = await orderRef(id);
   // One WhatsApp for the whole order (Make sends it after the last booking). Empty for a single booking:
   // Make then uses Bookings → Confirm text, as before (ifempty in Respond.io 15).
   const confirm = items.length < 2 ? "" : [
-    firstName ? t.confirmHi(firstName) : t.confirmHiNo, "",
+    firstName ? t.confirmHi(firstName) : t.confirmHiNo, `${t.bookingNo}: ${ref}`, "",
     ...[...items].sort((x, y) => x.activity_date.localeCompare(y.activity_date))
       .map((x) => `• ${x.shown}, ${when(x, lang, lang !== "de")}, ${diversLabel(x.divers, lang)}`), "",
     t.confirmPaid(thb(paid, lang)), t.confirmShop(thb(total - paid, lang)), "", t.confirmEnd,
   ].join("\n");
   const centerText = [
-    `New booking via Talay (${items.length} ${items.length === 1 ? "activity" : "activities"})`,
+    `New booking via Talay (${items.length} ${items.length === 1 ? "activity" : "activities"}), booking number ${ref}`,
     `Diver: ${payer || "-"} ${s.customer_details?.phone || ""}`.trim(), "",
     ...items.map((x) => `- ${x.product_name}: ${when(x, "en")}, ${diversLabel(x.divers, "en")}. Paid online ${thb(x.deposit_thb)} THB, at the shop ${thb(x.balance_thb)} THB.`),
     "", `Total paid online: ${thb(paid)} THB. To collect at the shop: ${thb(total - paid)} THB.`,
@@ -854,7 +880,7 @@ async function orderInfo(env, ctx, url) {
   ].join("\n");
   return json({
     session_id: id, paid: s.payment_status === "paid", center_slug: m.center_slug || "", center_name: m.center_name || "",
-    lead_ref: m.lead_ref || "", lang, note: m.note || "", payer_name: payer, payer_phone: s.customer_details?.phone || "",
+    order_ref: ref, lead_ref: m.lead_ref || "", lang, note: m.note || "", payer_name: payer, payer_phone: s.customer_details?.phone || "",
     count: items.length, total_thb: total, deposit_thb: paid, balance_thb: total - paid,
     items: items.map(({ shown, ...x }) => x), confirm, center_text: centerText,
   });
@@ -881,10 +907,12 @@ async function thanks(request, env, ctx, url) {
   const items = orderItems(m).sort((a, b) => a.date.localeCompare(b.date)).map((x) => {
     const p = byCode(x.code);
     const english = first(p["Name"]) || m.product_name || x.code;
-    return { ...x, p, name: tr(p, "Name", lang).v || english, checkIn: cap(tr(p, "Check-in", lang).v),
+    return { ...x, p, days: productDays(p), name: tr(p, "Name", lang).v || english, checkIn: cap(tr(p, "Check-in", lang).v),
       isCourse: x.code === "OW" || /course|diver/i.test(english) };
   });
-  const checkIns = [...new Set(items.map((x) => x.checkIn).filter(Boolean))];
+  // Check-in per activity, with its name above it (once per product).
+  const checkIns = items.filter((x, i) => x.checkIn && items.findIndex((y) => y.code === x.code) === i);
+  const ref = await orderRef(id);
   const slotWord = { AM: t.am, PM: t.pm, DAY: t.day };
 
   return page(`
@@ -894,7 +922,8 @@ async function thanks(request, env, ctx, url) {
 </header>
 <main>
   <h1>${esc(t.booked)}</h1>
-  <ul class="booked">${items.map((x) => `<li><strong>${esc(x.name)}</strong>, ${esc(fmtDate(x.date, lang))}${slotWord[x.slot] ? `, ${esc(lang === "de" ? slotWord[x.slot] : slotWord[x.slot].toLowerCase())}` : ""}, ${esc(diversLabel(x.divers, lang))}</li>`).join("")}</ul>
+  <p class="oref">${esc(t.bookingNo)} <b>${esc(ref)}</b></p>
+  <ul class="booked">${items.map((x) => `<li><strong>${esc(x.name)}</strong>, ${esc(fmtDays(x.date, x.days, lang))}${slotWord[x.slot] ? `, ${esc(lang === "de" ? slotWord[x.slot] : slotWord[x.slot].toLowerCase())}` : ""}, ${esc(diversLabel(x.divers, lang))}</li>`).join("")}</ul>
   <section class="slate" aria-label="${esc(t.paidNow)}">
     <div class="above">
       <div class="row now"><span>${esc(t.paidNow)}</span><span><b>${thb(Number(m.deposit_thb), lang)}</b> THB</span></div>
@@ -910,14 +939,14 @@ async function thanks(request, env, ctx, url) {
   <h2 class="next">${esc(t.nextTitle)}</h2>
   ${items.some((x) => x.isCourse) ? `<p class="course">${esc(t.courseNote)}</p>` : ""}
   <dl class="practical">
-    ${checkIns.length ? `<div><dt>${esc(t.checkIn)}</dt><dd>${checkIns.map(esc).join("<br>")}</dd></div>` : ""}
+    ${checkIns.length ? `<div><dt>${esc(t.checkIn)}</dt><dd>${checkIns.map((x) => (checkIns.length > 1 || items.length > 1 ? `<b>${esc(x.name)}</b>: ` : "") + esc(x.checkIn)).join("<br>")}</dd></div>` : ""}
     ${meeting ? `<div><dt>${esc(t.meeting)}</dt><dd>${esc(meeting)}${mapLink(c, m.center_name, first(c["Island"]) || "", t)}</dd></div>` : ""}
     <div><dt>${esc(t.bring)}</dt><dd>${esc(t.bringText)}</dd></div>
   </dl>
   <p class="hint" style="margin-top:2rem">${esc(t.questions(assistant))}</p>
   ${chat ? `<a class="book chat" href="${esc(chat)}">${esc(t.backToChat)}</a>` : ""}
 </main>
-<script>try{localStorage.removeItem(${JSON.stringify(`talay-b:${m.center_slug || ""}:${m.lead_ref || "-"}`).replace(/</g, "\\u003c")})}catch(e){}</script>`, 200, lang);
+<script>try{localStorage.removeItem(${JSON.stringify(`talay-b:${m.center_slug || ""}:${m.lead_ref || "-"}`).replace(/</g, "\\u003c")})}catch(e){}</script>`, 200, lang, "", false, "sea");
 }
 
 // ---------- Manage booking (for the dive center) ----------
@@ -1197,7 +1226,8 @@ function plusDays(iso, days) {
 // Optional Airtable fields (the page shows less when they are empty):
 //   Products: Time slot ("Morning or afternoon", "Morning", "Afternoon", "Full day"), Days (number),
 //             Max group (number), Dives (number), Max depth, Level (+ FR/DE/ES/NL), Bring (+ FR/DE/ES/NL),
-//             Not included (+ FR/DE/ES/NL), Short (label in the plan, default the Code), Group (Fun dive/Course/Package)
+//             Not included (+ FR/DE/ES/NL), Short (label in the plan, default the Code),
+//             Group (who it is for: New, Certified and/or Level up; several allowed), Max per day (number)
 //   Centers:  Photos (first one on top), Google rating, Google reviews, Closed dates (2026-12-24, 2026-12-25),
 //             Timezone (default Asia/Bangkok), Multi booking (checkbox: "Book another one" and one payment for all)
 
@@ -1219,11 +1249,18 @@ function productDays(p) {
   const m = String(first(p["Duration"]) || "").match(/(\d+)\s*(?:-\s*\d+\s*)?days?\b/i);
   return m ? Math.min(Math.max(Number(m[1]), 1), 14) : 1;
 }
-function productGroup(p) {
-  const v = `${first(p["Group"]) || ""} ${first(p["Category"]) || ""} ${first(p["Name"]) || ""}`;
-  if (/package|pack\b|pakket|\d+\s*-?\s*pack/i.test(v)) return "pack";
-  if (/fun ?dive/i.test(first(p["Group"]) || first(p["Category"]) || "")) return "fun";
-  return "course";
+// Who the activity is for: "new" (never dived), "cert" (certified: fun dives, refresh), "up" (next course).
+// Products → Group (New, Certified, Level up; several allowed). Empty: guessed from code, name and category.
+const GROUPS = ["new", "cert", "up"];
+function productGroups(p) {
+  const set = [].concat(p["Group"] || []).join(",").toLowerCase();
+  const out = GROUPS.filter((g) => ({ new: /new|beginner/, cert: /certif/, up: /level|advanc/ })[g].test(set));
+  if (out.length) return out;
+  const v = `${first(p["Code"]) || ""} ${first(p["Name"]) || ""} ${first(p["Category"]) || ""}`.toLowerCase();
+  if (/refresh|review/.test(v)) return ["cert"];
+  const fun = /fun ?dive|dive trip|package|\bpack\b|\d+\s*-?\s*pack/.test(v);
+  if (/advanced|\baow\b|rescue|special|deep|nitrox|wreck|night|navigation|buoyancy|adventure|divemaster|\bdds\b/.test(v)) return fun ? ["cert", "up"] : ["up"];
+  return fun || /\bfun\b/.test(v) ? ["cert"] : ["new"];
 }
 const SLOT_EN = { AM: "Morning", PM: "Afternoon", DAY: "Full day", "": "" };
 
@@ -1295,7 +1332,8 @@ function productView(p, c, lang) {
   return {
     code,
     name: tr(p, "Name", lang).v || first(p["Name"]) || code,
-    group: productGroup(p),
+    groups: productGroups(p),
+    refresh: /refresh|review/i.test(`${first(p["Code"]) || ""} ${first(p["Name"]) || ""} ${first(p["Category"]) || ""}`),
     price: num(p["Price THB"]),
     deposit: num(p["Deposit THB"]),
     slot, days,
@@ -1356,10 +1394,10 @@ function bookingPage(c, products, slug, env, lang, ref, wanted, taken = {}) {
   const testMode = key.startsWith("sk_test_");
   const multi = !!c["Multi booking"];
 
-  const order = { fun: 0, course: 1, pack: 2 };
+  // Within a group: Refresh first, then short and cheap before long and expensive.
   const views = products.filter((p) => p["Active"]).map((p) => productView(p, c, lang))
     .filter((p) => p.code && p.price > 0)
-    .sort((a, b) => order[a.group] - order[b.group] || a.price - b.price);
+    .sort((a, b) => b.refresh - a.refresh || a.days - b.days || a.price - b.price);
   const known = new Set(views.map((p) => p.code));
   const unknown = wanted.filter((w) => !known.has(w.code)).map((w) => {
     const p = products.find((x) => String(first(x["Code"]) || "").toUpperCase() === w.code);
@@ -1372,12 +1410,13 @@ function bookingPage(c, products, slug, env, lang, ref, wanted, taken = {}) {
   const data = {
     lang, locale: LOCALES[lang], sep: SEP[lang] ?? ",", max: MAX_DIVERS, maxItems: MAX_ITEMS,
     payments: !!key, multi, slug, ref, init, products: views,
-    maxDate: plusDays(today, 180), closed: closedDates(c), full: fullDates(c, today), taken,
+    now: plusDays(today, -1), maxDate: plusDays(today, 180), closed: closedDates(c), full: fullDates(c, today), taken,
     s: {
       diver: t.diver, divers: t.divers, chooseDate: t.chooseDate, chooseActivity: t.chooseActivity, chooseSlot: t.chooseSlot,
       tooSoon: t.tooSoon("{d}"), tooFar: t.tooFar(assistant), notOpen: t.notOpen, dayFull: t.dayFull, slotFull: t.slotFull, noPay: t.noPay(assistant),
       opening: t.opening, wrong: t.wrong, noConn: t.noConn, fixFirst: t.fixFirst, tooMany: t.tooMany,
-      groups: t.groups, perDiver: t.perDiver, infoTitle: t.infoTitle,
+      groups: t.groups, refreshTip: t.refreshTip, clash: t.clash("{d}", "{a}"), prevWeek: t.prevWeek, nextWeek: t.nextWeek,
+      choosePrice: t.choosePrice, perDiver: t.perDiver, infoTitle: t.infoTitle,
       info: { dives: t.infoDives, depth: t.infoDepth, duration: t.infoDuration, level: t.infoFor, inc: t.infoInc, not: t.infoNot, bring: t.infoBring, checkIn: t.checkIn },
       bringDefault: t.bringText, groupNote: t.groupNote, group: t.group(assistant),
       diversLabel: t.diversLabel, less: t.less, more: t.more, date: t.date, startDate: t.startDate,
@@ -1412,7 +1451,6 @@ ${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
   ${unknown.map((n) => `<p class="warn">${esc(t.unknown(n))}</p>`).join("")}
   <div id="items"></div>
   <button type="button" id="another" class="another" hidden><span aria-hidden="true">＋</span> ${esc(t.another)}</button>
-  <div id="overlap" class="warn" role="status" hidden></div>
 </div>
 
 <aside class="plan" aria-label="${esc(t.overview)}">
@@ -1421,7 +1459,8 @@ ${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
 </aside>
 
 <div class="bottom">
-  <section class="slate" aria-label="${esc(t.payNow)}">
+  <p id="choose" class="hint choose">${esc(t.choosePrice)}</p>
+  <section class="slate" id="pay" aria-label="${esc(t.payNow)}" hidden>
     <div class="above">
       <div id="lines"></div>
       <div class="row total"><span>${esc(t.totalAll)}</span><span><b id="total">0</b> THB</span></div>
@@ -1446,9 +1485,12 @@ ${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
     <ul>${t.policy.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
   </section>
 
-  <button type="button" id="book" class="book">${esc(t.btn[0])}<span id="btn-amount">0</span>${esc(t.btn[1])}</button>
-  <p id="msg" class="msg" role="status" hidden></p>
-  <p class="terms"><span class="lock" aria-hidden="true">🔒</span> ${esc(t.secure)} ${esc(t.terms[0])}<a href="${termsUrl(lang)}" target="_blank" rel="noopener">${esc(t.terms[1])}</a></p>
+  <div id="overlap" class="warn" role="status" hidden></div>
+  <div id="payb" hidden>
+    <button type="button" id="book" class="book">${esc(t.btn[0])}<span id="btn-amount">0</span>${esc(t.btn[1])}</button>
+    <p id="msg" class="msg" role="status" hidden></p>
+    <p class="terms"><span class="lock" aria-hidden="true">🔒</span> ${esc(t.secure)} ${esc(t.terms[0])}<a href="${termsUrl(lang)}" target="_blank" rel="noopener">${esc(t.terms[1])}</a></p>
+  </div>
 
   ${meeting ? `<dl class="practical small">
     <div><dt>${esc(t.meeting)}</dt><dd>${esc(meeting)}${mapLink(c, centerName, island, t)}</dd></div>
@@ -1477,7 +1519,11 @@ const BOOK_JS = String.raw`
   const hover = window.matchMedia && window.matchMedia("(hover: hover)").matches;
   const KEY = "talay-b:" + d.slug + ":" + (d.ref || "-");
   let uid = 0;
-  const mk = (x) => ({ id: ++uid, code: x.code || "", n: x.n || 1, date: x.date || "", slot: x.slot || "", open: true, pick: !x.code, err: "", month: "" });
+  const mk = (x) => ({ id: ++uid, code: x.code || "", n: x.n || 1, date: x.date || "", slot: x.slot || "", open: true, pick: !x.code, err: "", month: "",
+    grp: x.code && P[x.code] ? P[x.code].groups[0] : "" });
+  const GROUPS = ["new", "cert", "up"].filter((g) => d.products.some((p) => p.groups.indexOf(g) >= 0));
+  const monday = (iso) => addDays(iso, -((new Date(iso + "T00:00:00Z").getUTCDay() + 6) % 7));
+  let planStart = monday(d.now);
 
   // The plan on this phone (same chat link, last 3 days) plus what the link brings, without doubles.
   let items = [], note = "";
@@ -1575,10 +1621,13 @@ const BOOK_JS = String.raw`
     let h = '<section class="item open' + (it.err ? " bad" : "") + '" data-id="' + it.id + '"><div class="ihead"><h2>' + esc(fill(s.bookingN, "n", i + 1)) + "</h2>" +
       (items.length > 1 ? '<button type="button" class="linkbtn" data-remove>' + esc(s.remove) + "</button>" : "") + "</div>";
     if (it.pick || !p) {
-      ["fun", "course", "pack"].forEach((g) => {
-        const list = d.products.filter((x) => x.group === g);
-        if (list.length) h += '<p class="glabel">' + esc(s.groups[g]) + '</p><div class="acts">' + list.map((x) => actCard(x, it)).join("") + "</div>";
-      });
+      // First who the diver is (three cards, all closed), then the activities of that group.
+      h += '<div class="grps" role="group">' + GROUPS.map((g) => '<button type="button" class="grp' + (it.grp === g ? " on" : "") + '" data-grp="' + g + '" aria-pressed="' + (it.grp === g) + '"><b>' +
+        esc(s.groups[g][0]) + "</b><span>" + esc(s.groups[g][1]) + "</span></button>").join("") + "</div>";
+      if (it.grp) {
+        const list = d.products.filter((x) => x.groups.indexOf(it.grp) >= 0);
+        h += '<div class="acts">' + list.map((x) => actCard(x, it) + (it.grp === "cert" && x.refresh ? '<p class="tip">' + esc(s.refreshTip) + "</p>" : "")).join("") + "</div>";
+      }
     } else {
       h += '<div class="acts">' + actCard(p, it) + '</div><button type="button" class="linkbtn change" data-repick>' + esc(s.edit) + "</button>";
     }
@@ -1588,7 +1637,8 @@ const BOOK_JS = String.raw`
         (p.maxGroup && it.n > p.maxGroup ? '<p class="note-orange">' + esc(s.groupNote) + "</p>" : "") +
         (it.n >= d.max ? '<p class="hint">' + esc(s.group) + "</p>" : "") + "</div>";
       h += '<div class="field"><span class="lbl">' + esc(p.days > 1 ? s.startDate : s.date) +
-        (it.date ? ' <span class="chosen">' + esc(fmt(it.date, { weekday: "long", day: "numeric", month: "long" })) + (p.days > 1 ? " → " + esc(fmt(addDays(it.date, p.days - 1))) : "") + "</span>" : "") + "</span>" + calHtml(it, p) + "</div>";
+        (it.date ? ' <span class="chosen">' + esc(fmt(it.date, { weekday: "long", day: "numeric", month: "long" })) + (p.days > 1 ? " → " + esc(fmt(addDays(it.date, p.days - 1))) : "") + "</span>" : "") + "</span>" + calHtml(it, p) +
+        (clash(it) ? '<p class="note-orange" role="status">' + esc(clashText(clash(it))) + "</p>" : "") + "</div>";
       if (p.slot === "CHOOSE") {
         h += '<div class="field"><span class="lbl">' + esc(s.slotLabel) + '</span><div class="slots">' +
           ["AM", "PM"].map((k) => {
@@ -1598,21 +1648,56 @@ const BOOK_JS = String.raw`
       } else if (p.slot) {
         h += '<p class="hint slotfix">' + esc(slotWord(p.slot)) + (p.days > 1 ? " · " + esc(fill(s.daysN, "n", p.days)) : "") + "</p>";
       }
-      h += (it.err ? '<p class="error" role="alert">' + esc(it.err) + "</p>" : "") + '<button type="button" class="done" data-done>' + esc(s.done) + "</button>";
+      const pr = problem(it);
+      h += (it.err ? '<p class="error" role="alert">' + esc(it.err) + "</p>" : "") + '<button type="button" class="done" data-done' + (pr ? " disabled" : "") + ">" + esc(s.done) + "</button>" +
+        (pr && !it.err ? '<p class="hint">' + esc(pr) + "</p>" : "");
     } else if (it.err) {
       h += '<p class="error" role="alert">' + esc(it.err) + "</p>";
     }
     return h + "</section>";
   }
+  // A course of several days: "30–31 Oct", else "30 Oct".
+  function span(iso, days) {
+    const dm = (x) => fmt(x, { day: "numeric", month: "short" });
+    if (!(days > 1)) return dm(iso);
+    const end = addDays(iso, days - 1);
+    return iso.slice(0, 7) === end.slice(0, 7) && /^\d/.test(dm(iso)) ? String(Number(iso.slice(8))) + (d.lang === "de" ? "." : "") + "–" + dm(end) : dm(iso) + " – " + dm(end);
+  }
+  // Two bookings on the same day and the same part of it (or one takes the whole day).
+  function parts(it) {
+    const p = P[it.code];
+    if (!p || !it.date) return [];
+    const k = slotOf(it), part = p.days > 1 || k === "DAY" ? "day" : k === "AM" ? "am" : k === "PM" ? "pm" : "any";
+    const out = [];
+    for (let j = 0; j < p.days; j++) out.push({ day: addDays(it.date, j), part: part });
+    return out;
+  }
+  function clash(it) {
+    const mine = parts(it);
+    for (const o of items) {
+      if (o === it) continue;
+      for (const a of mine) for (const b of parts(o)) {
+        if (a.day === b.day && (a.part === "day" || b.part === "day" || a.part === b.part)) return { day: a.day, other: o, part: b.part };
+      }
+    }
+    return null;
+  }
+  function clashText(c) {
+    const w = { day: s.day, am: s.am, pm: s.pm }[c.part];
+    const what = P[c.other.code].name + (w ? " (" + (d.lang === "de" ? w : w.toLowerCase()) + ")" : "");
+    return fill(fill(s.clash, "d", fmt(c.day, { weekday: "short", day: "numeric", month: "short" })), "a", what);
+  }
+
   // ---- one booking, folded to one line ----
   function lineText(it) {
     const p = P[it.code];
     if (!p) return s.chooseActivity;
-    return [it.n + " p", p.name, it.date ? fmt(it.date, { day: "numeric", month: "short" }) : "", slotWord(slotOf(it)), f(p.deposit * it.n) + " THB " + s.depositWord].filter(Boolean).join(" · ");
+    return [it.n + " p", p.name, it.date ? span(it.date, p.days) : "", slotWord(slotOf(it)), f(p.deposit * it.n) + " THB " + s.depositWord].filter(Boolean).join(" · ");
   }
   function lineHtml(it) {
     return '<section class="item line' + (it.err ? " bad" : "") + '" data-id="' + it.id + '"><button type="button" class="lbtn" data-edit><span>' + esc(lineText(it)) + '</span><span class="pen">' + esc(s.edit) + "</span></button>" +
-      '<button type="button" class="x" data-remove aria-label="' + esc(s.remove) + '">×</button>' + (it.err ? '<p class="error">' + esc(it.err) + "</p>" : "") + "</section>";
+      '<button type="button" class="x" data-remove aria-label="' + esc(s.remove) + '">×</button>' + (it.err ? '<p class="error">' + esc(it.err) + "</p>" : "") +
+      (!it.err && clash(it) ? '<p class="lwarn">' + esc(clashText(clash(it))) + "</p>" : "") + "</section>";
   }
 
   // ---- plan on the right: mornings and afternoons per day ----
@@ -1629,32 +1714,42 @@ const BOOK_JS = String.raw`
     });
     return occ;
   }
+  // Three weeks from this week (Monday first), with arrows per week. While a booking is open,
+  // the day it clashes on gets an orange border.
   function renderPlan(occ) {
-    const days = Object.keys(occ).sort();
-    if (!days.length) { $("plan").innerHTML = '<p class="hint">' + esc(s.overviewEmpty) + "</p>"; return; }
-    const monday = (iso) => addDays(iso, -((new Date(iso + "T00:00:00Z").getUTCDay() + 6) % 7));
-    let start = monday(days[0]);
-    const last = days[days.length - 1];
-    let end = addDays(monday(last), 6);
-    if (end > addDays(start, 41)) end = addDays(start, 41);
-    let h = '<div class="pgrid">';
+    const open = items.find((x) => x.open);
+    const hot = open && clash(open) ? clash(open).day : "";
+    const last = addDays(planStart, 20);
+    let h = '<div class="pnav"><button type="button" data-week="-1" aria-label="' + esc(s.prevWeek) + '"' + (planStart <= monday(d.now) ? " disabled" : "") + ">‹</button><b>" +
+      esc(fmt(planStart, { day: "numeric", month: "short" }) + " – " + fmt(last, { day: "numeric", month: "short" })) +
+      '</b><button type="button" data-week="1" aria-label="' + esc(s.nextWeek) + '"' + (last >= d.maxDate ? " disabled" : "") + ">›</button></div>";
+    h += '<div class="pgrid">';
     for (let w = 0; w < 7; w++) h += '<span class="wd">' + esc(fmt(addDays("2024-01-01", w), { weekday: "short" })) + "</span>";
-    for (let day = start; day <= end; day = addDays(day, 1)) {
+    for (let day = planStart; day <= last; day = addDays(day, 1)) {
       const e = occ[day] || [];
       const chip = (x) => '<i class="' + x.part + '">' + esc(x.lbl) + "</i>";
       const full = e.filter((x) => x.part === "day");
       const am = e.filter((x) => x.part === "am" || x.part === "any"), pm = e.filter((x) => x.part === "pm");
-      h += '<div class="pday' + (e.length ? " busy" : "") + '"><b>' + esc(fmt(day, { day: "numeric", month: day.slice(8) === "01" || day === start ? "short" : undefined })) + "</b>" +
+      h += '<div class="pday' + (e.length ? " busy" : "") + (day === hot ? " hot" : "") + (day < d.now ? " past" : "") + '"><b>' +
+        esc(fmt(day, { day: "numeric", month: day.slice(8) === "01" || day === planStart ? "short" : undefined })) + "</b>" +
         (full.length ? '<div class="pfull">' + full.map(chip).join("") + "</div>" : "") +
         (am.length || pm.length || !full.length ? '<div class="pam">' + am.map(chip).join("") + '</div><div class="ppm">' + pm.map(chip).join("") + "</div>" : "") + "</div>";
     }
     $("plan").innerHTML = h + "</div>";
   }
-  function overlaps(occ) {
-    return Object.keys(occ).sort().filter((day) => {
-      const e = occ[day], n = (k) => e.filter((x) => x.part === k).length;
-      return (n("day") && e.length > 1) || n("am") > 1 || n("pm") > 1;
+  // Every clash once, for the bottom of the page (after "Done").
+  function clashes() {
+    const seen = {}, out = [];
+    items.forEach((it) => {
+      if (it.open) return;
+      const c = clash(it);
+      if (!c || c.other.open) return;
+      const k = c.day + [it.id, c.other.id].sort().join("-");
+      if (seen[k]) return;
+      seen[k] = 1;
+      out.push(clashText(c));
     });
+    return out;
   }
 
   function totals() {
@@ -1664,8 +1759,12 @@ const BOOK_JS = String.raw`
       const p = P[it.code];
       if (!p) return;
       total += p.price * it.n; dep += p.deposit * it.n;
-      if (items.length > 1) lines.push('<div class="row sub"><span>' + esc(it.n + " × " + p.name) + "</span><span>" + f(p.deposit * it.n) + " THB</span></div>");
+      lines.push('<div class="row sub"><span>' + esc(it.n + " × " + p.name) + "</span><span>" + f(p.deposit * it.n) + " THB " + esc(s.depositWord) + "</span></div>");
     });
+    // Nothing chosen yet: no total of 0 THB and no pay button.
+    const any = items.some((x) => P[x.code]);
+    $("pay").hidden = !any; $("payb").hidden = !any;
+    $("choose").hidden = any;
     $("lines").innerHTML = lines.join("");
     $("total").textContent = f(total);
     $("deposit").textContent = f(dep);
@@ -1679,11 +1778,10 @@ const BOOK_JS = String.raw`
 
   function render() {
     $("items").innerHTML = items.map((it, i) => (it.open ? openHtml(it, i) : lineHtml(it))).join("");
-    const occ = occupancy();
-    renderPlan(occ);
-    const ov = overlaps(occ);
+    renderPlan(occupancy());
+    const ov = clashes();
     $("overlap").hidden = !ov.length;
-    $("overlap").innerHTML = ov.map((day) => "<p>" + esc(fill(s.overlap, "d", fmt(day, { weekday: "short", day: "numeric", month: "short" }))) + "</p>").join("");
+    $("overlap").innerHTML = ov.map((x) => "<p>" + esc(x) + "</p>").join("");
     $("another").hidden = !d.multi || items.length >= d.maxItems;
     totals();
     save();
@@ -1717,13 +1815,18 @@ const BOOK_JS = String.raw`
     const b = e.target.closest("button");
     if (!it || !b) return;
     $("msg").hidden = true;
-    if (b.dataset.act) {
+    if (b.dataset.grp) { it.grp = b.dataset.grp; }
+    else if (b.dataset.act) {
       if (it.code !== b.dataset.act) { it.code = b.dataset.act; it.slot = ""; it.month = ""; if (it.date && it.date < P[it.code].minDate) it.date = ""; }
       it.pick = false; it.err = "";
     } else if (b.hasAttribute("data-repick")) { it.pick = true; }
     else if (b.dataset.n) { it.n = Math.min(Math.max(it.n + Number(b.dataset.n), 1), d.max); }
     else if (b.dataset.month) { it.month = b.dataset.month; }
-    else if (b.dataset.day) { it.date = b.dataset.day; it.err = ""; }
+    else if (b.dataset.day) {
+      it.date = b.dataset.day; it.err = "";
+      // Keep the chosen day in sight in the plan.
+      if (it.date < planStart || it.date > addDays(planStart, 20)) planStart = monday(it.date) < monday(d.now) ? monday(d.now) : monday(it.date);
+    }
     else if (b.dataset.slot) { it.slot = b.dataset.slot; it.err = ""; }
     else if (b.hasAttribute("data-done")) {
       const pr = problem(it);
@@ -1738,6 +1841,12 @@ const BOOK_JS = String.raw`
     } else return;
     render();
     if (b.hasAttribute("data-edit") || b.hasAttribute("data-done")) focusItem(it);
+  });
+  $("plan").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-week]");
+    if (!b || b.disabled) return;
+    planStart = addDays(planStart, 7 * Number(b.dataset.week));
+    render();
   });
   $("another").onclick = () => {
     const bad = settle(true);
@@ -1786,6 +1895,20 @@ function fmtDate(iso, lang = "en") {
   return new Date(iso + "T00:00:00Z").toLocaleDateString(LOCALES[lang] || "en-GB",
     { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
 }
+// One day: "Friday 30 October". A course of several days: "30–31 October" or "30 October – 2 November".
+function fmtDays(iso, days, lang = "en") {
+  if (!(days > 1) || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return fmtDate(iso, lang);
+  const end = plusDays(iso, days - 1);
+  const dm = (x) => new Date(x + "T00:00:00Z").toLocaleDateString(LOCALES[lang] || "en-GB", { day: "numeric", month: "long", timeZone: "UTC" });
+  const day = (x) => String(Number(x.slice(8)));
+  return iso.slice(0, 7) === end.slice(0, 7) && /^\d/.test(dm(iso)) ? `${day(iso)}${lang === "de" ? "." : ""}–${dm(end)}` : `${dm(iso)} – ${dm(end)}`;
+}
+// Booking number of one order (one Stripe payment), the same everywhere: "T-7K4M2Q".
+async function orderRef(sessionId) {
+  const buf = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(sessionId))));
+  const abc = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+  return "T-" + Array.from(buf.slice(0, 6), (b) => abc[b % 32]).join("");
+}
 
 // A product switched off in the customer zone (Products → Active) can't be booked online.
 const CLOSED = {
@@ -1819,7 +1942,7 @@ function problem(text, lang) {
   return `<main class="empty"><h1>${esc(T[lang].problemTitle)}</h1><p>${esc(text)}</p></main>`;
 }
 
-function page(body, status = 200, lang = "en", title = "", wide = false) {
+function page(body, status = 200, lang = "en", title = "", wide = false, theme = "") {
   const html = `<!doctype html>
 <html lang="${lang}">
 <head>
@@ -1833,7 +1956,7 @@ function page(body, status = 200, lang = "en", title = "", wide = false) {
 <style>${CSS}</style>
 <!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "d3d4dd17ea1747cbaac3011aa000a493"}'></script><!-- End Cloudflare Web Analytics -->
 </head>
-<body><div class="wrap${wide ? " wide" : ""}">${body}</div></body>
+<body${theme ? ` class="${theme}"` : ""}><div class="wrap${wide ? " wide" : ""}">${body}</div></body>
 </html>`;
   return new Response(html, {
     status,
@@ -2020,5 +2143,115 @@ textarea:focus-visible{outline:3px solid var(--sand);outline-offset:2px}
 .practical.small{font-size:.85rem;gap:.5rem}
 .practical.small div{grid-template-columns:6.5rem 1fr}
 .bottom .slate{margin-top:1.6rem}
+/* Round 2: groups, clash notes, bigger plan */
+.grps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;margin:.2rem 0 .8rem}
+.grp{display:flex;flex-direction:column;gap:.25rem;align-items:flex-start;text-align:left;min-height:5.2rem;padding:.8rem .85rem;border:1px solid var(--line);border-radius:14px;background:var(--shore);font:inherit;color:inherit;cursor:pointer}
+.grp b{font-size:.98rem;line-height:1.2}
+.grp span{font-size:.8rem;line-height:1.3;color:var(--muted)}
+.grp.on{border:2px solid var(--sand);padding:calc(.8rem - 1px) calc(.85rem - 1px)}
+.grp:focus-visible{outline:3px solid var(--sand);outline-offset:2px}
+.tip{margin:-.15rem 0 .2rem .2rem;font-size:.85rem;color:var(--muted)}
+.lwarn{width:100%;margin:0 1rem .7rem;font-size:.85rem;color:#7A4A00}
+.done:disabled{opacity:.4;cursor:not-allowed}
+.done:disabled:hover{background:var(--deep)}
+.choose{margin:1.6rem 0 0}
+.oref{margin:-.2rem 0 1rem;color:var(--muted)}
+.oref b{color:var(--ink);letter-spacing:.04em}
+.bottom #overlap{margin:0 0 1rem}
+.pnav{display:flex;justify-content:space-between;align-items:center;margin:0 0 .5rem}
+.pnav b{font-size:.85rem;font-weight:600}
+.pnav button{width:2.2rem;height:2.2rem;border:0;border-radius:999px;background:none;font:inherit;font-size:1.3rem;color:inherit;cursor:pointer}
+.pnav button:disabled{opacity:.3;cursor:default}
+.pgrid{gap:4px}
+.pday{min-height:5.4rem;padding:3px;font-size:.72rem;border-radius:8px}
+.pday b{font-size:.74rem}
+.pday i{font-size:.7rem;padding:1px 3px}
+.pam,.ppm{min-height:1.6rem}
+.pday.past{opacity:.45}
+.pday.hot{box-shadow:inset 0 0 0 2px #E8963A}
+@media (min-width:900px){
+  .wrap.wide{max-width:72rem}
+  .layout{grid-template-columns:minmax(0,1fr) 27rem}
+}
+@media (max-width:480px){.grps{gap:.35rem}.grp{padding:.65rem .6rem;min-height:4.8rem}.grp b{font-size:.88rem}.grp span{font-size:.74rem}}
+
+/* Underwater style (booking page and thanks page): teal at the top, navy at the bottom, so the page gets
+   darker as you scroll; light rays and a thin wave only at the top. Text stays high contrast. */
+body.sea{position:relative;min-height:100vh;color:#F7F3EA;background:linear-gradient(180deg,#1C6E7D 0%,#155868 30%,#0F4655 60%,#09262F 88%) #09262F}
+body.sea::before{content:"";position:absolute;left:0;right:0;top:0;height:640px;pointer-events:none;background:repeating-linear-gradient(110deg,rgba(255,255,255,0) 0 70px,rgba(255,255,255,.07) 70px 110px,rgba(255,255,255,0) 110px 190px,rgba(255,255,255,.05) 190px 210px,rgba(255,255,255,0) 210px 300px);-webkit-mask-image:linear-gradient(180deg,#000 0%,transparent 100%);mask-image:linear-gradient(180deg,#000 0%,transparent 100%)}
+body.sea::after{content:"";position:absolute;left:0;right:0;top:0;height:12px;pointer-events:none;opacity:.55;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='12'%3E%3Cpath d='M0 6 C 20 0, 40 12, 60 6 S 100 0, 120 6' fill='none' stroke='%23F7F3EA' stroke-width='1'/%3E%3C/svg%3E") repeat-x}
+.sea .wrap{position:relative;z-index:1}
+.sea .testmode{background:rgba(220,164,74,.18);color:#F3D9A8}
+.sea .center{background:rgba(9,38,47,.42);border:1px solid rgba(247,243,234,.12)}
+.sea .center .photo::after{background:linear-gradient(180deg,rgba(9,38,47,0) 35%,rgba(9,38,47,.9) 100%)}
+.sea .item{background:rgba(247,243,234,.08);border-color:rgba(247,243,234,.16);color:#F7F3EA}
+.sea .item.bad{border-color:#FF9B8F}
+.sea .linkbtn{color:#C9D6D9;text-decoration-color:rgba(247,243,234,.3)}
+.sea .linkbtn:hover{color:#F7F3EA;text-decoration-color:#DCA44A}
+.sea .grp{background:rgba(247,243,234,.06);border-color:rgba(247,243,234,.22);color:#F7F3EA}
+.sea .grp:hover{background:rgba(247,243,234,.12)}
+.sea .grp span{color:#C9D6D9}
+.sea .grp.on{background:#DCA44A;border-color:#DCA44A;color:#09262F}
+.sea .grp.on span{color:#3D2A08}
+.sea .act{background:rgba(247,243,234,.06);border-color:rgba(247,243,234,.18)}
+.sea .act.on{background:rgba(247,243,234,.1);border:2px solid #DCA44A;box-shadow:none}
+.sea .aprice,.sea .chosen,.sea .hint,.sea .info dt,.sea .tip,.sea .glabel{color:#C9D6D9}
+.sea .info summary{color:#8FD0D4;text-decoration-color:rgba(143,208,212,.5)}
+.sea .info summary::after{color:#DCA44A}
+.sea .stepper{background:rgba(247,243,234,.08);border-color:rgba(247,243,234,.22)}
+.sea .stepper button{color:#F7F3EA}
+.sea .stepper button:hover:not(:disabled){background:rgba(247,243,234,.14)}
+.sea .stepper button:disabled{color:rgba(247,243,234,.28)}
+.sea .cal{background:rgba(9,38,47,.32);border-color:rgba(247,243,234,.16)}
+.sea .calh button{color:#F7F3EA}
+.sea .calh button:hover:not(:disabled){background:rgba(247,243,234,.12)}
+.sea .calh button:disabled{color:rgba(247,243,234,.25)}
+.sea .calg .wd{color:#C9D6D9}
+.sea .day{color:#F7F3EA}
+.sea .day:hover:not(:disabled){background:rgba(247,243,234,.14)}
+.sea .day.off{color:rgba(247,243,234,.32);background:repeating-linear-gradient(135deg,transparent 0 5px,rgba(247,243,234,.08) 5px 6px)}
+.sea .day.sel,.sea .day.sel:hover:not(:disabled){background:#DCA44A;color:#09262F}
+.sea .day.in,.sea .day.in:hover:not(:disabled){background:rgba(220,164,74,.38);color:#F7F3EA}
+.sea .slots button{background:transparent;border-color:rgba(247,243,234,.32);color:#F7F3EA}
+.sea .slots button.on{background:#DCA44A;border-color:#DCA44A;color:#09262F}
+.sea .done{background:#F7F3EA;color:#09262F}
+.sea .done:hover,.sea .done:disabled:hover{background:#fff}
+.sea .lbtn{color:#F7F3EA}
+.sea .lbtn .pen{color:#C9D6D9}
+.sea .x{color:#C9D6D9}
+.sea .x:hover{background:rgba(255,155,143,.15);color:#FF9B8F}
+.sea .another{border-color:rgba(247,243,234,.42);color:#F7F3EA}
+.sea .another:hover{background:rgba(247,243,234,.08)}
+.sea .error{color:#FFB4AB}
+.sea .note-orange,.sea .warn{background:rgba(220,164,74,.16);border:1px solid rgba(220,164,74,.55);color:#F6DDB0}
+.sea .lwarn{color:#F6DDB0}
+.sea .plan{background:rgba(247,243,234,.08);border-color:rgba(247,243,234,.16)}
+.sea .pgrid .wd{color:#C9D6D9}
+.sea .pday{background:rgba(9,38,47,.32)}
+.sea .pday b{color:#C9D6D9}
+.sea .pday.busy b{color:#F7F3EA}
+.sea .pam{border-bottom-color:rgba(247,243,234,.18)}
+.sea .pday i.am,.sea .pday i.any{background:#DCA44A;color:#09262F}
+.sea .pday i.pm{background:#8FD0D4;color:#09262F}
+.sea .pday i.day{background:#F7F3EA;color:#09262F}
+.sea .pday.hot{box-shadow:inset 0 0 0 2px #F0A040}
+.sea .slate{border-color:rgba(247,243,234,.16)}
+.sea .slate .above{background:#11505E;color:#F7F3EA}
+.sea .waterline{background:#11505E}
+.sea .waterline path{fill:#061C23}
+.sea .slate .below{background:#061C23}
+.sea .now b{color:#DCA44A}
+.sea .total,.sea .row.sub,.sea .fine{color:#C9D6D9}
+.sea .book{background:#DCA44A;color:#09262F}
+.sea .book:hover{background:#F7F3EA;color:#09262F}
+.sea textarea{background:rgba(247,243,234,.08);border-color:rgba(247,243,234,.22);color:#F7F3EA}
+.sea textarea::placeholder{color:rgba(201,214,217,.75)}
+.sea .policy{background:rgba(247,243,234,.06);border-color:rgba(247,243,234,.16)}
+.sea .policy ul,.sea .terms,.sea .ask,.sea .practical dt,.sea .booked,.sea .course,.sea .oref,.sea .intro{color:#C9D6D9}
+.sea .booked strong,.sea .oref b{color:#F7F3EA}
+.sea .ask a,.sea .practical a.map,.sea .terms a{color:#8FD0D4;text-decoration-color:rgba(143,208,212,.5)}
+.sea .practical{border-top-color:rgba(247,243,234,.16)}
+.sea .msg{background:rgba(247,243,234,.1);color:#F7F3EA}
+.sea .empty p{color:#C9D6D9}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 `;
