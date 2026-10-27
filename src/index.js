@@ -2062,7 +2062,8 @@ input[type=date]::-webkit-date-and-time-value{text-align:left}
 .policy li+li{margin-top:.2rem}
 .lock{font-size:.75rem}
 .ask{margin:1.5rem 0 0;font-size:.9rem;color:var(--muted)}
-.paybar{position:sticky;bottom:0;z-index:5;margin:0 -1rem;padding:.9rem 1rem calc(.75rem + env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(247,243,234,0) 0,var(--shore) 1rem)}
+.paybar{position:sticky;bottom:0;z-index:5;padding:.9rem 0 calc(.75rem + env(safe-area-inset-bottom))}
+.paybar .book{box-shadow:0 8px 24px rgba(9,38,47,.35)}
 .paybar .msg{margin:.6rem 0 0}
 .notebox summary{display:inline-block;cursor:pointer;font-weight:600;list-style:none;text-decoration:underline;text-decoration-color:var(--sand);text-decoration-thickness:2px;text-underline-offset:3px}
 .notebox summary::-webkit-details-marker{display:none}
@@ -2253,7 +2254,7 @@ body.sea::after{content:"";position:absolute;left:0;right:0;top:0;height:12px;po
 .sea .total,.sea .row.sub,.sea .fine{color:#C9D6D9}
 .sea .book{background:#DCA44A;color:#09262F}
 .sea .book:hover{background:#F7F3EA;color:#09262F}
-.sea .paybar{background:linear-gradient(180deg,rgba(9,38,47,0) 0,rgba(9,38,47,.92) 1.1rem,#09262F 100%)}
+.sea .paybar .book{box-shadow:0 8px 24px rgba(0,0,0,.45)}
 .sea textarea{background:rgba(247,243,234,.08);border-color:rgba(247,243,234,.22);color:#F7F3EA}
 .sea textarea::placeholder{color:rgba(201,214,217,.75)}
 .sea .policy{background:rgba(247,243,234,.06);border-color:rgba(247,243,234,.16)}
