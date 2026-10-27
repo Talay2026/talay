@@ -635,6 +635,7 @@ export default {
         return new Response(JSON.stringify({ error: String(err.message || err).slice(0, 300) }), { status: 502, headers: { "Content-Type": "application/json" } });
       }
     }
+    if (url.pathname.startsWith("/r/")) return sourcePage(request, env, url);
     if (!url.pathname.startsWith("/b/")) return env.ASSETS.fetch(request);
     const lang = pickLang(request, url);
     if (!env.AIRTABLE_TOKEN) {
@@ -959,6 +960,7 @@ async function thanks(request, env, ctx, url) {
   <p class="hint" style="margin-top:2rem">${esc(t.questions(assistant))}</p>
   ${chat ? `<a class="book chat" href="${esc(chat)}">${esc(t.backToChat)}</a>` : ""}
 </main>
+${powered(lang, "thanks")}
 <script>try{localStorage.removeItem(${JSON.stringify(`talay-b:${m.center_slug || ""}:${m.lead_ref || "-"}`).replace(/</g, "\\u003c")})}catch(e){}</script>`, 200, lang, "", false, "sea");
 }
 
@@ -1530,6 +1532,7 @@ ${unknown.map((n) => `<p class="warn">${esc(t.unknown(n))}</p>`).join("")}
   </dl>` : ""}
   ${chat ? `<p class="ask">${esc(t.askFirst(assistant))} <a href="${esc(chat)}">${esc(t.backToChat)}</a></p>` : ""}
 </div>
+${powered(lang, "booking")}
 
 <script id="data" type="application/json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>
 <script>${BOOK_JS}</script>`;
@@ -1980,6 +1983,30 @@ function problem(text, lang) {
   return `<main class="empty"><h1>${esc(T[lang].problemTitle)}</h1><p>${esc(text)}</p></main>`;
 }
 
+// Small "Powered by Talay" line at the bottom of the booking and thanks page. Opens in a new tab, so the
+// diver never loses the booking. The link goes through /r/ so the HQ tab Website counts it as a source.
+const POWERED = {
+  en: "Powered by Talay", fr: "Propulsé par Talay", de: "Bereitgestellt von Talay", es: "Con la tecnología de Talay",
+  nl: "Mogelijk gemaakt door Talay", th: "ขับเคลื่อนโดย Talay", zh: "由 Talay 提供支持", ru: "Работает на Talay",
+  it: "Realizzato con Talay", ko: "Talay 제공",
+};
+const powered = (lang, from) =>
+  `<p class="powered"><a href="https://talay.io/r/${from}" target="_blank" rel="noopener">${esc(POWERED[lang] || POWERED.en)}</a></p>`;
+
+// Tracked links for outreach: talay.io/r/ig, /r/wa, /r/mail, … show the homepage (in the visitor's browser
+// language) at that address, so Cloudflare Web Analytics counts each source as its own page. WhatsApp and
+// the Instagram app pass no referrer, so without this they all land under "Direct".
+async function sourcePage(request, env, url) {
+  if (!/^\/r\/[a-z0-9-]{1,32}\/?$/.test(url.pathname)) return Response.redirect(`${url.origin}/`, 302);
+  const want = (request.headers.get("Accept-Language") || "").split(",").map((x) => x.trim().slice(0, 2).toLowerCase());
+  const l = want.find((x) => LANGS.includes(x)) || "en";
+  const home = await env.ASSETS.fetch(new Request(`${url.origin}/${l === "en" ? "" : l + "/"}`));
+  if (!home.ok) return home;
+  // Without the language redirect: it would move the visitor away before the analytics beacon counts /r/….
+  const html = (await home.text()).replace(/<!-- i18n:redirect -->[\s\S]*?<!-- \/i18n:redirect -->/, "");
+  return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex", "Vary": "Accept-Language" } });
+}
+
 function page(body, status = 200, lang = "en", title = "", wide = false, theme = "") {
   const html = `<!doctype html>
 <html lang="${lang}">
@@ -2057,6 +2084,9 @@ input[type=date]::-webkit-date-and-time-value{text-align:left}
 .testmode{margin:0 0 1rem;padding:.5rem .8rem;border-radius:8px;background:var(--sand-wash);color:#6B4A00;font-size:.85rem;font-weight:600}
 .terms{margin:.8rem 0 0;font-size:.82rem;text-align:center;color:var(--muted)}
 .terms a{color:inherit;text-underline-offset:3px}
+.powered{margin:2.5rem 0 .5rem;text-align:center;font-size:.75rem;letter-spacing:.02em}
+.powered a{color:var(--muted);text-decoration:none;opacity:.8}
+.powered a:hover{text-decoration:underline;opacity:1}
 .msg{margin:.9rem 0 0;padding:.8rem 1rem;border-radius:10px;background:var(--sand-wash);font-size:.95rem}
 .practical{margin:2.25rem 0 0;padding-top:1.25rem;border-top:1px solid var(--line);display:grid;gap:.8rem}
 .practical div{display:grid;grid-template-columns:7.5rem 1fr;gap:.75rem}
@@ -2275,5 +2305,6 @@ body.sea::after{content:"";position:absolute;left:0;right:0;top:0;height:12px;po
 .sea .practical{border-top-color:rgba(247,243,234,.16)}
 .sea .msg{background:rgba(247,243,234,.1);color:#F7F3EA}
 .sea .empty p{color:#C9D6D9}
+.sea .powered a{color:#C9D6D9}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 `;

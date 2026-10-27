@@ -2939,8 +2939,15 @@ async function adminWebsite(env, days) {
     const i = Math.round((Date.parse(g.dimensions.date) - Date.parse(day0)) / DAY);
     if (i >= 0 && i <= n) daily[i] = [(g.sum && g.sum.visits) || 0, g.count];
   });
+  // Tracked links (talay.io/r/ig, /r/mail, …): their own query, so they never drop out of the top 25 pages.
+  let sources = null;
+  try {
+    const f = range(start, end) + (bots ? ", bot: 0" : "") + ', requestPath_like: "/r/%"';
+    const s = await ask(`{ viewer { accounts(filter: {accountTag: "${env.CF_ACCOUNT_ID}"}) { ${groups("src", f, "requestPath", 30, "count_DESC")} } } }`);
+    sources = rows(s && s.src, "requestPath");
+  } catch (e) { /* older schema without _like: the table stays hidden */ }
   const p = (acc.prev && acc.prev[0]) || { count: 0, sum: { visits: 0 } };
-  return {
+  return { sources,
     days: n, options: WEB_DAYS, day0: day0 + "T00:00:00.000Z", bots, updated: isoT(end), daily,
     total: { views: daily.reduce((a, d) => a + d[1], 0), visits: daily.reduce((a, d) => a + d[0], 0) },
     prev: { views: p.count || 0, visits: (p.sum && p.sum.visits) || 0 },
@@ -4206,8 +4213,13 @@ function hqClient(cfg) {
     if ((m = p.match(/^\/b\/([^/]+)/))) return "Boekingspagina " + m[1];
     if (/^\/privacy/.test(p)) return "Privacy";
     if (/^\/terms/.test(p)) return "Voorwaarden";
+    if ((m = p.match(/^\/r\/([^/]+)/))) return "Link " + (WEB_SOURCES[m[1]] || m[1]);
+    if (/^\/research\//.test(p)) return "Artikel mystery shop";
     return "";
   }
+  // Tracked links /r/<code>: which link was clicked. Codes not listed here show as they are.
+  var WEB_SOURCES = { ig: "Instagram-bio", wa: "WhatsApp-profiel", mail: "Mailhandtekening", w1: "Mailcampagne", li: "LinkedIn",
+    fb: "Facebook", fbg: "Facebookgroepen", lig: "LinkedIn-groepen", forum: "Duikforums", dir: "Softwaregidsen", booking: "Powered by (boekingspagina)", thanks: "Powered by (bedankpagina)" };
   function webRef(h) { return !h ? "Direct" : h === "talay.io" ? "Binnen talay.io" : h.replace(/^www\./, ""); }
   function webTable(title, head, rows, label, note) {
     var max = Math.max.apply(null, rows.map(function (r) { return r.views; }).concat([1]));
@@ -4244,6 +4256,9 @@ function hqClient(cfg) {
         webTable("Pagina's", "Pagina", d.pages, function (k) { return { name: webPage(k) || k, sub: webPage(k) ? k : "" }; }) +
         webTable("Herkomst", "Komt van", d.refs, function (k) { return { name: webRef(k), sub: !k ? "WhatsApp, Instagram-app, mail-app of getypt" : "" }; },
           "Links in WhatsApp en in de Instagram-app geven geen herkomst door; die tellen als Direct.") + "</div>";
+      if (d.sources) h += '<div class="sec">' + webTable("Bronnen (eigen links)", "Link", d.sources, function (k) {
+        var c = (k.match(/^\/r\/([^/]+)/) || [])[1] || k; return { name: WEB_SOURCES[c] || c, sub: "talay.io" + k };
+      }, "Elke link talay.io/r/… in outreach telt hier apart, ook vanuit WhatsApp en de Instagram-app.") + "</div>";
       h += '<div class="grid2 sec">' +
         webTable("Landen", "Land", d.countries, function (k) { return { name: k || "Onbekend" }; }) +
         webTable("Toestellen", "Toestel", d.devices, function (k) { return { name: { desktop: "Computer", mobile: "Gsm", tablet: "Tablet" }[k] || k || "Onbekend" }; }) + "</div>";
