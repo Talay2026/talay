@@ -1474,10 +1474,10 @@ ${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
   <p class="via"><span aria-hidden="true">🔒</span> ${esc(t.via)}</p>
 </header>
 
+<h1>${esc(t.pageTitle)}</h1>
+${unknown.map((n) => `<p class="warn">${esc(t.unknown(n))}</p>`).join("")}
 <div class="layout">
 <div class="top">
-  <h1>${esc(t.pageTitle)}</h1>
-  ${unknown.map((n) => `<p class="warn">${esc(t.unknown(n))}</p>`).join("")}
   <div id="items"></div>
   <button type="button" id="another" class="another" hidden><span aria-hidden="true">＋</span> ${esc(t.another)}</button>
 </div>
@@ -2082,6 +2082,13 @@ a.book.chat{display:flex;align-items:center;justify-content:center;text-decorati
 .rating a:hover{color:var(--shore)}
 .via{margin:.7rem 0 0;width:100%;font-size:.78rem;color:var(--on-deep);position:relative}
 .layout{display:grid;grid-template-columns:minmax(0,1fr);gap:0 2.5rem}
+/* Computer: bookings left, the price and the pay button right (on a tall enough screen they stay in view). */
+@media (min-width:1000px){
+  .wrap.wide{max-width:68rem}
+  .layout{grid-template-columns:minmax(0,1fr) 23rem;align-items:start}
+  .layout .bottom .choose,.layout .bottom .slate{margin-top:0}
+}
+@media (min-width:1000px) and (min-height:900px){.bottom{position:sticky;top:1rem}}
 .item{border:1px solid var(--line);border-radius:16px;background:#fff;margin-bottom:.8rem}
 .item.open{padding:1rem 1.1rem 1.2rem}
 .item.bad{border-color:#B3261E}
