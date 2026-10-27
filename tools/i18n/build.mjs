@@ -10,7 +10,7 @@ import STRINGS from "./home.mjs";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const LANGS = ["fr", "de", "es", "nl", "th", "zh", "ru", "it", "ko"];
 // Thousands separator per language in the example prices (12,500 THB)
-const SEP = { fr: " ", de: ".", es: ".", nl: ".", th: "," };
+const SEP = { fr: " ", de: ".", es: ".", nl: ".", th: ",", zh: ",", ru: " ", it: ".", ko: "," };
 const THAI_FONT = '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">';
 
 const source = readFileSync(join(ROOT, "public/index.html"), "utf8");
