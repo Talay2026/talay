@@ -2032,6 +2032,12 @@ async function handleAdmin(request, env, url, p, email, role) {
     const m = /^\d{4}-\d{2}$/.test(url.searchParams.get("month") || "") ? url.searchParams.get("month") : thaiMonth(Date.now());
     return json(await cached(env, `admin/costs/${m}`, 600, () => adminCosts(env, m), fresh));
   }
+  if (get && p === "/zone/admin/api/website") {
+    if (!env.CF_ACCOUNT_ID || !env.CF_ANALYTICS_TOKEN) return json({ missing: true });
+    const n = Number(url.searchParams.get("days")) || 30;
+    // A failed request throws, so it is not kept in the cache
+    try { return json(await cached(env, `admin/web/${n}`, 900, () => adminWebsite(env, n), fresh)); } catch (e) { return json({ error: e.message }); }
+  }
   if (request.method === "POST") {
     const body = await readBody(request);
     if (!body) return json({ error: "Bad request" }, 400);
@@ -2888,6 +2894,61 @@ async function adminCosts(env, month) {
   };
 }
 
+// ---------- Website: visitors from Cloudflare Web Analytics ----------
+// Reads the same cookieless numbers as Cloudflare → Analytics & Logs → Web Analytics, through the GraphQL API.
+// Needs two secrets: CF_ACCOUNT_ID and CF_ANALYTICS_TOKEN (API token with Account → Account Analytics → Read).
+// /zone is not measured; /b/ booking pages are. Cloudflare keeps these numbers per query for at most 31 days.
+const WEB_DAYS = [7, 30];
+async function adminWebsite(env, days) {
+  const n = WEB_DAYS.includes(days) ? days : 30;
+  const end = Date.now(), start = end - n * DAY;
+  const day0 = new Date(start).toISOString().slice(0, 10);
+  const range = (a, b) => `datetime_geq: "${isoT(a)}", datetime_lt: "${isoT(b)}", requestHost: "talay.io"`;
+  const groups = (alias, f, dim, limit, order) =>
+    `${alias}: rumPageloadEventsAdaptiveGroups(limit: ${limit}, filter: {${f}}, orderBy: [${order}]) { count sum { visits } dimensions { ${dim} } }`;
+  const query = (bots) => {
+    const f = range(start, end) + bots, fp = range(start - n * DAY, start) + bots;
+    return `{ viewer { accounts(filter: {accountTag: "${env.CF_ACCOUNT_ID}"}) {
+      ${groups("daily", f, "date", 40, "date_ASC")}
+      ${groups("pages", f, "requestPath", 25, "count_DESC")}
+      ${groups("refs", f, "refererHost", 15, "count_DESC")}
+      ${groups("countries", f, "countryName", 15, "count_DESC")}
+      ${groups("devices", f, "deviceType", 5, "count_DESC")}
+      prev: rumPageloadEventsAdaptiveGroups(limit: 1, filter: {${fp}}) { count sum { visits } }
+    } } }`;
+  };
+  const ask = async (q) => {
+    const r = await fetch("https://api.cloudflare.com/client/v4/graphql", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${env.CF_ANALYTICS_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ query: q }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || (j.errors && j.errors.length)) throw new Error((j.errors && j.errors[0] && j.errors[0].message) || `HTTP ${r.status}`);
+    return j.data.viewer.accounts[0];
+  };
+  let acc, bots = true;
+  try { acc = await ask(query(", bot: 0")); } catch (e) {
+    // Older schema without the bot field: same query, bots included
+    try { acc = await ask(query("")); bots = false; } catch (e2) { throw new Error("Cloudflare Web Analytics: " + e2.message); }
+  }
+  if (!acc) throw new Error("Cloudflare Web Analytics: account niet gevonden. Kijk CF_ACCOUNT_ID na.");
+  const rows = (list, key) => (list || []).map((g) => ({ key: g.dimensions[key] || "", views: g.count, visits: (g.sum && g.sum.visits) || 0 }));
+  const daily = Array.from({ length: n + 1 }, () => [0, 0]);
+  (acc.daily || []).forEach((g) => {
+    const i = Math.round((Date.parse(g.dimensions.date) - Date.parse(day0)) / DAY);
+    if (i >= 0 && i <= n) daily[i] = [(g.sum && g.sum.visits) || 0, g.count];
+  });
+  const p = (acc.prev && acc.prev[0]) || { count: 0, sum: { visits: 0 } };
+  return {
+    days: n, options: WEB_DAYS, day0: day0 + "T00:00:00.000Z", bots, updated: isoT(end), daily,
+    total: { views: daily.reduce((a, d) => a + d[1], 0), visits: daily.reduce((a, d) => a + d[0], 0) },
+    prev: { views: p.count || 0, visits: (p.sum && p.sum.visits) || 0 },
+    pages: rows(acc.pages, "requestPath"), refs: rows(acc.refs, "refererHost"),
+    countries: rows(acc.countries, "countryName"), devices: rows(acc.devices, "deviceType"),
+  };
+}
+
 // ---------- Alerts (e-mail through Make) ----------
 // Every 15 minutes (Cloudflare cron, see wrangler.jsonc) Talay HQ looks for:
 //   - a handover nobody picked up: Handover at more than 30 min ago, no team reply, not handled;
@@ -3123,6 +3184,7 @@ const HQ_ICONS = {
   pipeline: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/>',
   funnel: '<path d="M3 4h18l-7 8v6l-4 2v-8z"/>',
   mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+  web: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
   cost: '<circle cx="12" cy="12" r="9"/><path d="M15 9.2a3 3 0 0 0-3-1.7c-1.7 0-3 .9-3 2.2 0 3 6 1.6 6 4.6 0 1.3-1.3 2.2-3 2.2a3.2 3.2 0 0 1-3.2-1.8M12 6v1.5M12 16.5V18"/>',
 };
 const hqIcon = (k) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${HQ_ICONS[k]}</svg>`;
@@ -3130,7 +3192,7 @@ const hqIcon = (k) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="non
 function adminApp(email, role) {
   const nav = [
     ["overzicht", "Overzicht", "home"], ["inbox", "Inbox", "inbox"], ["zoeken", "Zoeken", "search"],
-    ["pijplijn", "Pijplijn", "pipeline"], ["mail", "Mailcampagne", "mail"], ["centra", "Centra", "centers"], ["conversie", "Conversie", "funnel"],
+    ["pijplijn", "Pijplijn", "pipeline"], ["mail", "Mailcampagne", "mail"], ["website", "Website", "web"], ["centra", "Centra", "centers"], ["conversie", "Conversie", "funnel"],
     ["boekingen", "Boekingen", "bookings"], ["commissie", "Commissie", "money"], ["kosten", "Claude-kosten", "cost"],
     ["aanmeldingen", "Aanmeldingen", "intake"], ["systeem", "Systeem", "system"],
   ];
@@ -4131,6 +4193,67 @@ function hqClient(cfg) {
     }).catch(fail);
   }
 
+  // ---------- Website ----------
+  var webDays = 30;
+  var LANG_NAMES = { fr: "FR", de: "DE", es: "ES", nl: "NL", th: "TH", zh: "ZH", ru: "RU", it: "IT", ko: "KO" };
+  function webPage(p) {
+    var m;
+    if (p === "/") return "Homepage (EN)";
+    if ((m = p.match(/^\/([a-z]{2})\/?$/)) && LANG_NAMES[m[1]]) return "Homepage (" + LANG_NAMES[m[1]] + ")";
+    if (/^\/start/.test(p)) return "Intake /start";
+    if (/^\/demo\//.test(p)) return "Demopagina";
+    if (/^\/b\/thanks/.test(p)) return "Bedankt na betaling";
+    if ((m = p.match(/^\/b\/([^/]+)/))) return "Boekingspagina " + m[1];
+    if (/^\/privacy/.test(p)) return "Privacy";
+    if (/^\/terms/.test(p)) return "Voorwaarden";
+    return "";
+  }
+  function webRef(h) { return !h ? "Direct" : h === "talay.io" ? "Binnen talay.io" : h.replace(/^www\./, ""); }
+  function webTable(title, head, rows, label, note) {
+    var max = Math.max.apply(null, rows.map(function (r) { return r.views; }).concat([1]));
+    return '<div class="card"><h2>' + title + '</h2><table class="t"><thead><tr><th>' + head + '</th><th class="n">Bezoeken</th><th class="n">Weergaven</th></tr></thead><tbody>' +
+      (rows.map(function (r) {
+        var l = label(r.key);
+        return '<tr><td class="nm"><b>' + esc(l.name) + "</b>" + (l.sub ? "<small>" + esc(l.sub) + "</small>" : "") +
+          '<div class="meter"><span style="width:' + Math.round(r.views / max * 100) + '%"></span></div></td><td class="n">' + nf.format(r.visits) + '</td><td class="n">' + nf.format(r.views) + "</td></tr>";
+      }).join("") || '<tr><td colspan="3" class="empty">Nog niets gemeten.</td></tr>') + "</tbody></table>" +
+      (note ? '<p class="muted" style="font-size:13px;margin:10px 16px 14px">' + note + "</p>" : "") + "</div>";
+  }
+  function pWebsite(fresh) {
+    setPage("Website", '<div class="skel"></div>');
+    load("web:" + webDays, "website?days=" + webDays, fresh).then(function (d) {
+      if (route().k !== "website") return;
+      if (d.missing) {
+        setPage("Website", '<div class="alert warn"><div class="x"><b>Nog niet ingesteld</b>Zet in Cloudflare bij de Worker twee geheimen: <b>CF_ACCOUNT_ID</b> (je account-ID) en <b>CF_ANALYTICS_TOKEN</b> (een API-token met Account → Account Analytics → Read). Daarna verschijnen hier de bezoekers van talay.io.</div></div>');
+        return;
+      }
+      var t = d.total, pv = d.prev;
+      function dl(cur, prev) {
+        var diff = cur - prev, cls = diff > 0 ? "up" : diff < 0 ? "down" : "";
+        return '<span class="d ' + cls + '">' + (diff > 0 ? "▲ " : diff < 0 ? "▼ " : "") + "vorige " + d.days + " dagen: " + nf.format(prev) + "</span>";
+      }
+      var h = '<div class="bar"><div class="seg" id="wseg">' + d.options.map(function (n) {
+        return '<button type="button" data-n="' + n + '" class="' + (n === d.days ? "on" : "") + '">' + n + " dagen</button>";
+      }).join("") + "</div></div>";
+      h += '<div class="kpis">' + kpi("Bezoeken", nf.format(t.visits), dl(t.visits, pv.visits)) +
+        kpi("Paginaweergaven", nf.format(t.views), dl(t.views, pv.views)) +
+        kpi("Pagina's per bezoek", t.visits ? nf.format(Math.round(t.views / t.visits * 10) / 10) : "–") +
+        kpi("Mobiel", (function () { var m = d.devices.filter(function (x) { return x.key === "mobile"; })[0], all = d.devices.reduce(function (a, x) { return a + x.views; }, 0); return all && m ? Math.round(m.views / all * 100) + " %" : "–"; })(), '<span class="d">van de weergaven</span>') + "</div>";
+      h += '<div class="card sec"><h2>Bezoeken per dag</h2><div class="chart">' + chart("web", d.daily.map(function (x) { return x[0]; }), function (v) { return nf.format(v) + " bezoeken"; }, d.day0) + "</div></div>";
+      h += '<div class="grid2 sec">' +
+        webTable("Pagina's", "Pagina", d.pages, function (k) { return { name: webPage(k) || k, sub: webPage(k) ? k : "" }; }) +
+        webTable("Herkomst", "Komt van", d.refs, function (k) { return { name: webRef(k), sub: !k ? "WhatsApp, Instagram-app, mail-app of getypt" : "" }; },
+          "Links in WhatsApp en in de Instagram-app geven geen herkomst door; die tellen als Direct.") + "</div>";
+      h += '<div class="grid2 sec">' +
+        webTable("Landen", "Land", d.countries, function (k) { return { name: k || "Onbekend" }; }) +
+        webTable("Toestellen", "Toestel", d.devices, function (k) { return { name: { desktop: "Computer", mobile: "Gsm", tablet: "Tablet" }[k] || k || "Onbekend" }; }) + "</div>";
+      h += '<p class="muted" style="font-size:13.5px">Bron: Cloudflare Web Analytics (zonder cookies), ' + (d.bots ? "zonder bots" : "bots inbegrepen") +
+        ". Jullie eigen bezoeken en tests tellen mee (vooral België, en de Verenigde Staten voor testwerk). De zone wordt niet gemeten. Ververst elk kwartier; Vernieuwen haalt de cijfers meteen op.</p>";
+      setPage("Website", h);
+      $$("#wseg button").forEach(function (b) { b.onclick = function () { webDays = +b.getAttribute("data-n"); pWebsite(); }; });
+    }).catch(fail);
+  }
+
   // ---------- Aanmeldingen ----------
   function pIntake(fresh) {
     setPage("Aanmeldingen", '<div class="skel"></div>');
@@ -4223,7 +4346,7 @@ function hqClient(cfg) {
     var h = (location.hash || "#/overzicht").slice(2).split("?")[0].split("/");
     return { k: h[0] || "overzicht", id: h[1] ? decodeURIComponent(h[1]) : "" };
   }
-  var PAGES = { overzicht: pOverview, inbox: pInbox, zoeken: pSearch, pijplijn: pPipeline, mail: pOutreach, centra: pCenters, conversie: pConversion, boekingen: pBookings, commissie: pCommission, kosten: pCosts, aanmeldingen: pIntake, systeem: pSystem, team: pTeam };
+  var PAGES = { overzicht: pOverview, inbox: pInbox, zoeken: pSearch, pijplijn: pPipeline, mail: pOutreach, centra: pCenters, conversie: pConversion, boekingen: pBookings, commissie: pCommission, kosten: pCosts, website: pWebsite, aanmeldingen: pIntake, systeem: pSystem, team: pTeam };
   function render(fresh) {
     var r = route();
     $$("#nav a").forEach(function (a) { a.classList.toggle("on", a.getAttribute("data-k") === r.k); });
