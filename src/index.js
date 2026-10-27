@@ -1804,7 +1804,8 @@ const BOOK_JS = String.raw`
     totals();
     save();
     if (hover) document.querySelectorAll("#items details.info").forEach((det) => {
-      det.addEventListener("mouseenter", () => { if (!det.dataset.pin) det.open = true; });
+      // Opens on the words "What's included +" only, not on the whole width of the card.
+      det.querySelector("summary").addEventListener("mouseenter", () => { if (!det.dataset.pin) det.open = true; });
       det.addEventListener("mouseleave", () => { if (!det.dataset.pin) det.open = false; });
       det.querySelector("summary").addEventListener("click", (e) => { e.preventDefault(); det.dataset.pin = det.dataset.pin ? "" : "1"; det.open = !!det.dataset.pin; });
     });
@@ -1851,12 +1852,24 @@ const BOOK_JS = String.raw`
     } else if (b.hasAttribute("data-edit")) {
       settle(false);
       it.open = true;
+      it.snap = snapOf(it);
     } else if (b.hasAttribute("data-remove")) {
       items = items.filter((x) => x !== it);
       if (!items.length) items.push(mk({}));
     } else return;
     render();
     if (b.hasAttribute("data-edit") || b.hasAttribute("data-done")) focusItem(it);
+  });
+  // A booking opened again from the list closes with a click next to it, as long as nothing changed;
+  // after a change, Done confirms it.
+  function snapOf(it) { return [it.code, it.n, it.date, it.slot].join("|"); }
+  document.addEventListener("click", (e) => {
+    if (!e.target.isConnected || e.target.closest("#items .item.open")) return; // click inside (or re-rendered by) the open one
+    let changed = false;
+    items.forEach((it) => {
+      if (it.open && it.snap && it.snap === snapOf(it) && !problem(it)) { it.open = false; it.pick = false; it.err = ""; it.snap = ""; changed = true; }
+    });
+    if (changed) render();
   });
   $("another").onclick = () => {
     const bad = settle(true);
@@ -1987,6 +2000,9 @@ body{margin:0;background:var(--shore);color:var(--ink);font:400 17px/1.55 "Schib
 .logo{width:52px;height:52px;object-fit:contain;border-radius:12px;background:#fff;border:1px solid var(--ridge)}
 .center-name{margin:0;font-weight:700;font-size:1.1rem;letter-spacing:-.01em}
 .island{margin:0;color:var(--sand);font-size:.9rem;font-weight:500}
+.center .hrow .logo{width:76px;height:76px;border-radius:16px;flex:none}
+.center .hrow .center-name{font-size:1.6rem;line-height:1.1;letter-spacing:-.025em}
+.center .hrow .island{font-size:1.02rem;margin-top:.15rem}
 .lang{margin-left:auto;align-self:flex-start;-webkit-appearance:none;appearance:none;font:inherit;font-size:.85rem;font-weight:600;color:var(--shore);padding:.35rem 1.7rem .35rem .7rem;border:1px solid var(--ridge);border-radius:999px;background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23C9D6D9' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right .65rem center;cursor:pointer}
 .lang:hover{border-color:var(--on-deep)}
 .lang option{color:var(--deep);background:var(--shore)}
@@ -2057,7 +2073,7 @@ a.book.chat{display:flex;align-items:center;justify-content:center;text-decorati
 .wrap.wide{max-width:38rem}
 .center{flex-wrap:wrap;position:relative;overflow:hidden}
 .center .hrow{display:flex;align-items:center;gap:.85rem;width:100%;position:relative}
-.center.has-photo{padding-top:7.5rem}
+.center.has-photo{padding-top:6rem}
 .center .photo{position:absolute;inset:0 0 auto 0;height:9rem;background-size:cover;background-position:center}
 .center .photo::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(9,38,47,0) 35%,var(--deep) 100%)}
 .rating{margin:.15rem 0 0;font-size:.85rem}
@@ -2156,7 +2172,7 @@ textarea:focus-visible{outline:3px solid var(--sand);outline-offset:2px}
 .day i.full{background:var(--deep);color:var(--shore)}
 .day.hot{box-shadow:inset 0 0 0 2px #E8963A}
 @media (min-width:600px){.day i{font-size:.68rem}}
-@media (max-width:480px){.grps{gap:.35rem}.grp{padding:.65rem .6rem;min-height:4.8rem}.grp b{font-size:.88rem}.grp span{font-size:.74rem}}
+@media (max-width:480px){.center .hrow .logo{width:64px;height:64px;border-radius:14px}.center .hrow .center-name{font-size:1.35rem}.grps{gap:.35rem}.grp{padding:.65rem .6rem;min-height:4.8rem}.grp b{font-size:.88rem}.grp span{font-size:.74rem}}
 
 /* Underwater style (booking page and thanks page): teal at the top, navy at the bottom, so the page gets
    darker as you scroll; light rays and a thin wave only at the top. Text stays high contrast. */
@@ -2173,6 +2189,10 @@ body.sea::after{content:"";position:absolute;left:0;right:0;top:0;height:12px;po
 .sea .linkbtn:hover{color:#F7F3EA;text-decoration-color:#DCA44A}
 .sea .grp{background:rgba(247,243,234,.06);border-color:rgba(247,243,234,.22);color:#F7F3EA}
 .sea .grp:hover{background:rgba(247,243,234,.12)}
+@media (hover:hover){
+  .grp:hover:not(.on),.act:hover:not(.on){background:#fff;border-color:var(--ridge)}
+  .sea .grp:hover:not(.on),.sea .act:hover:not(.on){background:rgba(247,243,234,.17);border-color:rgba(247,243,234,.45)}
+}
 .sea .grp span{color:#C9D6D9}
 .sea .grp.on{background:#DCA44A;border-color:#DCA44A;color:#09262F}
 .sea .grp.on span{color:#3D2A08}
