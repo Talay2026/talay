@@ -1,0 +1,8 @@
+# talay.io: the public site may be indexed. Customer zone, booking links and API are private.
+User-agent: *
+Allow: /
+Disallow: /zone
+Disallow: /b/
+Disallow: /api/
+
+Sitemap: https://talay.io/sitemap.xml
