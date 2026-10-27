@@ -39,7 +39,7 @@ const T = {
     group: (a) => `Coming with more than ${MAX_DIVERS}? Message ${a} in your chat and the team will plan it with you.`,
     diver: "diver", divers: "divers",
     totalFor: "Total for",
-    payNow: "Pay now to secure your spot",
+    payNow: "Pay now",
     payShop: "Pay at the shop on the day",
     never: "You never pay more than the shop price.",
     terms: ["Booking and payment via Talay. ", "Booking terms"],
@@ -98,7 +98,7 @@ const T = {
     group: (a) => `Vous êtes plus de ${MAX_DIVERS} ? Écrivez à ${a} dans votre conversation et l'équipe organisera tout avec vous.`,
     diver: "plongeur", divers: "plongeurs",
     totalFor: "Total pour",
-    payNow: "À payer maintenant pour réserver votre place",
+    payNow: "À payer maintenant",
     payShop: "À payer au centre le jour même",
     never: "Vous ne payez jamais plus que le prix du centre.",
     terms: ["Réservation et paiement via Talay. ", "Conditions de réservation"],
@@ -157,7 +157,7 @@ const T = {
     group: (a) => `Ihr seid mehr als ${MAX_DIVERS}? Schreib ${a} im Chat, dann plant das Team alles mit euch.`,
     diver: "Taucher", divers: "Taucher",
     totalFor: "Gesamt für",
-    payNow: "Jetzt zahlen und Platz sichern",
+    payNow: "Jetzt zahlen",
     payShop: "Am Tag selbst im Shop zahlen",
     never: "Du zahlst nie mehr als den Preis im Shop.",
     terms: ["Buchung und Zahlung über Talay. ", "Buchungsbedingungen"],
@@ -216,7 +216,7 @@ const T = {
     group: (a) => `¿Sois más de ${MAX_DIVERS}? Escribe a ${a} en el chat y el equipo lo organizará con vosotros.`,
     diver: "buceador", divers: "buceadores",
     totalFor: "Total para",
-    payNow: "Paga ahora para asegurar tu plaza",
+    payNow: "Paga ahora",
     payShop: "Paga en el centro el mismo día",
     never: "Nunca pagas más que el precio del centro.",
     terms: ["Reserva y pago a través de Talay. ", "Condiciones de reserva"],
@@ -275,7 +275,7 @@ const T = {
     group: (a) => `Met meer dan ${MAX_DIVERS}? Stuur ${a} een bericht in je chat, dan plant het team alles met jullie.`,
     diver: "duiker", divers: "duikers",
     totalFor: "Totaal voor",
-    payNow: "Nu betalen om je plaats vast te leggen",
+    payNow: "Nu betalen",
     payShop: "Op de dag zelf te betalen in het duikcentrum",
     never: "Je betaalt nooit meer dan de prijs in het duikcentrum.",
     terms: ["Boeking en betaling via Talay. ", "Boekingsvoorwaarden"],
@@ -928,8 +928,10 @@ async function thanks(request, env, ctx, url) {
 
   return page(`
 <header class="center">
-  ${logo ? `<img class="logo" src="${esc(logo)}" alt="${esc(m.center_name)} logo">` : ""}
-  <div><p class="center-name">${esc(m.center_name)}</p>${c["Island"] ? `<p class="island">${esc(first(c["Island"]))}</p>` : ""}</div>
+  <div class="hrow">
+    ${logo ? `<img class="logo" src="${esc(logo)}" alt="${esc(m.center_name)} logo">` : ""}
+    <div><p class="center-name">${esc(m.center_name)}</p>${c["Island"] ? `<p class="island">${esc(first(c["Island"]))}</p>` : ""}</div>
+  </div>
 </header>
 <main>
   <h1>${esc(t.booked)}</h1>
@@ -1035,8 +1037,10 @@ async function managePage(env, ctx, url) {
 
   return page(`
 <header class="center">
-  ${logo ? `<img class="logo" src="${esc(logo)}" alt="${esc(centerName)} logo">` : ""}
-  <div><p class="center-name">${esc(centerName)}</p><p class="island">Manage booking</p></div>
+  <div class="hrow">
+    ${logo ? `<img class="logo" src="${esc(logo)}" alt="${esc(centerName)} logo">` : ""}
+    <div><p class="center-name">${esc(centerName)}</p><p class="island">Manage booking</p></div>
+  </div>
 </header>
 <main>
   <h1>${esc(ref || "Booking")}</h1>
@@ -1736,13 +1740,15 @@ const BOOK_JS = String.raw`
   }
 
   // ---- one booking, folded to one line ----
+  // Two short lines: what and for how many, then when and the deposit.
   function lineText(it) {
     const p = P[it.code];
-    if (!p) return s.chooseActivity;
-    return [it.n + " p", p.name, it.date ? span(it.date, p.days) : "", slotWord(slotOf(it)), f(p.deposit * it.n) + " THB " + s.depositWord].filter(Boolean).join(" · ");
+    if (!p) return '<span class="l1">' + esc(s.chooseActivity) + "</span>";
+    return '<span class="l1">' + esc(p.name + " · " + it.n + " p") + '</span><span class="l2">' +
+      esc([it.date ? span(it.date, p.days) : "", slotWord(slotOf(it)), f(p.deposit * it.n) + " THB " + s.depositWord].filter(Boolean).join(" · ")) + "</span>";
   }
   function lineHtml(it) {
-    return '<section class="item line' + (it.err ? " bad" : "") + '" data-id="' + it.id + '"><button type="button" class="lbtn" data-edit><span>' + esc(lineText(it)) + '</span><span class="pen">' + esc(s.edit) + "</span></button>" +
+    return '<section class="item line' + (it.err ? " bad" : "") + '" data-id="' + it.id + '"><button type="button" class="lbtn" data-edit><span class="ltxt">' + lineText(it) + '</span><span class="pen">' + esc(s.edit) + "</span></button>" +
       '<button type="button" class="x" data-remove aria-label="' + esc(s.remove) + '">×</button>' + (it.err ? '<p class="error">' + esc(it.err) + "</p>" : "") +
       (!it.err && clash(it) && !clash(it).other.open ? '<p class="lwarn">' + esc(clashText(clash(it))) + "</p>" : "") + "</section>";
   }
@@ -1807,6 +1813,8 @@ const BOOK_JS = String.raw`
     $("overlap").innerHTML = ov.map((x) => "<p>" + esc(x) + "</p>").join("");
     $("another").hidden = !d.multi || items.length >= d.maxItems;
     totals();
+    // While a booking is open, Done comes first: the floating pay button would cover it.
+    if (items.some((x) => x.open)) $("payb").hidden = true;
     save();
     if (hover) document.querySelectorAll("#items details.info").forEach((det) => {
       // Opens on the words "What's included +" only, not on the whole width of the card.
@@ -2146,6 +2154,9 @@ a.book.chat{display:flex;align-items:center;justify-content:center;text-decorati
 .done:hover{background:var(--ridge)}
 .item.line{display:flex;align-items:center;flex-wrap:wrap}
 .lbtn{flex:1;display:flex;justify-content:space-between;gap:1rem;align-items:center;min-height:3.2rem;border:0;background:none;padding:.6rem .4rem .6rem 1rem;font:inherit;font-size:.95rem;color:var(--ink);text-align:left;cursor:pointer}
+.lbtn .ltxt{display:flex;flex-direction:column;gap:.1rem;min-width:0}
+.lbtn .l1{font-weight:600}
+.lbtn .l2{font-size:.86rem;color:var(--muted)}
 .lbtn .pen{font-size:.82rem;font-weight:600;color:var(--muted);white-space:nowrap}
 .lbtn:hover .pen{color:var(--ink)}
 .x{width:2.8rem;height:2.8rem;margin-right:.3rem;border:0;border-radius:999px;background:none;font-size:1.4rem;color:var(--muted);cursor:pointer}
@@ -2237,7 +2248,7 @@ body.sea::after{content:"";position:absolute;left:0;right:0;top:0;height:12px;po
 .sea .done{background:#F7F3EA;color:#09262F}
 .sea .done:hover,.sea .done:disabled:hover{background:#fff}
 .sea .lbtn{color:#F7F3EA}
-.sea .lbtn .pen{color:#C9D6D9}
+.sea .lbtn .pen,.sea .lbtn .l2{color:#C9D6D9}
 .sea .x{color:#C9D6D9}
 .sea .x:hover{background:rgba(255,155,143,.15);color:#FF9B8F}
 .sea .another{border-color:rgba(247,243,234,.42);color:#F7F3EA}
