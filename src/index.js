@@ -1474,10 +1474,10 @@ ${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
   <p class="via"><span aria-hidden="true">🔒</span> ${esc(t.via)}</p>
 </header>
 
+<h1>${esc(t.pageTitle)}</h1>
+${unknown.map((n) => `<p class="warn">${esc(t.unknown(n))}</p>`).join("")}
 <div class="layout">
 <div class="top">
-  <h1>${esc(t.pageTitle)}</h1>
-  ${unknown.map((n) => `<p class="warn">${esc(t.unknown(n))}</p>`).join("")}
   <div id="items"></div>
   <button type="button" id="another" class="another" hidden><span aria-hidden="true">＋</span> ${esc(t.another)}</button>
 </div>
@@ -1499,10 +1499,10 @@ ${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
     </div>
   </section>
 
-  <div class="field">
-    <label for="note">${esc(t.noteLabel)}</label>
-    <textarea id="note" maxlength="300" rows="2" placeholder="${esc(t.notePh)}"></textarea>
-  </div>
+  <details class="field notebox" id="notebox">
+    <summary>${esc(t.noteLabel)}</summary>
+    <textarea id="note" maxlength="300" rows="2" placeholder="${esc(t.notePh)}" aria-label="${esc(t.noteLabel)}"></textarea>
+  </details>
 
   <section class="policy" aria-label="${esc(t.policyTitle)}">
     <p class="policy-title">${esc(t.policyTitle)}</p>
@@ -1510,17 +1510,21 @@ ${testMode ? `<p class="testmode">${esc(t.testmode)}</p>` : ""}
   </section>
 
   <div id="overlap" class="warn" role="status" hidden></div>
-  <div id="payb" hidden>
-    <button type="button" id="book" class="book">${esc(t.btn[0])}<span id="btn-amount">0</span>${esc(t.btn[1])}</button>
-    <p id="msg" class="msg" role="status" hidden></p>
-    <p class="terms"><span class="lock" aria-hidden="true">🔒</span> ${esc(t.secure)} ${esc(t.terms[0])}<a href="${termsUrl(lang)}" target="_blank" rel="noopener">${esc(t.terms[1])}</a></p>
-  </div>
+</div>
+</div>
 
+<!-- Pay button stays at the bottom of the screen while scrolling (sticky inside the whole page) -->
+<div id="payb" class="paybar" hidden>
+  <button type="button" id="book" class="book">${esc(t.btn[0])}<span id="btn-amount">0</span>${esc(t.btn[1])}</button>
+  <p id="msg" class="msg" role="status" hidden></p>
+</div>
+<p id="terms" class="terms" hidden><span class="lock" aria-hidden="true">🔒</span> ${esc(t.secure)} ${esc(t.terms[0])}<a href="${termsUrl(lang)}" target="_blank" rel="noopener">${esc(t.terms[1])}</a></p>
+
+<div class="after">
   ${meeting ? `<dl class="practical small">
     <div><dt>${esc(t.meeting)}</dt><dd>${esc(meeting)}${mapLink(c, centerName, island, t)}</dd></div>
   </dl>` : ""}
   ${chat ? `<p class="ask">${esc(t.askFirst(assistant))} <a href="${esc(chat)}">${esc(t.backToChat)}</a></p>` : ""}
-</div>
 </div>
 
 <script id="data" type="application/json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>
@@ -1571,6 +1575,7 @@ const BOOK_JS = String.raw`
   items.forEach((it) => { const ok = !problem(it); it.open = !ok && !opened; if (it.open) opened = true; });
   if (!opened && items.length === 1 && !items[0].code) items[0].open = true;
   $("note").value = note;
+  if (note) $("notebox").open = true; // a note from before stays visible
 
   // Steps for the drop-off count in Talay HQ (one visit = this tab).
   const VISIT = (() => {
@@ -1782,7 +1787,7 @@ const BOOK_JS = String.raw`
     });
     // Nothing chosen yet: no total of 0 THB and no pay button.
     const any = items.some((x) => P[x.code]);
-    $("pay").hidden = !any; $("payb").hidden = !any;
+    $("pay").hidden = !any; $("payb").hidden = !any; $("terms").hidden = !any;
     $("choose").hidden = any;
     $("lines").innerHTML = lines.join("");
     $("total").textContent = f(total);
@@ -1993,7 +1998,7 @@ const CSS = `
 :root{--deep:#09262F;--shelf:#163741;--ridge:#28505D;--on-deep:#C9D6D9;--sand:#DCA44A;--sand-wash:#F1E6CF;--shore:#F7F3EA;--line:#DDD5C6;--ink:#09262F;--muted:#4E646C}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-html,body{overflow-x:hidden}
+html{overflow-x:hidden} /* not on body too: that would make body a scroll box and break the sticky pay button */
 body{margin:0;background:var(--shore);color:var(--ink);font:400 17px/1.55 "Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
 .wrap{max-width:30rem;margin:0 auto;padding:1rem 1rem 3rem}
 .center{display:flex;align-items:center;gap:.85rem;margin-bottom:2rem;padding:1rem;border-radius:16px;background:radial-gradient(320px 160px at 100% 0%,#1C5262 0%,transparent 70%),var(--deep);color:var(--shore)}
@@ -2057,6 +2062,13 @@ input[type=date]::-webkit-date-and-time-value{text-align:left}
 .policy li+li{margin-top:.2rem}
 .lock{font-size:.75rem}
 .ask{margin:1.5rem 0 0;font-size:.9rem;color:var(--muted)}
+.paybar{position:sticky;bottom:0;z-index:5;margin:0 -1rem;padding:.9rem 1rem calc(.75rem + env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(247,243,234,0) 0,var(--shore) 1rem)}
+.paybar .msg{margin:.6rem 0 0}
+.notebox summary{display:inline-block;cursor:pointer;font-weight:600;list-style:none;text-decoration:underline;text-decoration-color:var(--sand);text-decoration-thickness:2px;text-underline-offset:3px}
+.notebox summary::-webkit-details-marker{display:none}
+.notebox summary::after{content:" +";color:var(--sand)}
+.notebox[open] summary::after{content:" −"}
+.notebox textarea{margin-top:.6rem}
 .ask a{color:var(--deep);font-weight:600;text-decoration-color:var(--sand);text-decoration-thickness:2px;text-underline-offset:3px}
 h2.next{font-size:1.15rem;letter-spacing:-.01em;margin:2.25rem 0 .5rem}
 .course{margin:0;color:var(--muted)}
@@ -2241,6 +2253,7 @@ body.sea::after{content:"";position:absolute;left:0;right:0;top:0;height:12px;po
 .sea .total,.sea .row.sub,.sea .fine{color:#C9D6D9}
 .sea .book{background:#DCA44A;color:#09262F}
 .sea .book:hover{background:#F7F3EA;color:#09262F}
+.sea .paybar{background:linear-gradient(180deg,rgba(9,38,47,0) 0,rgba(9,38,47,.92) 1.1rem,#09262F 100%)}
 .sea textarea{background:rgba(247,243,234,.08);border-color:rgba(247,243,234,.22);color:#F7F3EA}
 .sea textarea::placeholder{color:rgba(201,214,217,.75)}
 .sea .policy{background:rgba(247,243,234,.06);border-color:rgba(247,243,234,.16)}
