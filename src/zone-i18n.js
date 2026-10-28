@@ -551,6 +551,10 @@ export const ZONE_ROWS = [
   ["Max depth", "Profundidad máx.", "Profondeur max.", "Max. Tiefe", "Max. diepte"],
   ["e.g. 18 m", "p. ej. 18 m", "ex. 18 m", "z. B. 18 m", "bv. 18 m"],
   ["Price and booking", "Precio y reserva", "Prix et réservation", "Preis und Buchung", "Prijs en boeken"],
+  ["AM", "Mañ.", "Mat.", "Vorm.", "VM"],
+  ["PM", "Tarde", "A-m.", "Nachm.", "NM"],
+  ["Show past weeks ({n})", "Ver semanas pasadas ({n})", "Voir les semaines passées ({n})", "Vergangene Wochen zeigen ({n})", "Voorbije weken tonen ({n})"],
+  ["Hide past weeks", "Ocultar semanas pasadas", "Masquer les semaines passées", "Vergangene Wochen ausblenden", "Voorbije weken verbergen"],
 ];
 
 // { es: { English: Spanish, … }, fr: …, de: …, nl: …, th: … }
@@ -1090,6 +1094,10 @@ export const ZONE_TH = {
   "Max depth": "ความลึกสูงสุด",
   "e.g. 18 m": "เช่น 18 ม.",
   "Price and booking": "ราคาและการจอง",
+  "AM": "เช้า",
+  "PM": "บ่าย",
+  "Show past weeks ({n})": "แสดงสัปดาห์ที่ผ่านมา ({n})",
+  "Hide past weeks": "ซ่อนสัปดาห์ที่ผ่านมา",
 };
 ZONE_TEXT.th = ZONE_TH;
 Object.assign(ZONE_TEXT, ZONE_MORE);
