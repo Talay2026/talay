@@ -28,7 +28,7 @@ a{color:inherit}
 .btn-dark{background:var(--deep);color:var(--paper)}
 .btn-ghost{color:var(--paper);box-shadow:inset 0 0 0 1.5px rgba(244,240,230,.35)}
 .btn-line{color:var(--deep);box-shadow:inset 0 0 0 1.5px var(--line);background:#fff}
-.btn:focus-visible,.copy:focus-visible,.langsel:focus-visible{outline:3px solid var(--sand);outline-offset:3px}
+.btn:focus-visible,.langsel:focus-visible{outline:3px solid var(--sand);outline-offset:3px}
 
 /* hero */
 .hero{background:radial-gradient(700px 360px at 90% -10%,#1C5262 0%,transparent 62%),var(--deep);color:var(--paper)}
@@ -55,24 +55,10 @@ h2{font-size:clamp(26px,6vw,36px);line-height:1.1;letter-spacing:-.02em;margin:0
 .feat p{margin:0;color:var(--muted);font-size:15.5px}
 .ico{width:40px;height:40px;border-radius:12px;background:var(--deep);display:grid;place-items:center;flex:none}
 
-.try{background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px;display:grid;gap:18px}
-.tstep{display:flex;gap:12px}
-.tstep p{margin:4px 0 10px;color:var(--muted);font-size:15.5px}
-.tstep p b{color:var(--deep)}
-.n{width:30px;height:30px;border-radius:50%;background:var(--sand);display:grid;place-items:center;font-size:14px;font-weight:800;flex:none}
-.tstep > div{flex:1;min-width:0}
-.msgs{display:grid;gap:8px;margin:0 0 12px}
-.msg{display:flex;align-items:center;gap:10px}
-.msg q{quotes:none;flex:1;min-width:0;background:var(--wa-out);border-radius:12px;border-top-right-radius:3px;padding:7px 11px;font-weight:600;font-size:15px;line-height:1.35}
-.copy{flex:none;background:var(--paper-2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;color:var(--deep)}
-.copy.done{background:var(--ok);border-color:var(--ok);color:#fff}
-.open{display:flex;flex-wrap:wrap;gap:8px}
-.open .btn{padding:10px 16px;font-size:15px}
 .card{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:linear-gradient(135deg,var(--deep-2),var(--deep));color:var(--paper);border-radius:14px;padding:14px 16px}
 .card .num{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:18px;letter-spacing:.08em}
 .card small{color:var(--soft);font-size:14px}
-.tour{margin:0}
-.tour video{display:block;width:100%;max-width:300px;border-radius:18px;border:1px solid var(--line);background:var(--deep)}
+.tl .cardp{margin:14px 0 8px}
 
 /* timeline */
 .tl{list-style:none;margin:0;padding:0;position:relative}
@@ -88,6 +74,7 @@ h2{font-size:clamp(26px,6vw,36px);line-height:1.1;letter-spacing:-.02em;margin:0
 .tl h3{margin:0 0 4px;font-size:19px}
 .tl p{margin:0;color:var(--muted);font-size:15.5px}
 .tl .btn{margin-top:12px;padding:11px 18px;font-size:15px}
+#next{padding-top:40px}
 
 .deal{margin-top:56px;background:var(--deep);color:var(--paper);border-radius:22px;padding:26px}
 .deal h2{color:var(--paper)}
@@ -100,7 +87,6 @@ h2{font-size:clamp(26px,6vw,36px);line-height:1.1;letter-spacing:-.02em;margin:0
 .contact h2{font-size:26px}
 .contact p{margin:0 0 16px;color:var(--muted)}
 .contact .ctas .btn{flex:1 1 200px}
-.sign{margin:16px 0 0 !important;font-weight:600;color:var(--deep) !important}
 
 footer.wrap{padding-top:32px;padding-bottom:44px;color:var(--muted);font-size:15px;display:flex;flex-wrap:wrap;gap:8px 24px;justify-content:space-between}
 footer a{color:var(--deep);font-weight:600}
@@ -108,7 +94,7 @@ footer a{color:var(--deep);font-weight:600}
 @media (max-width:480px){
   .wrap{padding:0 16px}
   .ctas .btn{width:100%}
-  .try,.deal,.contact{padding:18px}
+  .deal,.contact{padding:18px}
 }
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.btn{transition:none}}
 </style>
@@ -133,82 +119,25 @@ footer a{color:var(--deep);font-weight:600}
         <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5 5 0 0 0 1 2.7 11.5 11.5 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6a2.6 2.6 0 0 0 1.7-1.2 2.1 2.1 0 0 0 .2-1.2c-.1-.1-.3-.2-.5-.3z"/></svg>
         <span data-t="cta">Try Mia now</span>
       </a>
-      <a class="btn btn-ghost" href="#next" data-t="cta2">See the next steps</a>
+      <a class="btn btn-ghost" href="#next" data-t="cta2">How to get started</a>
     </div>
     <p class="demo-num"><span data-t="demoNum">On WhatsApp with our demo centre Ridgefin Divers:</span> <b>+32 456 90 00 33</b></p>
   </div>
 </header>
 
 <main class="wrap">
-  <section>
-    <h2 data-t="essH">In short</h2>
-    <div class="ess">
-      <div class="feat">
-        <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z" fill="#E0A84A"/></svg></div>
-        <div><h3 data-t="e1h">Answers in seconds, 24/7</h3><p data-t="e1p">More than 200 pre-written answers with your prices, times and rules, in 10 languages. The AI writes nothing itself: it only picks the right answer.</p></div>
-      </div>
-      <div class="feat">
-        <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="#E0A84A" stroke-width="2"/><path d="M3 10h18" stroke="#E0A84A" stroke-width="2"/></svg></div>
-        <div><h3 data-t="e2h">Turns chats into bookings</h3><p data-t="e2p">Mia sends a link where the diver picks a date and pays a deposit. You get the booking by email and in your own zone.</p></div>
-      </div>
-      <div class="feat">
-        <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="#E0A84A" stroke-width="2"/><path d="M4 21a8 8 0 0 1 16 0" fill="none" stroke="#E0A84A" stroke-width="2" stroke-linecap="round"/></svg></div>
-        <div><h3 data-t="e3h">You stay in charge</h3><p data-t="e3p">Medical questions, groups or anything unusual go to your team. All day or only outside office hours, and off with one tap.</p></div>
-      </div>
-    </div>
-  </section>
-
-  <section id="try">
-    <h2 data-t="tryH">Try it in 5 minutes</h2>
-    <p class="sub" data-t="trySub">Ridgefin Divers is our demo centre. Mia, the booking page and the emails are real; the payment uses a test card.</p>
-    <div class="try">
-      <div class="tstep">
-        <span class="n">1</span>
-        <div>
-          <p data-t="t1"><b>Message Mia as if you were a diver.</b> Any question, any language. Try to catch her out.</p>
-          <div class="msgs">
-            <div class="msg"><q>Hi! How much is diving here?</q><button class="copy" type="button" data-t="copy">Copy</button></div>
-            <div class="msg"><q>I have asthma, can I still dive?</q><button class="copy" type="button" data-t="copy">Copy</button></div>
-            <div class="msg"><q>My ferry arrives at 8:45, can I start later?</q><button class="copy" type="button" data-t="copy">Copy</button></div>
-          </div>
-          <div class="open">
-            <a class="btn btn-dark" href="https://wa.me/32456900033?text=Hi!" target="_blank" rel="noopener">WhatsApp</a>
-            <a class="btn btn-line" href="https://ig.me/m/ridgefin.divers" target="_blank" rel="noopener">Instagram</a>
-            <a class="btn btn-line" href="https://m.me/1426903903835555" target="_blank" rel="noopener">Messenger</a>
-          </div>
-        </div>
-      </div>
-      <div class="tstep">
-        <span class="n">2</span>
-        <div>
-          <p data-t="t2"><b>Book with the test card.</b> Tap the link Mia sends, pick a date and pay. Nothing is charged.</p>
-          <div class="card"><span class="num">4242 4242 4242 4242</span><small>12/30 · CVC 123</small></div>
-        </div>
-      </div>
-      <div class="tstep">
-        <span class="n">3</span>
-        <div>
-          <p data-t="t3"><b>See what your team gets.</b> Every conversation and booking, live in your own zone. A 30-second tour:</p>
-          <figure class="tour">
-            <video controls playsinline preload="none" poster="/img/zone/tour-poster.webp">
-              <source src="/img/zone/zone-tour-phone.webm" type="video/webm">
-              <source src="/img/zone/zone-tour-phone.mp4" type="video/mp4">
-            </video>
-          </figure>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <section id="next">
-    <h2 data-t="nextH">What happens next</h2>
-    <p class="sub" data-t="nextSub">From this chat to Mia answering for your own centre. You decide at every step.</p>
+    <h2 data-t="nextH">Get started in 5 simple steps</h2>
+    <p class="sub" data-t="nextSub">Free and without commitment. You decide at every step, and the first one takes 5 minutes.</p>
     <ol class="tl">
       <li class="now">
         <span class="dot">1</span>
         <span class="when" data-t="w1">Today</span>
         <h3 data-t="s1h">Try Mia</h3>
         <p data-t="s1p">Test her on the demo number, alone or with your team. Ask the questions your divers ask you.</p>
+        <a class="btn btn-sand" href="https://wa.me/32456900033?text=Hi!" target="_blank" rel="noopener"><span data-t="cta">Try Mia now</span></a>
+        <p class="cardp" data-t="cardP">Book through the link Mia sends and pay with this test card. Nothing is charged.</p>
+        <div class="card"><span class="num">4242 4242 4242 4242</span><small>12/30 · CVC 123</small></div>
       </li>
       <li>
         <span class="dot">2</span>
@@ -237,6 +166,25 @@ footer a{color:var(--deep);font-weight:600}
       </li>
     </ol>
   </section>
+  <section>
+    <h2 data-t="essH">In short</h2>
+    <div class="ess">
+      <div class="feat">
+        <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z" fill="#E0A84A"/></svg></div>
+        <div><h3 data-t="e1h">Answers in seconds, 24/7</h3><p data-t="e1p">More than 200 pre-written answers with your prices, times and rules, in 10 languages. The AI writes nothing itself: it only picks the right answer.</p></div>
+      </div>
+      <div class="feat">
+        <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="#E0A84A" stroke-width="2"/><path d="M3 10h18" stroke="#E0A84A" stroke-width="2"/></svg></div>
+        <div><h3 data-t="e2h">Turns chats into bookings</h3><p data-t="e2p">Mia sends a link where the diver picks a date and pays a deposit. You get the booking by email and in your own zone.</p></div>
+      </div>
+      <div class="feat">
+        <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="#E0A84A" stroke-width="2"/><path d="M4 21a8 8 0 0 1 16 0" fill="none" stroke="#E0A84A" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <div><h3 data-t="e3h">You stay in charge</h3><p data-t="e3p">Medical questions, groups or anything unusual go to your team. All day or only outside office hours, and off with one tap.</p></div>
+      </div>
+    </div>
+  </section>
+
+
 
   <div class="deal">
     <h2 data-t="dealH">Free to use</h2>
@@ -255,7 +203,6 @@ footer a{color:var(--deep);font-weight:600}
       <a class="btn btn-dark" href="https://wa.me/32456953907" target="_blank" rel="noopener"><span data-t="cWa">WhatsApp Jonas</span></a>
       <a class="btn btn-line" href="mailto:info@talay.io">info@talay.io</a>
     </div>
-    <p class="sign">Jonas &amp; Lars · Talay</p>
   </div>
 </main>
 
@@ -273,18 +220,13 @@ var T = {
     hi: "Merci pour l'échange !", hiName: "Merci pour l'échange, {c} !",
     h1: "Chaque plongeur a sa réponse en quelques secondes. <em>Jour et nuit.</em>",
     lead: "Talay est un assistant de demandes pour centres de plongée. Sur WhatsApp, Instagram et Messenger, Mia répond aux plongeurs avec vos propres prix et textes, dans leur langue, et envoie un lien pour réserver avec un acompte.",
-    cta: "Essayer Mia", cta2: "Voir les prochaines étapes", demoNum: "Sur WhatsApp avec notre centre de démo Ridgefin Divers :",
+    cta: "Essayer Mia", cta2: "Comment démarrer", demoNum: "Sur WhatsApp avec notre centre de démo Ridgefin Divers :",
     essH: "En bref",
     e1h: "Des réponses en quelques secondes, 24h/24", e1p: "Plus de 200 réponses préécrites avec vos prix, horaires et règles, en 10 langues. L'IA n'écrit rien elle-même : elle choisit seulement la bonne réponse.",
     e2h: "Les conversations deviennent des réservations", e2p: "Mia envoie un lien où le plongeur choisit une date et paie un acompte. Vous recevez la réservation par e-mail et dans votre propre espace.",
     e3h: "Vous gardez la main", e3p: "Questions médicales, groupes ou demandes inhabituelles vont à votre équipe. Toute la journée ou seulement hors des heures d'ouverture, et désactivable d'un geste.",
-    tryH: "Essayez en 5 minutes", trySub: "Ridgefin Divers est notre centre de démo. Mia, la page de réservation et les e-mails sont réels ; le paiement se fait avec une carte de test.",
-    t1: "<b>Écrivez à Mia comme un plongeur.</b> N'importe quelle question, dans n'importe quelle langue. Essayez de la piéger.",
-    t2: "<b>Réservez avec la carte de test.</b> Touchez le lien envoyé par Mia, choisissez une date et payez. Rien n'est débité.",
-    t3: "<b>Voyez ce que reçoit votre équipe.</b> Chaque conversation et réservation, en direct dans votre propre espace. Visite de 30 secondes :",
-    copy: "Copier", copied: "Copié ✓",
-    nextH: "Et ensuite ?", nextSub: "De cet échange à Mia qui répond pour votre centre. Vous décidez à chaque étape.",
-    w1: "Aujourd'hui", s1h: "Essayez Mia", s1p: "Testez-la sur le numéro de démo, seul ou avec votre équipe. Posez les questions que vos plongeurs vous posent.",
+    nextH: "Démarrez en 5 étapes simples", nextSub: "Gratuit et sans engagement. Vous décidez à chaque étape, et la première prend 5 minutes.",
+    w1: "Aujourd'hui", s1h: "Essayez Mia", s1p: "Testez-la sur le numéro de démo, seul ou avec votre équipe. Posez les questions que vos plongeurs vous posent.", cardP: "Réservez via le lien envoyé par Mia et payez avec cette carte de test. Rien n'est débité.",
     w2: "Environ 20 minutes", s2h: "Parlez-nous de votre centre", s2p: "Un court formulaire avec vos cours, prix, horaires et règles. Il s'enregistre au fur et à mesure : vous pouvez vous arrêter et reprendre plus tard.", s2b: "Ouvrir le formulaire",
     w3: "1 à 2 jours", s3h: "Nous préparons votre assistant", s3p: "Avec vos propres prix et textes, au nom de votre centre. Rien ne change dans votre système.",
     w4: "Aussi longtemps que vous voulez", s4h: "Vous et votre équipe le testez", s4p: "D'abord sur un numéro de test, pas avec de vrais plongeurs. Nous ajustons jusqu'à ce que vous soyez satisfait.",
@@ -298,18 +240,13 @@ var T = {
     hi: "Danke für das Gespräch!", hiName: "Danke für das Gespräch, {c}!",
     h1: "Jeder Taucher bekommt in Sekunden eine Antwort. <em>Tag und Nacht.</em>",
     lead: "Talay ist ein Anfrage-Assistent für Tauchcenter. Auf WhatsApp, Instagram und Messenger antwortet Mia mit Ihren eigenen Preisen und Texten, in der Sprache des Tauchers, und schickt einen Link zum Buchen mit Anzahlung.",
-    cta: "Mia jetzt testen", cta2: "Die nächsten Schritte", demoNum: "Auf WhatsApp mit unserem Demo-Center Ridgefin Divers:",
+    cta: "Mia jetzt testen", cta2: "So starten Sie", demoNum: "Auf WhatsApp mit unserem Demo-Center Ridgefin Divers:",
     essH: "Kurz gesagt",
     e1h: "Antworten in Sekunden, rund um die Uhr", e1p: "Über 200 vorgeschriebene Antworten mit Ihren Preisen, Zeiten und Regeln, in 10 Sprachen. Die KI schreibt selbst nichts: Sie wählt nur die richtige Antwort.",
     e2h: "Aus Chats werden Buchungen", e2p: "Mia schickt einen Link, über den der Taucher ein Datum wählt und eine Anzahlung leistet. Sie erhalten die Buchung per E-Mail und in Ihrem eigenen Bereich.",
     e3h: "Sie behalten die Kontrolle", e3p: "Medizinische Fragen, Gruppen oder Ungewöhnliches gehen an Ihr Team. Den ganzen Tag oder nur außerhalb der Öffnungszeiten, und mit einem Tipp ausgeschaltet.",
-    tryH: "In 5 Minuten ausprobieren", trySub: "Ridgefin Divers ist unser Demo-Center. Mia, die Buchungsseite und die E-Mails sind echt; bezahlt wird mit einer Testkarte.",
-    t1: "<b>Schreiben Sie Mia wie ein Taucher.</b> Jede Frage, jede Sprache. Versuchen Sie, sie aus dem Konzept zu bringen.",
-    t2: "<b>Buchen Sie mit der Testkarte.</b> Tippen Sie auf Mias Link, wählen Sie ein Datum und bezahlen Sie. Es wird nichts abgebucht.",
-    t3: "<b>Sehen Sie, was Ihr Team bekommt.</b> Jedes Gespräch und jede Buchung, live in Ihrem eigenen Bereich. Eine Tour in 30 Sekunden:",
-    copy: "Kopieren", copied: "Kopiert ✓",
-    nextH: "Wie es weitergeht", nextSub: "Von diesem Gespräch bis Mia für Ihr Center antwortet. Sie entscheiden bei jedem Schritt.",
-    w1: "Heute", s1h: "Mia testen", s1p: "Testen Sie sie auf der Demo-Nummer, allein oder mit Ihrem Team. Stellen Sie die Fragen, die Ihre Taucher Ihnen stellen.",
+    nextH: "In 5 einfachen Schritten starten", nextSub: "Kostenlos und unverbindlich. Sie entscheiden bei jedem Schritt, und der erste dauert 5 Minuten.",
+    w1: "Heute", s1h: "Mia testen", s1p: "Testen Sie sie auf der Demo-Nummer, allein oder mit Ihrem Team. Stellen Sie die Fragen, die Ihre Taucher Ihnen stellen.", cardP: "Buchen Sie über Mias Link und bezahlen Sie mit dieser Testkarte. Es wird nichts abgebucht.",
     w2: "Etwa 20 Minuten", s2h: "Erzählen Sie uns von Ihrem Center", s2p: "Ein kurzes Formular mit Ihren Kursen, Preisen, Zeiten und Regeln. Es speichert laufend, Sie können also pausieren und später weitermachen.", s2b: "Formular öffnen",
     w3: "1 bis 2 Tage", s3h: "Wir richten Ihren Assistenten ein", s3p: "Mit Ihren eigenen Preisen und Texten, unter dem Namen Ihres Centers. In Ihrem System ändert sich nichts.",
     w4: "So lange Sie möchten", s4h: "Sie und Ihr Team testen", s4p: "Zuerst auf einer Testnummer, nicht mit echten Tauchern. Wir passen an, bis Sie zufrieden sind.",
@@ -323,18 +260,13 @@ var T = {
     hi: "¡Gracias por la charla!", hiName: "¡Gracias por la charla, {c}!",
     h1: "Cada buceador recibe respuesta en segundos. <em>De día y de noche.</em>",
     lead: "Talay es un asistente de consultas para centros de buceo. En WhatsApp, Instagram y Messenger, Mia responde con tus propios precios y textos, en el idioma del buceador, y envía un enlace para reservar con un depósito.",
-    cta: "Prueba a Mia ahora", cta2: "Ver los próximos pasos", demoNum: "Por WhatsApp con nuestro centro de demostración Ridgefin Divers:",
+    cta: "Prueba a Mia ahora", cta2: "Cómo empezar", demoNum: "Por WhatsApp con nuestro centro de demostración Ridgefin Divers:",
     essH: "En resumen",
     e1h: "Respuestas en segundos, 24/7", e1p: "Más de 200 respuestas ya escritas con tus precios, horarios y normas, en 10 idiomas. La IA no escribe nada: solo elige la respuesta correcta.",
     e2h: "Convierte chats en reservas", e2p: "Mia envía un enlace donde el buceador elige fecha y paga un depósito. Recibes la reserva por correo y en tu propia zona.",
     e3h: "Tú tienes el control", e3p: "Preguntas médicas, grupos o casos especiales van a tu equipo. Todo el día o solo fuera del horario de oficina, y se apaga con un toque.",
-    tryH: "Pruébalo en 5 minutos", trySub: "Ridgefin Divers es nuestro centro de demostración. Mia, la página de reserva y los correos son reales; el pago usa una tarjeta de prueba.",
-    t1: "<b>Escribe a Mia como si fueras un buceador.</b> Cualquier pregunta, en cualquier idioma. Intenta pillarla.",
-    t2: "<b>Reserva con la tarjeta de prueba.</b> Toca el enlace que envía Mia, elige una fecha y paga. No se cobra nada.",
-    t3: "<b>Mira lo que recibe tu equipo.</b> Cada conversación y reserva, en directo en tu propia zona. Un recorrido de 30 segundos:",
-    copy: "Copiar", copied: "Copiado ✓",
-    nextH: "Próximos pasos", nextSub: "De esta charla a Mia respondiendo por tu centro. Tú decides en cada paso.",
-    w1: "Hoy", s1h: "Prueba a Mia", s1p: "Pruébala en el número de demostración, solo o con tu equipo. Hazle las preguntas que te hacen tus buceadores.",
+    nextH: "Empieza en 5 pasos sencillos", nextSub: "Gratis y sin compromiso. Tú decides en cada paso, y el primero lleva 5 minutos.",
+    w1: "Hoy", s1h: "Prueba a Mia", s1p: "Pruébala en el número de demostración, solo o con tu equipo. Hazle las preguntas que te hacen tus buceadores.", cardP: "Reserva con el enlace que envía Mia y paga con esta tarjeta de prueba. No se cobra nada.",
     w2: "Unos 20 minutos", s2h: "Cuéntanos sobre tu centro", s2p: "Un formulario corto con tus cursos, precios, horarios y normas. Se guarda mientras avanzas, así que puedes parar y seguir después.", s2b: "Abrir el formulario",
     w3: "1 a 2 días", s3h: "Preparamos tu asistente", s3p: "Con tus propios precios y textos, con el nombre de tu centro. No cambia nada en tu sistema.",
     w4: "El tiempo que quieras", s4h: "Tú y tu equipo lo probáis", s4p: "Primero en un número de prueba, no con buceadores reales. Ajustamos hasta que estés contento.",
@@ -348,18 +280,13 @@ var T = {
     hi: "Grazie per la chiacchierata!", hiName: "Grazie per la chiacchierata, {c}!",
     h1: "Ogni subacqueo riceve una risposta in pochi secondi. <em>Giorno e notte.</em>",
     lead: "Talay è un assistente per le richieste dei diving center. Su WhatsApp, Instagram e Messenger, Mia risponde con i vostri prezzi e testi, nella lingua del subacqueo, e invia un link per prenotare con un acconto.",
-    cta: "Prova Mia ora", cta2: "Vedi i prossimi passi", demoNum: "Su WhatsApp con il nostro centro demo Ridgefin Divers:",
+    cta: "Prova Mia ora", cta2: "Come iniziare", demoNum: "Su WhatsApp con il nostro centro demo Ridgefin Divers:",
     essH: "In breve",
     e1h: "Risposte in pochi secondi, 24/7", e1p: "Oltre 200 risposte già scritte con i vostri prezzi, orari e regole, in 10 lingue. L'IA non scrive nulla da sola: sceglie solo la risposta giusta.",
     e2h: "Le chat diventano prenotazioni", e2p: "Mia invia un link dove il subacqueo sceglie la data e paga un acconto. Ricevete la prenotazione via e-mail e nella vostra area.",
     e3h: "Il controllo resta a voi", e3p: "Domande mediche, gruppi o richieste insolite vanno al vostro team. Tutto il giorno o solo fuori orario, e si spegne con un tocco.",
-    tryH: "Provalo in 5 minuti", trySub: "Ridgefin Divers è il nostro centro demo. Mia, la pagina di prenotazione e le e-mail sono reali; il pagamento usa una carta di prova.",
-    t1: "<b>Scrivi a Mia come un subacqueo.</b> Qualsiasi domanda, in qualsiasi lingua. Prova a metterla in difficoltà.",
-    t2: "<b>Prenota con la carta di prova.</b> Tocca il link di Mia, scegli una data e paga. Non viene addebitato nulla.",
-    t3: "<b>Guarda cosa riceve il tuo team.</b> Ogni conversazione e prenotazione, in tempo reale nella tua area. Un tour di 30 secondi:",
-    copy: "Copia", copied: "Copiato ✓",
-    nextH: "I prossimi passi", nextSub: "Da questa chiacchierata a Mia che risponde per il tuo centro. Decidi tu a ogni passo.",
-    w1: "Oggi", s1h: "Prova Mia", s1p: "Provala sul numero demo, da solo o con il tuo team. Falle le domande che ti fanno i tuoi subacquei.",
+    nextH: "Inizia in 5 semplici passi", nextSub: "Gratis e senza impegno. Decidi tu a ogni passo, e il primo richiede 5 minuti.",
+    w1: "Oggi", s1h: "Prova Mia", s1p: "Provala sul numero demo, da solo o con il tuo team. Falle le domande che ti fanno i tuoi subacquei.", cardP: "Prenota dal link che invia Mia e paga con questa carta di prova. Non viene addebitato nulla.",
     w2: "Circa 20 minuti", s2h: "Raccontaci del tuo centro", s2p: "Un breve modulo con corsi, prezzi, orari e regole. Si salva mentre compili, quindi puoi fermarti e continuare dopo.", s2b: "Apri il modulo",
     w3: "1-2 giorni", s3h: "Prepariamo il tuo assistente", s3p: "Con i tuoi prezzi e testi, a nome del tuo centro. Nel tuo sistema non cambia nulla.",
     w4: "Quanto vuoi", s4h: "Tu e il tuo team lo provate", s4p: "Prima su un numero di prova, non con subacquei veri. Lo regoliamo finché sei soddisfatto.",
@@ -373,18 +300,13 @@ var T = {
     hi: "Bedankt voor het gesprek!", hiName: "Bedankt voor het gesprek, {c}!",
     h1: "Elke duiker binnen enkele seconden een antwoord. <em>Dag en nacht.</em>",
     lead: "Talay is een assistent voor aanvragen bij duikcentra. Op WhatsApp, Instagram en Messenger antwoordt Mia met je eigen prijzen en teksten, in de taal van de duiker, en stuurt ze een link om te boeken met een voorschot.",
-    cta: "Probeer Mia nu", cta2: "Bekijk de volgende stappen", demoNum: "Op WhatsApp met ons democentrum Ridgefin Divers:",
+    cta: "Probeer Mia nu", cta2: "Zo start je", demoNum: "Op WhatsApp met ons democentrum Ridgefin Divers:",
     essH: "In het kort",
     e1h: "Antwoord in seconden, 24/7", e1p: "Meer dan 200 vooraf geschreven antwoorden met je prijzen, uren en regels, in 10 talen. De AI schrijft zelf niets: ze kiest alleen het juiste antwoord.",
     e2h: "Van gesprek naar boeking", e2p: "Mia stuurt een link waar de duiker een datum kiest en een voorschot betaalt. Jij krijgt de boeking per mail en in je eigen zone.",
     e3h: "Jij houdt de touwtjes in handen", e3p: "Medische vragen, groepen of iets ongewoons gaan naar je team. De hele dag of alleen buiten de kantooruren, en met één tik uit.",
-    tryH: "Probeer het in 5 minuten", trySub: "Ridgefin Divers is ons democentrum. Mia, de boekingspagina en de mails zijn echt; de betaling gebeurt met een testkaart.",
-    t1: "<b>Stuur Mia een bericht alsof je een duiker bent.</b> Elke vraag, in elke taal. Probeer haar te strikken.",
-    t2: "<b>Boek met de testkaart.</b> Tik op de link die Mia stuurt, kies een datum en betaal. Er wordt niets aangerekend.",
-    t3: "<b>Bekijk wat je team krijgt.</b> Elk gesprek en elke boeking, live in je eigen zone. Een rondleiding van 30 seconden:",
-    copy: "Kopieer", copied: "Gekopieerd ✓",
-    nextH: "Wat er nu volgt", nextSub: "Van dit gesprek tot Mia antwoordt voor je eigen centrum. Jij beslist bij elke stap.",
-    w1: "Vandaag", s1h: "Probeer Mia", s1p: "Test haar op het demonummer, alleen of met je team. Stel de vragen die je duikers jou stellen.",
+    nextH: "Start in 5 eenvoudige stappen", nextSub: "Gratis en vrijblijvend. Jij beslist bij elke stap, en de eerste duurt 5 minuten.",
+    w1: "Vandaag", s1h: "Probeer Mia", s1p: "Test haar op het demonummer, alleen of met je team. Stel de vragen die je duikers jou stellen.", cardP: "Boek via de link die Mia stuurt en betaal met deze testkaart. Er wordt niets aangerekend.",
     w2: "Ongeveer 20 minuten", s2h: "Vertel ons over je centrum", s2p: "Een kort formulier met je cursussen, prijzen, uren en regels. Het bewaart terwijl je invult, dus je kunt stoppen en later verdergaan.", s2b: "Open het formulier",
     w3: "1 tot 2 dagen", s3h: "Wij zetten je assistent klaar", s3p: "Met je eigen prijzen en teksten, onder de naam van je centrum. Er verandert niets in je systeem.",
     w4: "Zo lang als je wilt", s4h: "Jij en je team testen", s4p: "Eerst op een testnummer, niet met echte duikers. We passen aan tot je tevreden bent.",
@@ -398,18 +320,13 @@ var T = {
     hi: "ขอบคุณที่ได้คุยกันนะครับ!", hiName: "ขอบคุณที่ได้คุยกันนะครับ {c}!",
     h1: "ตอบนักดำน้ำทุกคนภายในไม่กี่วินาที <em>ทั้งกลางวันและกลางคืน</em>",
     lead: "Talay คือผู้ช่วยตอบคำถามสำหรับศูนย์ดำน้ำ บน WhatsApp, Instagram และ Messenger Mia ตอบนักดำน้ำด้วยราคาและข้อความของคุณเอง ในภาษาของเขา และส่งลิงก์ให้จองพร้อมมัดจำ",
-    cta: "ลองคุยกับ Mia เลย", cta2: "ดูขั้นตอนถัดไป", demoNum: "ทาง WhatsApp กับศูนย์ตัวอย่าง Ridgefin Divers:",
+    cta: "ลองคุยกับ Mia เลย", cta2: "เริ่มต้นอย่างไร", demoNum: "ทาง WhatsApp กับศูนย์ตัวอย่าง Ridgefin Divers:",
     essH: "สรุปสั้นๆ",
     e1h: "ตอบภายในไม่กี่วินาที ตลอด 24 ชั่วโมง", e1p: "คำตอบที่เขียนไว้ล่วงหน้ากว่า 200 แบบ พร้อมราคา เวลา และกฎของคุณ ใน 10 ภาษา AI ไม่ได้เขียนเอง แค่เลือกคำตอบที่ถูกต้อง",
     e2h: "เปลี่ยนแชทเป็นการจอง", e2p: "Mia ส่งลิงก์ให้นักดำน้ำเลือกวันและจ่ายมัดจำ คุณได้รับการจองทางอีเมลและในโซนของคุณเอง",
     e3h: "คุณยังควบคุมทุกอย่าง", e3p: "คำถามด้านสุขภาพ กลุ่มใหญ่ หรือเรื่องพิเศษจะส่งต่อให้ทีมของคุณ เปิดทั้งวันหรือเฉพาะนอกเวลาทำการ และปิดได้ในแตะเดียว",
-    tryH: "ลองได้ใน 5 นาที", trySub: "Ridgefin Divers คือศูนย์ตัวอย่างของเรา Mia หน้าจอง และอีเมลเป็นของจริง การชำระเงินใช้บัตรทดสอบ",
-    t1: "<b>ส่งข้อความหา Mia เหมือนเป็นนักดำน้ำ</b> ถามอะไรก็ได้ ภาษาไหนก็ได้ ลองหาจุดที่เธอตอบไม่ได้",
-    t2: "<b>จองด้วยบัตรทดสอบ</b> แตะลิงก์ที่ Mia ส่งมา เลือกวัน แล้วชำระเงิน ไม่มีการเรียกเก็บเงินจริง",
-    t3: "<b>ดูว่าทีมของคุณได้รับอะไร</b> ทุกบทสนทนาและการจอง แบบเรียลไทม์ในโซนของคุณ ชมทัวร์ 30 วินาที:",
-    copy: "คัดลอก", copied: "คัดลอกแล้ว ✓",
-    nextH: "ขั้นตอนต่อไป", nextSub: "จากการคุยครั้งนี้ จนถึง Mia ตอบแทนศูนย์ของคุณ คุณเป็นคนตัดสินใจทุกขั้นตอน",
-    w1: "วันนี้", s1h: "ลองใช้ Mia", s1p: "ทดสอบบนเบอร์ตัวอย่าง คนเดียวหรือกับทีม ถามคำถามที่นักดำน้ำมักถามคุณ",
+    nextH: "เริ่มต้นใน 5 ขั้นตอนง่ายๆ", nextSub: "ฟรีและไม่มีข้อผูกมัด คุณตัดสินใจได้ทุกขั้นตอน และขั้นแรกใช้เวลาแค่ 5 นาที",
+    w1: "วันนี้", s1h: "ลองใช้ Mia", s1p: "ทดสอบบนเบอร์ตัวอย่าง คนเดียวหรือกับทีม ถามคำถามที่นักดำน้ำมักถามคุณ", cardP: "จองผ่านลิงก์ที่ Mia ส่งมา แล้วชำระด้วยบัตรทดสอบนี้ ไม่มีการเรียกเก็บเงินจริง",
     w2: "ประมาณ 20 นาที", s2h: "เล่าเกี่ยวกับศูนย์ของคุณ", s2p: "แบบฟอร์มสั้นๆ เรื่องคอร์ส ราคา เวลา และกฎของคุณ บันทึกอัตโนมัติ หยุดแล้วกลับมาทำต่อได้", s2b: "เปิดแบบฟอร์ม",
     w3: "1-2 วัน", s3h: "เราตั้งค่าผู้ช่วยให้คุณ", s3p: "ด้วยราคาและข้อความของคุณเอง ในชื่อศูนย์ของคุณ ระบบของคุณไม่ต้องเปลี่ยนอะไร",
     w4: "นานเท่าที่คุณต้องการ", s4h: "คุณและทีมทดสอบ", s4p: "ทดสอบบนเบอร์ทดสอบก่อน ไม่ใช่กับนักดำน้ำจริง เราปรับจนกว่าคุณจะพอใจ",
@@ -449,14 +366,6 @@ var sel = document.getElementById("lang");
 LANGS.forEach(function (x) { var o = document.createElement("option"); o.value = x[0]; o.textContent = x[1]; if (x[0] === lang) o.selected = true; sel.appendChild(o); });
 sel.onchange = function () { q.set("l", sel.value); location.search = q.toString(); };
 
-document.querySelectorAll(".copy").forEach(function (b) {
-  b.addEventListener("click", function () {
-    var txt = b.parentElement.querySelector("q").textContent;
-    var done = function () { b.textContent = t("copied") || "Copied ✓"; b.classList.add("done"); setTimeout(function () { b.textContent = t("copy"); b.classList.remove("done"); }, 1600); };
-    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt).then(done, done); }
-    else { var a = document.createElement("textarea"); a.value = txt; document.body.appendChild(a); a.select(); try { document.execCommand("copy"); } catch (e) {} document.body.removeChild(a); done(); }
-  });
-});
 </script>
 </body>
 </html>
