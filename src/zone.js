@@ -4802,7 +4802,6 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 .paused .btn{flex:none;font:inherit;font-size:14px;font-weight:700;border:0;border-radius:999px;padding:10px 16px;background:var(--sand);color:#0A2029;cursor:pointer;white-space:nowrap}
 .paused .btn:hover{filter:brightness(1.05)}
 .paused .btn[disabled]{opacity:.6;cursor:progress}
-.ghost.hb{background:var(--sand);border-color:var(--sand);color:#0A2029}
 @media (max-width:760px){.paused{flex-wrap:wrap;padding:10px 12px}.paused .btn{width:100%}}
 .placeholder{margin:auto;color:var(--muted);text-align:center;padding:24px;max-width:380px}
 #dash{flex-direction:column}
@@ -5799,6 +5798,40 @@ nav,button,.item,.chip,.day,.who{-webkit-user-select:none;user-select:none;-webk
 @keyframes paneIn{from{transform:translateX(100%)}to{transform:none}}
 @keyframes listIn{from{transform:translateX(-25%);opacity:.6}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){#convos.open .pane,#convos.back-anim .list{animation:none}}
+/* Consistency (29 Oct): one page width, one page title, buttons in two sizes */
+.twrap,.bwrap,.calwrap{max-width:1120px}
+.bwrap,.swrap,.twrap,.calwrap{padding-top:28px}
+.phead{margin:0 0 16px}
+.phead h1,.calbar h2{margin:0;font-size:26px;letter-spacing:-.025em;line-height:1.2}
+.thead h1{font-size:26px}
+.phead p{margin:4px 0 0;color:var(--muted);font-size:14px;max-width:640px}
+.swrap{max-width:1120px;grid-template-columns:minmax(0,760px);align-content:start}
+.swrap .phead{margin-bottom:2px}
+.stoc{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 90%,transparent);mask-image:linear-gradient(90deg,#000 90%,transparent);padding-right:24px}
+.stoc::-webkit-scrollbar{display:none}
+.stoc button{flex:none;font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--deep);border-radius:999px;padding:5px 12px;cursor:pointer}
+.stoc button:hover{border-color:var(--deep)}
+.swrap .scard{scroll-margin-top:16px}
+@media (min-width:1100px){
+ .swrap{grid-template-columns:minmax(0,760px) 190px;column-gap:28px}
+ .swrap > *{grid-column:1}
+ .swrap > .stoc{grid-column:2;grid-row:2 / span 30;align-self:start;position:sticky;top:0;flex-direction:column;gap:2px;overflow:visible;-webkit-mask-image:none;mask-image:none;padding:0}
+ .stoc button{border:0;background:none;text-align:left;border-radius:8px;padding:7px 10px;color:var(--muted)}
+ .stoc button:hover{background:var(--card);color:var(--deep)}
+}
+.ghost,.calnav .ghost,.psel.pbtn{font-size:13.5px;font-weight:600;border-radius:10px;min-height:36px;padding:7px 14px}
+.calnav .ghost{min-width:38px}
+.scard .btn,.srow .btn,.nact .btn{font-size:14px;border-radius:10px;min-height:38px;padding:8px 18px}
+.ptable th:nth-child(4){min-width:116px}
+@media (max-width:760px){
+ .bwrap,.swrap,.twrap,.calwrap{padding-top:16px}
+ .phead{margin-bottom:12px}
+ .phead h1,.thead h1{font-size:21px}
+ .calbar h2{font-size:18px}
+ .phead p{font-size:13px}
+ .btools,.tools .chips{-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent);padding-right:28px}
+ .cmeta .bt{display:none}
+}
 </style></head>
 <body>
 <header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>${T("Customer zone")}</small></span></div><span class="sp"></span>${switcher}<div class="htools">${superadmin ? `<a href="/zone/admin" title="Talay HQ">Talay HQ</a>` : ""}<button class="lnk hlang" id="hlang" type="button" title="${T("Language")}" aria-haspopup="menu" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg><span class="sl">${(ZONE_LANGS.find(l => l[0] === lang) || ZONE_LANGS[0])[1]}</span><svg class="chev sl" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">${T("Sign out")}</span></a><div class="soc"><a href="https://www.instagram.com/talay.io/" target="_blank" rel="noopener" title="${T("Talay on Instagram")}" aria-label="${T("Talay on Instagram")}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.5 6.5h.01"/></svg></a><a href="https://www.facebook.com/profile.php?id=61594947457744" target="_blank" rel="noopener" title="${T("Talay on Facebook")}" aria-label="${T("Talay on Facebook")}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg></a></div></div></header><div class="lmenu" id="lmenu" role="menu" hidden>${ZONE_LANGS.map(([code, name]) => `<button type="button" role="menuitemradio" aria-checked="${code === lang}" data-l="${code}"${code === lang ? ' class="on"' : ""}><span class="code">${code}</span>${name}<svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7"/></svg></button>`).join("")}</div>
@@ -5839,6 +5872,7 @@ nav,button,.item,.chip,.day,.who{-webkit-user-select:none;user-select:none;-webk
 
 <section id="books" class="view">
   <div class="bwrap">
+    <div class="phead"><h1>${T("Bookings")}</h1></div>
     <div class="btools">
       <button class="chip on" data-r="today">${T("Today")}</button>
       <button class="chip" data-r="tomorrow">${T("Tomorrow")}</button>
@@ -5868,20 +5902,22 @@ nav,button,.item,.chip,.day,.who{-webkit-user-select:none;user-select:none;-webk
 
 <section id="sett" class="view">
   <div class="swrap">
-    <div class="scard">
+    <div class="phead"><h1>${T("Settings")}</h1></div>
+    <div class="stoc" role="navigation" aria-label="${T("Settings")}"><button type="button" data-s="s-mia">${esc(center.assistant)}</button><button type="button" data-s="s-push">${T("Notifications")}</button><button type="button" data-s="s-prod">${T("Products")}</button><button type="button" data-s="s-hours">${T("Office hours")}</button><button type="button" data-s="s-alert">${T("Alert email")}</button><button type="button" data-s="s-team">${T("Team")}</button><button type="button" data-s="s-quick">${T("Quick replies")}</button><button type="button" data-s="s-info">${T("About you")}</button><button type="button" data-s="s-lang">${T("Language")}</button></div>
+    <div id="s-mia" class="scard">
       <h3>${esc(center.assistant)}</h3>
       <p class="d">${T("Pause {a} for the whole dive center, for example during a storm or a holiday. While paused she doesn't answer anyone: your team answers every diver under <b>Conversations → Open</b>.", { a: A })}</p>
       <div class="switch"><span class="pill" id="miaState">…</span><button class="ghost" id="miaToggle" type="button">…</button></div>
       <div class="smsg" id="miaMsg"></div>
     </div>
-    <div class="scard">
+    <div id="s-push" class="scard">
       <h3>${T("Notifications on this device")}</h3>
       <p class="d">${T("Get a notification as soon as {a} hands a conversation to your team, even when the zone is closed. Turn it on separately on every phone or computer. On an iPhone, first add the zone to your home screen (Share → Add to Home Screen) and open it from there.", { a: A })}</p>
       <div class="switch"><span class="pill" id="pushState">…</span><button class="btn" id="pushOn" type="button">${T("Turn on notifications")}</button><button class="ghost" id="pushTest" type="button" hidden>${T("Send a test")}</button><button class="ghost" id="pushOff" type="button" hidden>${T("Turn off")}</button></div>
       <div class="smsg" id="pushMsg"></div>
     </div>
     <div class="lock" id="adminNote" hidden>${T("Only an admin of your dive center can change prices, office hours, the alert email and the team. You can still pause {a}.", { a: A })}</div>
-    <div class="scard adm">
+    <div id="s-prod" class="scard adm">
       <h3>${T("Products and prices")}</h3>
       <p class="d">${T("What divers pay and until when they can book online. The online deposit is your commission to Talay; divers pay the rest at your shop. Changes reach {a} and the booking page within about two minutes.", { a: A })}</p>
       <div class="bscroll"><table class="ptable"><thead><tr><th>${T("Product")}</th><th>${T("Price (THB)")}</th><th>${T("Deposit")}</th><th>${T("Book until (day before)")}</th><th>${T("Max divers per day")}</th><th>${T("Bookable online")}</th><th></th></tr></thead><tbody id="prods"></tbody></table></div>
@@ -5889,7 +5925,7 @@ nav,button,.item,.chip,.day,.who{-webkit-user-select:none;user-select:none;-webk
       <div class="pnew"><button class="ghost" id="pAdd" type="button">+ ${T("Add a product")}</button><span class="d">${T("Something you offer that isn't listed, like a night dive or a snorkel trip? Add it here. {a} and your booking page pick it up straight away.", { a: A })}</span></div>
       <div class="smsg" id="pMsg"></div>
     </div>
-    <div class="scard adm">
+    <div id="s-hours" class="scard adm">
       <h3>${T("Office hours")}</h3>
       <p class="d">${T("When your team answers personally (Thai time, every day).")}</p>
       <div class="srow"><label>${T("From")} <input type="time" id="hFrom" step="900"></label><label>${T("to")} <input type="time" id="hTo" step="900"></label><button class="btn" id="hSave" type="button">${T("Save")}</button></div>
@@ -5898,20 +5934,20 @@ nav,button,.item,.chip,.day,.who{-webkit-user-select:none;user-select:none;-webk
       <div class="switch"><span class="pill" id="modeState">…</span><button class="ghost" id="modeToggle" type="button">…</button></div>
       <div class="smsg" id="modeMsg"></div>
     </div>
-    <div class="scard adm">
+    <div id="s-alert" class="scard adm">
       <h3>${T("Alert email")}</h3>
       <p class="d">${T("Where handovers, large groups and reminders are sent. A shared inbox works best.")}</p>
       <div class="srow"><input type="email" id="aEmail" placeholder="team@yourdivecenter.com"><button class="btn" id="aSave" type="button">${T("Save")}</button></div>
       <div class="smsg" id="aMsg"></div>
     </div>
-    <div class="scard adm">
+    <div id="s-team" class="scard adm">
       <h3>${T("Team")}</h3>
       <p class="d">${T("Everyone here can sign in at talay.io/zone with a code sent to their email.")} ${T("Add a name and WhatsApp number so {a}'s notifications reach the right person.", { a: A })}</p>
       <ul class="people" id="team"></ul>
       <div class="srow"><input type="email" id="tEmail" placeholder="${T("colleague@email.com")}"><button class="btn" id="tAdd" type="button">${T("Add")}</button></div>
       <div class="smsg" id="tMsg"></div>
     </div>
-    <div class="scard">
+    <div id="s-quick" class="scard">
       <h3>${T("Quick replies")}</h3>
       <p class="d">${T("Texts your team often sends, like your address or what to bring. In a chat, type / and the first letters of the name to put one in.")}</p>
       <ul class="people qlist" id="qlist"></ul>
@@ -5919,12 +5955,12 @@ nav,button,.item,.chip,.day,.who{-webkit-user-select:none;user-select:none;-webk
       <button type="button" class="ghost" id="qNew">${T("+ New quick reply")}</button>
       <div class="smsg" id="qMsg"></div>
     </div>
-    <div class="scard">
+    <div id="s-info" class="scard">
       <h3>${T("What {a} knows about you", { a: A })}</h3>
       <p class="d">${T("To change any of this, message Jonas at {mail}.", { mail: '<a href="mailto:jonas@talay.io">jonas@talay.io</a>' })}</p>
       <dl class="info" id="info"></dl>
     </div>
-    <div class="scard">
+    <div id="s-lang" class="scard">
       <h3>${T("Language")}</h3>
       <p class="d">${T("The language of the zone on this device. Every colleague can choose their own. The messages to divers don't change: {a} always answers in the diver's language.", { a: A })}</p>
       <div class="chips zlangs" role="group" aria-label="${T("Language")}">${langOpts}</div>
@@ -5934,6 +5970,7 @@ nav,button,.item,.chip,.day,.who{-webkit-user-select:none;user-select:none;-webk
 
 <section id="supp" class="view">
   <div class="bwrap">
+    <div class="phead"><h1>${T("Support")}</h1><p>${T("Tell Talay what's wrong or what you'd like. Jonas gets it right away and answers here.")}</p></div>
     <div class="btools">
       <button class="chip on" data-t="open">${T("Open")}</button>
       <button class="chip" data-t="done">${T("Done")}</button>
@@ -5947,6 +5984,7 @@ nav,button,.item,.chip,.day,.who{-webkit-user-select:none;user-select:none;-webk
 
 <section id="dash" class="view">
   <div class="bwrap">
+    <div class="phead"><h1>${T("Dashboard")}</h1></div>
     <div class="btools">
       <select id="period" aria-label="${T("Period")}" class="psel" hidden></select><button type="button" class="psel pbtn" id="pbtn" aria-haspopup="menu" aria-expanded="false" title="${T("Period")}"><span id="pname">${T("Last 30 days")}</span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><div class="amenu" id="pmenu" role="menu" hidden></div>
       <span class="sp"></span>
@@ -6864,6 +6902,10 @@ function zoneClient(cfg) {
     tr.querySelector(".xn").focus();
   }
   $("#pAdd").onclick = function () { if (sdata && sdata.admin) editProduct(null, null); };
+  // Section menu at the top of Settings: jump to a block.
+  document.querySelectorAll(".stoc [data-s]").forEach(function (b) {
+    b.onclick = function () { var el = document.getElementById(b.dataset.s); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  });
   function loadSettings() {
     return api("settings").then(function (d) {
       sdata = d;
