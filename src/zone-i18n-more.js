@@ -501,6 +501,18 @@ export const ZONE_ZH = {
   "Saving and translating…": "正在保存并翻译…",
   "Remove {x}? Divers can no longer book it.": "删除 {x}？潜水员将无法再预订。",
   "Details": "详情",
+  "What to bring": "需要携带",
+  "e.g. swimwear, a towel and sunscreen": "例如 泳衣、毛巾和防晒霜",
+  "On the booking page": "在预订页面上",
+  "Time slot": "时段",
+  "Not asked": "不询问",
+  "Morning or afternoon": "上午或下午",
+  "Number of days": "天数",
+  "Max divers per group": "每组最多潜水员",
+  "Dives": "潜水次数",
+  "Max depth": "最大深度",
+  "e.g. 18 m": "例如 18 米",
+  "Price and booking": "价格与预订",
 };
 
 // Russian
@@ -1003,6 +1015,18 @@ export const ZONE_RU = {
   "Saving and translating…": "Сохраняем и переводим…",
   "Remove {x}? Divers can no longer book it.": "Удалить {x}? Дайверы больше не смогут это забронировать.",
   "Details": "Подробнее",
+  "What to bring": "Что взять с собой",
+  "e.g. swimwear, a towel and sunscreen": "например, купальник, полотенце и солнцезащитный крем",
+  "On the booking page": "На странице бронирования",
+  "Time slot": "Время",
+  "Not asked": "Не спрашивать",
+  "Morning or afternoon": "Утро или день",
+  "Number of days": "Количество дней",
+  "Max divers per group": "Макс. дайверов в группе",
+  "Dives": "Погружения",
+  "Max depth": "Макс. глубина",
+  "e.g. 18 m": "например, 18 м",
+  "Price and booking": "Цена и бронирование",
 };
 
 // Italian
@@ -1505,6 +1529,18 @@ export const ZONE_IT = {
   "Saving and translating…": "Salvataggio e traduzione…",
   "Remove {x}? Divers can no longer book it.": "Rimuovere {x}? I subacquei non potranno più prenotarlo.",
   "Details": "Dettagli",
+  "What to bring": "Cosa portare",
+  "e.g. swimwear, a towel and sunscreen": "es. costume, asciugamano e crema solare",
+  "On the booking page": "Sulla pagina di prenotazione",
+  "Time slot": "Fascia oraria",
+  "Not asked": "Non chiesto",
+  "Morning or afternoon": "Mattina o pomeriggio",
+  "Number of days": "Numero di giorni",
+  "Max divers per group": "Max subacquei per gruppo",
+  "Dives": "Immersioni",
+  "Max depth": "Profondità max",
+  "e.g. 18 m": "es. 18 m",
+  "Price and booking": "Prezzo e prenotazione",
 };
 
 // Korean
@@ -2007,4 +2043,16 @@ export const ZONE_KO = {
   "Saving and translating…": "저장하고 번역하는 중…",
   "Remove {x}? Divers can no longer book it.": "{x}을(를) 삭제할까요? 다이버가 더 이상 예약할 수 없어요.",
   "Details": "자세히",
+  "What to bring": "준비물",
+  "e.g. swimwear, a towel and sunscreen": "예: 수영복, 수건, 선크림",
+  "On the booking page": "예약 페이지에서",
+  "Time slot": "시간대",
+  "Not asked": "묻지 않음",
+  "Morning or afternoon": "오전 또는 오후",
+  "Number of days": "일수",
+  "Max divers per group": "그룹당 최대 다이버",
+  "Dives": "다이빙 횟수",
+  "Max depth": "최대 수심",
+  "e.g. 18 m": "예: 18 m",
+  "Price and booking": "가격 및 예약",
 };
