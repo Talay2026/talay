@@ -88,6 +88,7 @@ h2{font-size:clamp(26px,6vw,36px);line-height:1.1;letter-spacing:-.02em;margin:0
 .tl h3{margin:0 0 4px;font-size:19px}
 .tl p{margin:0;color:var(--muted);font-size:15.5px}
 .tl .btn{margin-top:12px;padding:11px 18px;font-size:15px}
+#next{padding-top:40px}
 
 .deal{margin-top:56px;background:var(--deep);color:var(--paper);border-radius:22px;padding:26px}
 .deal h2{color:var(--paper)}
@@ -100,7 +101,6 @@ h2{font-size:clamp(26px,6vw,36px);line-height:1.1;letter-spacing:-.02em;margin:0
 .contact h2{font-size:26px}
 .contact p{margin:0 0 16px;color:var(--muted)}
 .contact .ctas .btn{flex:1 1 200px}
-.sign{margin:16px 0 0 !important;font-weight:600;color:var(--deep) !important}
 
 footer.wrap{padding-top:32px;padding-bottom:44px;color:var(--muted);font-size:15px;display:flex;flex-wrap:wrap;gap:8px 24px;justify-content:space-between}
 footer a{color:var(--deep);font-weight:600}
@@ -133,13 +133,51 @@ footer a{color:var(--deep);font-weight:600}
         <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5 5 0 0 0 1 2.7 11.5 11.5 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6a2.6 2.6 0 0 0 1.7-1.2 2.1 2.1 0 0 0 .2-1.2c-.1-.1-.3-.2-.5-.3z"/></svg>
         <span data-t="cta">Try Mia now</span>
       </a>
-      <a class="btn btn-ghost" href="#next" data-t="cta2">See the next steps</a>
+      <a class="btn btn-ghost" href="#next" data-t="cta2">How to get started</a>
     </div>
     <p class="demo-num"><span data-t="demoNum">On WhatsApp with our demo centre Ridgefin Divers:</span> <b>+32 456 90 00 33</b></p>
   </div>
 </header>
 
 <main class="wrap">
+  <section id="next">
+    <h2 data-t="nextH">Get started in 5 simple steps</h2>
+    <p class="sub" data-t="nextSub">Free and without commitment. You decide at every step, and the first one takes 5 minutes.</p>
+    <ol class="tl">
+      <li class="now">
+        <span class="dot">1</span>
+        <span class="when" data-t="w1">Today</span>
+        <h3 data-t="s1h">Try Mia</h3>
+        <p data-t="s1p">Test her on the demo number, alone or with your team. Ask the questions your divers ask you.</p>
+        <a class="btn btn-sand" href="https://wa.me/32456900033?text=Hi!" target="_blank" rel="noopener"><span data-t="cta">Try Mia now</span></a>
+      </li>
+      <li>
+        <span class="dot">2</span>
+        <span class="when" data-t="w2">About 20 minutes</span>
+        <h3 data-t="s2h">Tell us about your centre</h3>
+        <p data-t="s2p">A short form with your courses, prices, times and rules. It saves as you go, so you can stop and continue later.</p>
+        <a class="btn btn-dark" href="/start/" id="startLink" data-t="s2b">Open the form</a>
+      </li>
+      <li>
+        <span class="dot">3</span>
+        <span class="when" data-t="w3">1 to 2 days</span>
+        <h3 data-t="s3h">We set up your assistant</h3>
+        <p data-t="s3p">With your own prices and texts, under your centre's name. Nothing changes in your system.</p>
+      </li>
+      <li>
+        <span class="dot">4</span>
+        <span class="when" data-t="w4">As long as you like</span>
+        <h3 data-t="s4h">You and your team test it</h3>
+        <p data-t="s4p">First on a test number, not with real divers. We adjust it until you are happy.</p>
+      </li>
+      <li class="live">
+        <span class="dot">5</span>
+        <span class="when" data-t="w5">When you say go</span>
+        <h3 data-t="s5h">Mia answers your divers</h3>
+        <p data-t="s5p">On your own number, all day or only outside office hours. You follow everything in your zone and can switch it off at any moment.</p>
+      </li>
+    </ol>
+  </section>
   <section>
     <h2 data-t="essH">In short</h2>
     <div class="ess">
@@ -200,43 +238,6 @@ footer a{color:var(--deep);font-weight:600}
     </div>
   </section>
 
-  <section id="next">
-    <h2 data-t="nextH">What happens next</h2>
-    <p class="sub" data-t="nextSub">From this chat to Mia answering for your own centre. You decide at every step.</p>
-    <ol class="tl">
-      <li class="now">
-        <span class="dot">1</span>
-        <span class="when" data-t="w1">Today</span>
-        <h3 data-t="s1h">Try Mia</h3>
-        <p data-t="s1p">Test her on the demo number, alone or with your team. Ask the questions your divers ask you.</p>
-      </li>
-      <li>
-        <span class="dot">2</span>
-        <span class="when" data-t="w2">About 20 minutes</span>
-        <h3 data-t="s2h">Tell us about your centre</h3>
-        <p data-t="s2p">A short form with your courses, prices, times and rules. It saves as you go, so you can stop and continue later.</p>
-        <a class="btn btn-dark" href="/start/" id="startLink" data-t="s2b">Open the form</a>
-      </li>
-      <li>
-        <span class="dot">3</span>
-        <span class="when" data-t="w3">1 to 2 days</span>
-        <h3 data-t="s3h">We set up your assistant</h3>
-        <p data-t="s3p">With your own prices and texts, under your centre's name. Nothing changes in your system.</p>
-      </li>
-      <li>
-        <span class="dot">4</span>
-        <span class="when" data-t="w4">As long as you like</span>
-        <h3 data-t="s4h">You and your team test it</h3>
-        <p data-t="s4p">First on a test number, not with real divers. We adjust it until you are happy.</p>
-      </li>
-      <li class="live">
-        <span class="dot">5</span>
-        <span class="when" data-t="w5">When you say go</span>
-        <h3 data-t="s5h">Mia answers your divers</h3>
-        <p data-t="s5p">On your own number, all day or only outside office hours. You follow everything in your zone and can switch it off at any moment.</p>
-      </li>
-    </ol>
-  </section>
 
   <div class="deal">
     <h2 data-t="dealH">Free to use</h2>
@@ -255,7 +256,6 @@ footer a{color:var(--deep);font-weight:600}
       <a class="btn btn-dark" href="https://wa.me/32456953907" target="_blank" rel="noopener"><span data-t="cWa">WhatsApp Jonas</span></a>
       <a class="btn btn-line" href="mailto:info@talay.io">info@talay.io</a>
     </div>
-    <p class="sign">Jonas &amp; Lars · Talay</p>
   </div>
 </main>
 
@@ -273,7 +273,7 @@ var T = {
     hi: "Merci pour l'échange !", hiName: "Merci pour l'échange, {c} !",
     h1: "Chaque plongeur a sa réponse en quelques secondes. <em>Jour et nuit.</em>",
     lead: "Talay est un assistant de demandes pour centres de plongée. Sur WhatsApp, Instagram et Messenger, Mia répond aux plongeurs avec vos propres prix et textes, dans leur langue, et envoie un lien pour réserver avec un acompte.",
-    cta: "Essayer Mia", cta2: "Voir les prochaines étapes", demoNum: "Sur WhatsApp avec notre centre de démo Ridgefin Divers :",
+    cta: "Essayer Mia", cta2: "Comment démarrer", demoNum: "Sur WhatsApp avec notre centre de démo Ridgefin Divers :",
     essH: "En bref",
     e1h: "Des réponses en quelques secondes, 24h/24", e1p: "Plus de 200 réponses préécrites avec vos prix, horaires et règles, en 10 langues. L'IA n'écrit rien elle-même : elle choisit seulement la bonne réponse.",
     e2h: "Les conversations deviennent des réservations", e2p: "Mia envoie un lien où le plongeur choisit une date et paie un acompte. Vous recevez la réservation par e-mail et dans votre propre espace.",
@@ -283,7 +283,7 @@ var T = {
     t2: "<b>Réservez avec la carte de test.</b> Touchez le lien envoyé par Mia, choisissez une date et payez. Rien n'est débité.",
     t3: "<b>Voyez ce que reçoit votre équipe.</b> Chaque conversation et réservation, en direct dans votre propre espace. Visite de 30 secondes :",
     copy: "Copier", copied: "Copié ✓",
-    nextH: "Et ensuite ?", nextSub: "De cet échange à Mia qui répond pour votre centre. Vous décidez à chaque étape.",
+    nextH: "Démarrez en 5 étapes simples", nextSub: "Gratuit et sans engagement. Vous décidez à chaque étape, et la première prend 5 minutes.",
     w1: "Aujourd'hui", s1h: "Essayez Mia", s1p: "Testez-la sur le numéro de démo, seul ou avec votre équipe. Posez les questions que vos plongeurs vous posent.",
     w2: "Environ 20 minutes", s2h: "Parlez-nous de votre centre", s2p: "Un court formulaire avec vos cours, prix, horaires et règles. Il s'enregistre au fur et à mesure : vous pouvez vous arrêter et reprendre plus tard.", s2b: "Ouvrir le formulaire",
     w3: "1 à 2 jours", s3h: "Nous préparons votre assistant", s3p: "Avec vos propres prix et textes, au nom de votre centre. Rien ne change dans votre système.",
@@ -298,7 +298,7 @@ var T = {
     hi: "Danke für das Gespräch!", hiName: "Danke für das Gespräch, {c}!",
     h1: "Jeder Taucher bekommt in Sekunden eine Antwort. <em>Tag und Nacht.</em>",
     lead: "Talay ist ein Anfrage-Assistent für Tauchcenter. Auf WhatsApp, Instagram und Messenger antwortet Mia mit Ihren eigenen Preisen und Texten, in der Sprache des Tauchers, und schickt einen Link zum Buchen mit Anzahlung.",
-    cta: "Mia jetzt testen", cta2: "Die nächsten Schritte", demoNum: "Auf WhatsApp mit unserem Demo-Center Ridgefin Divers:",
+    cta: "Mia jetzt testen", cta2: "So starten Sie", demoNum: "Auf WhatsApp mit unserem Demo-Center Ridgefin Divers:",
     essH: "Kurz gesagt",
     e1h: "Antworten in Sekunden, rund um die Uhr", e1p: "Über 200 vorgeschriebene Antworten mit Ihren Preisen, Zeiten und Regeln, in 10 Sprachen. Die KI schreibt selbst nichts: Sie wählt nur die richtige Antwort.",
     e2h: "Aus Chats werden Buchungen", e2p: "Mia schickt einen Link, über den der Taucher ein Datum wählt und eine Anzahlung leistet. Sie erhalten die Buchung per E-Mail und in Ihrem eigenen Bereich.",
@@ -308,7 +308,7 @@ var T = {
     t2: "<b>Buchen Sie mit der Testkarte.</b> Tippen Sie auf Mias Link, wählen Sie ein Datum und bezahlen Sie. Es wird nichts abgebucht.",
     t3: "<b>Sehen Sie, was Ihr Team bekommt.</b> Jedes Gespräch und jede Buchung, live in Ihrem eigenen Bereich. Eine Tour in 30 Sekunden:",
     copy: "Kopieren", copied: "Kopiert ✓",
-    nextH: "Wie es weitergeht", nextSub: "Von diesem Gespräch bis Mia für Ihr Center antwortet. Sie entscheiden bei jedem Schritt.",
+    nextH: "In 5 einfachen Schritten starten", nextSub: "Kostenlos und unverbindlich. Sie entscheiden bei jedem Schritt, und der erste dauert 5 Minuten.",
     w1: "Heute", s1h: "Mia testen", s1p: "Testen Sie sie auf der Demo-Nummer, allein oder mit Ihrem Team. Stellen Sie die Fragen, die Ihre Taucher Ihnen stellen.",
     w2: "Etwa 20 Minuten", s2h: "Erzählen Sie uns von Ihrem Center", s2p: "Ein kurzes Formular mit Ihren Kursen, Preisen, Zeiten und Regeln. Es speichert laufend, Sie können also pausieren und später weitermachen.", s2b: "Formular öffnen",
     w3: "1 bis 2 Tage", s3h: "Wir richten Ihren Assistenten ein", s3p: "Mit Ihren eigenen Preisen und Texten, unter dem Namen Ihres Centers. In Ihrem System ändert sich nichts.",
@@ -323,7 +323,7 @@ var T = {
     hi: "¡Gracias por la charla!", hiName: "¡Gracias por la charla, {c}!",
     h1: "Cada buceador recibe respuesta en segundos. <em>De día y de noche.</em>",
     lead: "Talay es un asistente de consultas para centros de buceo. En WhatsApp, Instagram y Messenger, Mia responde con tus propios precios y textos, en el idioma del buceador, y envía un enlace para reservar con un depósito.",
-    cta: "Prueba a Mia ahora", cta2: "Ver los próximos pasos", demoNum: "Por WhatsApp con nuestro centro de demostración Ridgefin Divers:",
+    cta: "Prueba a Mia ahora", cta2: "Cómo empezar", demoNum: "Por WhatsApp con nuestro centro de demostración Ridgefin Divers:",
     essH: "En resumen",
     e1h: "Respuestas en segundos, 24/7", e1p: "Más de 200 respuestas ya escritas con tus precios, horarios y normas, en 10 idiomas. La IA no escribe nada: solo elige la respuesta correcta.",
     e2h: "Convierte chats en reservas", e2p: "Mia envía un enlace donde el buceador elige fecha y paga un depósito. Recibes la reserva por correo y en tu propia zona.",
@@ -333,7 +333,7 @@ var T = {
     t2: "<b>Reserva con la tarjeta de prueba.</b> Toca el enlace que envía Mia, elige una fecha y paga. No se cobra nada.",
     t3: "<b>Mira lo que recibe tu equipo.</b> Cada conversación y reserva, en directo en tu propia zona. Un recorrido de 30 segundos:",
     copy: "Copiar", copied: "Copiado ✓",
-    nextH: "Próximos pasos", nextSub: "De esta charla a Mia respondiendo por tu centro. Tú decides en cada paso.",
+    nextH: "Empieza en 5 pasos sencillos", nextSub: "Gratis y sin compromiso. Tú decides en cada paso, y el primero lleva 5 minutos.",
     w1: "Hoy", s1h: "Prueba a Mia", s1p: "Pruébala en el número de demostración, solo o con tu equipo. Hazle las preguntas que te hacen tus buceadores.",
     w2: "Unos 20 minutos", s2h: "Cuéntanos sobre tu centro", s2p: "Un formulario corto con tus cursos, precios, horarios y normas. Se guarda mientras avanzas, así que puedes parar y seguir después.", s2b: "Abrir el formulario",
     w3: "1 a 2 días", s3h: "Preparamos tu asistente", s3p: "Con tus propios precios y textos, con el nombre de tu centro. No cambia nada en tu sistema.",
@@ -348,7 +348,7 @@ var T = {
     hi: "Grazie per la chiacchierata!", hiName: "Grazie per la chiacchierata, {c}!",
     h1: "Ogni subacqueo riceve una risposta in pochi secondi. <em>Giorno e notte.</em>",
     lead: "Talay è un assistente per le richieste dei diving center. Su WhatsApp, Instagram e Messenger, Mia risponde con i vostri prezzi e testi, nella lingua del subacqueo, e invia un link per prenotare con un acconto.",
-    cta: "Prova Mia ora", cta2: "Vedi i prossimi passi", demoNum: "Su WhatsApp con il nostro centro demo Ridgefin Divers:",
+    cta: "Prova Mia ora", cta2: "Come iniziare", demoNum: "Su WhatsApp con il nostro centro demo Ridgefin Divers:",
     essH: "In breve",
     e1h: "Risposte in pochi secondi, 24/7", e1p: "Oltre 200 risposte già scritte con i vostri prezzi, orari e regole, in 10 lingue. L'IA non scrive nulla da sola: sceglie solo la risposta giusta.",
     e2h: "Le chat diventano prenotazioni", e2p: "Mia invia un link dove il subacqueo sceglie la data e paga un acconto. Ricevete la prenotazione via e-mail e nella vostra area.",
@@ -358,7 +358,7 @@ var T = {
     t2: "<b>Prenota con la carta di prova.</b> Tocca il link di Mia, scegli una data e paga. Non viene addebitato nulla.",
     t3: "<b>Guarda cosa riceve il tuo team.</b> Ogni conversazione e prenotazione, in tempo reale nella tua area. Un tour di 30 secondi:",
     copy: "Copia", copied: "Copiato ✓",
-    nextH: "I prossimi passi", nextSub: "Da questa chiacchierata a Mia che risponde per il tuo centro. Decidi tu a ogni passo.",
+    nextH: "Inizia in 5 semplici passi", nextSub: "Gratis e senza impegno. Decidi tu a ogni passo, e il primo richiede 5 minuti.",
     w1: "Oggi", s1h: "Prova Mia", s1p: "Provala sul numero demo, da solo o con il tuo team. Falle le domande che ti fanno i tuoi subacquei.",
     w2: "Circa 20 minuti", s2h: "Raccontaci del tuo centro", s2p: "Un breve modulo con corsi, prezzi, orari e regole. Si salva mentre compili, quindi puoi fermarti e continuare dopo.", s2b: "Apri il modulo",
     w3: "1-2 giorni", s3h: "Prepariamo il tuo assistente", s3p: "Con i tuoi prezzi e testi, a nome del tuo centro. Nel tuo sistema non cambia nulla.",
@@ -373,7 +373,7 @@ var T = {
     hi: "Bedankt voor het gesprek!", hiName: "Bedankt voor het gesprek, {c}!",
     h1: "Elke duiker binnen enkele seconden een antwoord. <em>Dag en nacht.</em>",
     lead: "Talay is een assistent voor aanvragen bij duikcentra. Op WhatsApp, Instagram en Messenger antwoordt Mia met je eigen prijzen en teksten, in de taal van de duiker, en stuurt ze een link om te boeken met een voorschot.",
-    cta: "Probeer Mia nu", cta2: "Bekijk de volgende stappen", demoNum: "Op WhatsApp met ons democentrum Ridgefin Divers:",
+    cta: "Probeer Mia nu", cta2: "Zo start je", demoNum: "Op WhatsApp met ons democentrum Ridgefin Divers:",
     essH: "In het kort",
     e1h: "Antwoord in seconden, 24/7", e1p: "Meer dan 200 vooraf geschreven antwoorden met je prijzen, uren en regels, in 10 talen. De AI schrijft zelf niets: ze kiest alleen het juiste antwoord.",
     e2h: "Van gesprek naar boeking", e2p: "Mia stuurt een link waar de duiker een datum kiest en een voorschot betaalt. Jij krijgt de boeking per mail en in je eigen zone.",
@@ -383,7 +383,7 @@ var T = {
     t2: "<b>Boek met de testkaart.</b> Tik op de link die Mia stuurt, kies een datum en betaal. Er wordt niets aangerekend.",
     t3: "<b>Bekijk wat je team krijgt.</b> Elk gesprek en elke boeking, live in je eigen zone. Een rondleiding van 30 seconden:",
     copy: "Kopieer", copied: "Gekopieerd ✓",
-    nextH: "Wat er nu volgt", nextSub: "Van dit gesprek tot Mia antwoordt voor je eigen centrum. Jij beslist bij elke stap.",
+    nextH: "Start in 5 eenvoudige stappen", nextSub: "Gratis en vrijblijvend. Jij beslist bij elke stap, en de eerste duurt 5 minuten.",
     w1: "Vandaag", s1h: "Probeer Mia", s1p: "Test haar op het demonummer, alleen of met je team. Stel de vragen die je duikers jou stellen.",
     w2: "Ongeveer 20 minuten", s2h: "Vertel ons over je centrum", s2p: "Een kort formulier met je cursussen, prijzen, uren en regels. Het bewaart terwijl je invult, dus je kunt stoppen en later verdergaan.", s2b: "Open het formulier",
     w3: "1 tot 2 dagen", s3h: "Wij zetten je assistent klaar", s3p: "Met je eigen prijzen en teksten, onder de naam van je centrum. Er verandert niets in je systeem.",
@@ -398,7 +398,7 @@ var T = {
     hi: "ขอบคุณที่ได้คุยกันนะครับ!", hiName: "ขอบคุณที่ได้คุยกันนะครับ {c}!",
     h1: "ตอบนักดำน้ำทุกคนภายในไม่กี่วินาที <em>ทั้งกลางวันและกลางคืน</em>",
     lead: "Talay คือผู้ช่วยตอบคำถามสำหรับศูนย์ดำน้ำ บน WhatsApp, Instagram และ Messenger Mia ตอบนักดำน้ำด้วยราคาและข้อความของคุณเอง ในภาษาของเขา และส่งลิงก์ให้จองพร้อมมัดจำ",
-    cta: "ลองคุยกับ Mia เลย", cta2: "ดูขั้นตอนถัดไป", demoNum: "ทาง WhatsApp กับศูนย์ตัวอย่าง Ridgefin Divers:",
+    cta: "ลองคุยกับ Mia เลย", cta2: "เริ่มต้นอย่างไร", demoNum: "ทาง WhatsApp กับศูนย์ตัวอย่าง Ridgefin Divers:",
     essH: "สรุปสั้นๆ",
     e1h: "ตอบภายในไม่กี่วินาที ตลอด 24 ชั่วโมง", e1p: "คำตอบที่เขียนไว้ล่วงหน้ากว่า 200 แบบ พร้อมราคา เวลา และกฎของคุณ ใน 10 ภาษา AI ไม่ได้เขียนเอง แค่เลือกคำตอบที่ถูกต้อง",
     e2h: "เปลี่ยนแชทเป็นการจอง", e2p: "Mia ส่งลิงก์ให้นักดำน้ำเลือกวันและจ่ายมัดจำ คุณได้รับการจองทางอีเมลและในโซนของคุณเอง",
@@ -408,7 +408,7 @@ var T = {
     t2: "<b>จองด้วยบัตรทดสอบ</b> แตะลิงก์ที่ Mia ส่งมา เลือกวัน แล้วชำระเงิน ไม่มีการเรียกเก็บเงินจริง",
     t3: "<b>ดูว่าทีมของคุณได้รับอะไร</b> ทุกบทสนทนาและการจอง แบบเรียลไทม์ในโซนของคุณ ชมทัวร์ 30 วินาที:",
     copy: "คัดลอก", copied: "คัดลอกแล้ว ✓",
-    nextH: "ขั้นตอนต่อไป", nextSub: "จากการคุยครั้งนี้ จนถึง Mia ตอบแทนศูนย์ของคุณ คุณเป็นคนตัดสินใจทุกขั้นตอน",
+    nextH: "เริ่มต้นใน 5 ขั้นตอนง่ายๆ", nextSub: "ฟรีและไม่มีข้อผูกมัด คุณตัดสินใจได้ทุกขั้นตอน และขั้นแรกใช้เวลาแค่ 5 นาที",
     w1: "วันนี้", s1h: "ลองใช้ Mia", s1p: "ทดสอบบนเบอร์ตัวอย่าง คนเดียวหรือกับทีม ถามคำถามที่นักดำน้ำมักถามคุณ",
     w2: "ประมาณ 20 นาที", s2h: "เล่าเกี่ยวกับศูนย์ของคุณ", s2p: "แบบฟอร์มสั้นๆ เรื่องคอร์ส ราคา เวลา และกฎของคุณ บันทึกอัตโนมัติ หยุดแล้วกลับมาทำต่อได้", s2b: "เปิดแบบฟอร์ม",
     w3: "1-2 วัน", s3h: "เราตั้งค่าผู้ช่วยให้คุณ", s3p: "ด้วยราคาและข้อความของคุณเอง ในชื่อศูนย์ของคุณ ระบบของคุณไม่ต้องเปลี่ยนอะไร",
