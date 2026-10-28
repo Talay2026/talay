@@ -5337,10 +5337,24 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .cb.sPM,.crow.sPM{border-left-color:#2E8FA0;background:rgba(46,143,160,.13)}
 .cb.sDAY,.crow.sDAY{border-left-color:var(--deep);background:rgba(127,140,145,.12)}
 /* Calendar cells (29 Oct): one line per booking, divers first, full name on up to 2 lines */
-.calgrid .cb,.agenda .cb{flex-direction:row;align-items:flex-start;gap:6px;padding:3px 7px}
-.cb.gnew,.clg i.gnew{border-left-color:#DCA44A;background:rgba(220,164,74,.16)}
-.cb.gcert,.clg i.gcert{border-left-color:#2E8FA0;background:rgba(46,143,160,.14)}
-.cb.gup,.clg i.gup{border-left-color:#8A63C9;background:rgba(138,99,201,.14)}
+/* Calendar, calmer (29 Oct): one summary line instead of 3 cards, lighter blocks, totals as text, today as a dot */
+.calbar{margin-bottom:4px}
+.calsum{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:14px;color:var(--muted);margin:0 2px 14px}
+.calsum b{color:var(--deep);font-weight:700}
+.calnav .ghost.on{border-color:var(--sand)}
+@media (max-width:760px){.calbar h2{font-size:19px}.calsum{font-size:13px;gap:2px 12px}}
+.cd{min-height:84px;padding:6px 7px;gap:3px;border-radius:10px}
+.cdh b{font-size:13.5px;min-width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:0 4px}
+.cd.today .cdh b{background:var(--sand);color:#09262F}
+.cd.today{box-shadow:none}
+.ctot,.cd.past .ctot{background:none;color:var(--muted);padding:0;font-size:11.5px;font-weight:600}
+@media (prefers-color-scheme:dark){.ctot{background:none;color:var(--muted)}}
+.calgrid .cb,.agenda .cb{flex-direction:row;align-items:flex-start;gap:6px;padding:2px 6px;border-left-width:3px;border-radius:5px}
+.cb.gnew,.clg i.gnew{border-left-color:#DCA44A;background:rgba(220,164,74,.09)}
+.cb.gcert,.clg i.gcert{border-left-color:#2E8FA0;background:rgba(46,143,160,.08)}
+.cb.gup,.clg i.gup{border-left-color:#8A63C9;background:rgba(138,99,201,.08)}
+.cb.gx{background:none}
+.calgrid .cb b{font-weight:600;font-size:12px}
 .cb em{margin-left:auto;flex:none;font-style:normal;font-size:10.5px;font-weight:700;color:var(--muted);line-height:1.5}
 .agenda .cb i{font-style:normal;font-size:13px;font-weight:800;flex:none}
 .agenda .cb b{font-size:13px;white-space:normal}
@@ -5834,7 +5848,7 @@ nav,button,.item,.chip,.day,.who{-webkit-user-select:none;user-select:none;-webk
       <h2 id="calTitle"></h2>
       <div class="calnav"><button class="ghost" type="button" data-cw="-1" aria-label="${T("Previous")}">‹</button><button class="ghost" type="button" data-cw="0">${T("Today")}</button><button class="ghost" type="button" data-cw="1" aria-label="${T("Next")}">›</button></div>
     </div>
-    <div id="calCards" class="cards"></div>
+    <div id="calCards" class="calsum"></div>
     <div id="calBody"><div class="skel"><i></i><i></i><i></i></div></div>
   </div>
   <div class="cmodal" id="cmodal" hidden></div>
@@ -7197,8 +7211,9 @@ function zoneClient(cfg) {
   loadToday();
   setInterval(function () { if (!document.hidden && $("#today").classList.contains("on")) loadToday(); }, 60000);
 
-  // ---- Calendar: one calendar month at a time, Monday first. Click a day for its bookings and to mark it full.
-  var calMonth = "", calDay = "", calPast = false;
+  // ---- Calendar, Monday first. Opens on "now": this week and the 4 weeks after it (earlier weeks of this month fold
+  // into one line). The arrows show whole calendar months. Click a day for its bookings and to mark it full.
+  var calMonth = "", calDay = "", calPast = false; // calMonth "" = now, else "YYYY-MM"
   function addMonths(ym, n) { var d = new Date(ym + "-01T12:00:00Z"); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 7); }
   function monday(iso) { return addDays(iso, -((new Date(iso + "T12:00:00Z").getUTCDay() + 6) % 7)); }
   function shortDay(iso) { return new Date(iso + "T12:00:00Z").toLocaleDateString(LOC, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }); }
@@ -7219,34 +7234,44 @@ function zoneClient(cfg) {
   document.querySelectorAll("[data-cw]").forEach(function (b) {
     b.onclick = function () {
       if (!bdata) return;
-      var m = Number(b.dataset.cw);
-      calMonth = m ? addMonths(calMonth, m) : bdata.today.slice(0, 7); calPast = false;
+      var m = Number(b.dataset.cw), now = bdata.today.slice(0, 7);
+      calMonth = !m ? "" : !calMonth ? (m < 0 ? now : addMonths(now, 1)) : addMonths(calMonth, m); calPast = false;
       renderCalendar();
     };
   });
   function renderCalendar() {
     if (!bdata) { $("#calCards").innerHTML = ""; $("#calBody").innerHTML = '<div class="skel"><i></i><i></i></div>'; return; }
     var td = bdata.today, now = td.slice(0, 7); // /bookings returns last month up to 3 months ahead
-    if (!calMonth) calMonth = now;
-    var m1 = calMonth + "-01", mEnd = addDays(addMonths(calMonth, 1) + "-01", -1);
-    var calStart = monday(m1), days = [];
-    for (var i = 0; addDays(calStart, i) <= mEnd || i % 7; i++) days.push(addDays(calStart, i));
-    var inMonth = function (dd) { return dd.slice(0, 7) === calMonth; };
+    var thisMon = monday(td), calStart, days = [], i;
+    if (calMonth) {
+      var mEnd = addDays(addMonths(calMonth, 1) + "-01", -1);
+      calStart = monday(calMonth + "-01");
+      for (i = 0; addDays(calStart, i) <= mEnd || i % 7; i++) days.push(addDays(calStart, i));
+    } else {
+      calStart = monday(now + "-01");
+      for (i = 0; addDays(calStart, i) < addDays(thisMon, 35); i++) days.push(addDays(calStart, i));
+    }
+    var inMonth = function (dd) { return !calMonth || dd.slice(0, 7) === calMonth; };
+    var counted = function (dd) { return calMonth ? inMonth(dd) : dd >= td; }; // what the line under the title adds up
     var by = calByDay(), full = bdata.full || {};
     var divers = function (dd) { return (by[dd] || []).reduce(function (a, b) { return a + b.divers; }, 0); };
     var fmt = function (iso, o) { return new Date(iso + "T12:00:00Z").toLocaleDateString(LOC, Object.assign({ timeZone: "UTC" }, o)); };
-    var title = fmt(m1, { month: "long", year: "numeric" });
+    var last = days[days.length - 1], first = calMonth ? calMonth + "-01" : td;
+    var title = calMonth || first.slice(0, 7) === last.slice(0, 7) ? fmt(first, { month: "long", year: "numeric" })
+      : first.slice(0, 4) === last.slice(0, 4) ? fmt(first, { month: "long" }) + " – " + fmt(last, { month: "long", year: "numeric" })
+      : fmt(first, { month: "long", year: "numeric" }) + " – " + fmt(last, { month: "long", year: "numeric" });
     $("#calTitle").textContent = title.charAt(0).toUpperCase() + title.slice(1);
-    $('[data-cw="-1"]').disabled = calMonth <= addMonths(now, -1);
-    $('[data-cw="1"]').disabled = calMonth >= addMonths(now, 3);
+    $('[data-cw="-1"]').disabled = !!calMonth && calMonth <= addMonths(now, -1);
+    $('[data-cw="1"]').disabled = !!calMonth && calMonth >= addMonths(now, 3);
+    $('[data-cw="0"]').classList.toggle("on", !calMonth);
     var best = null, total = 0, nfull = 0;
-    days.filter(inMonth).forEach(function (dd) { var v = divers(dd); total += v; if (v && (!best || v > best[1])) best = [dd, v]; if (full[dd]) nfull++; });
-    $("#calCards").innerHTML = '<div class="cardn"><small>' + t("Divers this month") + "</small><b>" + total + "</b></div>" +
-      '<div class="cardn"><small>' + t("Busiest day") + "</small><b>" + (best ? esc(shortDay(best[0])) : "–") + "</b></div>" +
-      '<div class="cardn"><small>' + t("Days full") + "</small><b>" + nfull + "</b></div>";
+    days.filter(counted).forEach(function (dd) { var v = divers(dd); total += v; if (v && (!best || v > best[1])) best = [dd, v]; if (full[dd]) nfull++; });
+    $("#calCards").innerHTML = "<span><b>" + tn(total, "1 diver", "{n} divers") + "</b></span>" +
+      (best ? "<span>" + t("Busiest day") + " <b>" + esc(shortDay(best[0])) + "</b></span>" : "") +
+      "<span>" + t("Days full") + " <b>" + nfull + "</b></span>";
     var cell = function (dd, idx) {
       var list = by[dd] || [], tot = divers(dd), dt = new Date(dd + "T12:00:00Z"), wk = dt.getUTCDay() === 0 || dt.getUTCDay() === 6;
-      var num = dd.slice(8) === "01" && !inMonth(dd) ? fmt(dd, { day: "numeric", month: "short" }) : String(dt.getUTCDate());
+      var num = dd.slice(8) === "01" && (!calMonth || !inMonth(dd)) ? fmt(dd, { day: "numeric", month: "short" }) : String(dt.getUTCDate());
       // Past days only show their total, so the days ahead stand out.
       var past = dd < td, shown = past ? [] : list.slice(0, 4);
       return '<button type="button" class="cd' + (dd === td ? " today" : "") + (dd < td ? " past" : "") + (wk ? " wk" : "") + (inMonth(dd) ? "" : " out") + (full[dd] ? " full" : "") + '" data-cday="' + dd + '" aria-label="' + esc(dayLabel(dd)) + '">' +
@@ -7262,8 +7287,8 @@ function zoneClient(cfg) {
       return '<span class="cb g' + esc(b.group || "x") + '" title="' + esc(b.product + " · " + tn(b.divers, "1 diver", "{n} divers") + (slotName(k) ? " · " + slotName(k) : "")) + '"><i>' + b.divers + "</i><b>" + esc(b.product) + "</b>" +
         (k !== "DAY" ? "<em>" + t(k) + "</em>" : "") + "</span>";
     }
-    // This month: weeks before this week fold into one line, so the calendar starts at this week.
-    var thisMon = monday(td), nPast = calMonth === now ? Math.floor(days.filter(function (dd) { return dd < thisMon; }).length / 7) : 0;
+    // Now: weeks of this month before this week fold into one line, so the calendar starts at this week.
+    var nPast = calMonth ? 0 : Math.floor(days.filter(function (dd) { return dd < thisMon; }).length / 7);
     var weeks = days.map(function (dd, i) {
       if (i >= nPast * 7) return cell(dd, i);
       if (i === 0) return '<button type="button" class="cpast" id="calPast" aria-expanded="' + calPast + '">' + (calPast ? t("Hide past weeks") : t("Show past weeks ({n})", { n: nPast })) + "</button>" + (calPast ? cell(dd, i) : "");
@@ -7272,7 +7297,7 @@ function zoneClient(cfg) {
     var head = "";
     for (var w = 0; w < 7; w++) head += '<span class="cwd">' + esc(fmt(addDays(calStart, w), { weekday: "short" })) + "</span>";
     // Phone: the same weeks as a list of days that have something on them.
-    var agenda = days.filter(function (dd) { return inMonth(dd) && dd >= td && ((by[dd] || []).length || full[dd] || dd === td); }).map(function (dd) {
+    var agenda = days.filter(function (dd) { return inMonth(dd) && dd >= td && (!calMonth || dd >= first) && ((by[dd] || []).length || full[dd] || dd === td); }).map(function (dd) {
       var list = by[dd] || [];
       return '<button type="button" class="ag' + (dd === td ? " today" : "") + '" data-cday="' + dd + '"><span class="agd"><b>' + esc(fmt(dd, { weekday: "short", day: "numeric", month: "short" })) + "</b>" +
         (full[dd] ? '<span class="cfl">' + esc(FULL_T[full[dd]]) + "</span>" : "") + (divers(dd) ? '<span class="ctot">' + tn(divers(dd), "1 diver", "{n} divers") + "</span>" : "") + "</span>" +
