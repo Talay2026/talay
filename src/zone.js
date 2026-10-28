@@ -4388,6 +4388,7 @@ function hqClient(cfg) {
     if (/^\/terms/.test(p)) return "Voorwaarden";
     if ((m = p.match(/^\/r\/([^/]+)/))) return "Link " + (WEB_SOURCES[m[1]] || m[1]);
     if (/^\/research\//.test(p)) return "Artikel mystery shop";
+    if (/^\/next/.test(p)) return "Vervolgpagina na gesprek";
     return "";
   }
   // Tracked links /r/<code>: which link was clicked. Codes not listed here show as they are.
