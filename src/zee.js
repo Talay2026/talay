@@ -8,6 +8,23 @@ body.zee{background:#1F4B5A}
 body.zee::before,body.zee::after{display:none}
 body.zee .wrap{position:relative;z-index:1}
 @media (max-width:560px){body.zee .wrap{padding-right:2.9rem}}
+/* Boxes a bit more solid on the moving background, fields and calendar clearly fillable (Jonas, 28 Oct) */
+body.zee .center{background:rgba(9,38,47,.66);border-color:rgba(247,243,234,.16)}
+body.zee .item{background:rgba(12,44,54,.62);border-color:rgba(247,243,234,.24)}
+body.zee .policy{background:rgba(12,44,54,.58);border-color:rgba(247,243,234,.22)}
+body.zee .grp,body.zee .act{background:rgba(247,243,234,.1);border-color:rgba(247,243,234,.4)}
+body.zee .grp:hover,body.zee .act:hover{background:rgba(247,243,234,.16)}
+body.zee .grp.on{background:#DCA44A;border-color:#DCA44A}
+body.zee .act.on{background:rgba(247,243,234,.14);border-color:#DCA44A}
+body.zee .stepper,body.zee textarea{background:rgba(6,28,35,.55);border-color:rgba(247,243,234,.45)}
+body.zee .cal{background:rgba(6,28,35,.82);border-color:rgba(247,243,234,.3)}
+.zee .day:enabled{background:rgba(247,243,234,.09)}
+body.zee .day:hover:not(:disabled){background:rgba(247,243,234,.22)}
+body.zee .day.off{color:rgba(247,243,234,.3);background:repeating-linear-gradient(135deg,transparent 0 5px,rgba(247,243,234,.07) 5px 6px)}
+body.zee .day.sel,body.zee .day.sel:hover:not(:disabled){background:#DCA44A;color:#09262F}
+body.zee .day.in,body.zee .day.in:hover:not(:disabled){background:rgba(220,164,74,.45);color:#F7F3EA}
+body.zee .slots button{background:rgba(6,28,35,.55);border-color:rgba(247,243,234,.45)}
+body.zee .slots button.on{background:#DCA44A;border-color:#DCA44A}
 .zsky,.zlight,.zwave,.zmeter,.zfish{pointer-events:none}
 .zsky{position:fixed;inset:0;z-index:-2;background:linear-gradient(180deg,#3E7486,#326676)}
 .zlight{position:fixed;inset:0;z-index:-1;overflow:hidden}
