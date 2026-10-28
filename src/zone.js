@@ -1737,6 +1737,11 @@ async function settings(env, center) {
       fixed: Number(first(p["Deposit fixed THB"])) > 0,
       cutoff: Number(first(p["Cutoff hour"])) || 15, active: !!p["Active"],
       maxDay: Number(first(p["Max per day"])) || 0,
+      own: !STANDARD_CODES.includes(String(first(p["Code"]) || "").toUpperCase()),
+      group: [].concat(p["Group"] || []).filter((g) => PRODUCT_GROUPS.includes(g)),
+      minAge: Number(first(p["Min age"])) || 0,
+      texts: Object.fromEntries(Object.entries(PRODUCT_TEXTS).map(([k, f]) =>
+        [k, String(first(p[f]) || (k === "level" ? first(p["Prerequisites"]) || "" : ""))])),
     };
   }).sort((a, b) => a.price - b.price);
   const staff = splitEmails(f["Staff emails"]);
@@ -1908,6 +1913,14 @@ async function logChange(env, center, email, what) {
 // Centers (OW price, DSD price, …) is updated too, because texts read it.
 const CENTER_PRICE = { OW: "OW price", DSD: "DSD price", FUN: "FUN price", FUN10: "FUN10 price", AOW: "AOW price" };
 async function saveProduct(env, center, email, b) {
+  if (b.mode === "new") return await createProduct(env, center, email, b);
+  if (b.mode === "details" || b.mode === "delete") {
+    if (!/^rec[A-Za-z0-9]{10,20}$/.test(String(b.id || ""))) return json({ error: "Bad request" }, 400);
+    const res = await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Products/${b.id}`, { headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` } });
+    const p = res.ok ? (await res.json()).fields || {} : null;
+    if (!p || ![].concat(p["C slug"] || []).map(String).includes(center.slug)) return json({ error: "Product not found." }, 404);
+    return b.mode === "delete" ? await deleteProduct(env, center, email, b.id, p) : await saveDetails(env, center, email, b, p);
+  }
   if (!/^rec[A-Za-z0-9]{10,20}$/.test(String(b.id || ""))) return json({ error: "Bad request" }, 400);
   const res = await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Products/${b.id}`,
     { headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` } });
@@ -1967,6 +1980,166 @@ async function saveProduct(env, center, email, b) {
   if (oldAct !== !!b.active) parts.push(b.active ? "bookable online" : "online booking closed");
   if (oldMax !== maxDay) parts.push(`max per day ${oldMax || "none"} → ${maxDay || "none"}`);
   if (parts.length) await logChange(env, center, email, `${first(p["Name"]) || code}: ${parts.join(", ")}`);
+  return json({ ok: true });
+}
+
+// ---------- Own products: add, change and remove in Settings → Products ----------
+// A product the center adds itself goes into the same Products table as the standard ones, so it reaches
+// Mia (Products → Product line, collected in Centers → Product list for the prompt), the booking page
+// (under Products → Group) and the zone without any other change. The team writes the texts in one
+// language; Claude translates them into the ten languages (the base fields are English). Fields that
+// don't exist in Airtable yet are skipped, so a missing translation field never blocks a save.
+// New products copy Commission pct, Deposit fixed THB and Cutoff hour from the center's other products,
+// and link Template to the center's reply.course text, so Products → Reply works as for any course.
+const STANDARD_CODES = ["DSD", "OW", "AOW", "AD", "FUN", "FUN10", "DDS", "REF"];
+const PRODUCT_GROUPS = ["New", "Certified", "Level up"];
+const PRODUCT_LANGS = ["FR", "DE", "ES", "NL", "TH", "ZH", "RU", "IT", "KO"];
+const PRODUCT_TEXTS = { name: "Name", description: "Description", duration: "Duration", checkin: "Check-in", level: "Level", included: "Included", notIncluded: "Not included" };
+const PRODUCT_MAX = { name: 80, description: 400, duration: 60, checkin: 120, level: 200, included: 400, notIncluded: 300 };
+
+function productInput(b) {
+  const texts = {};
+  for (const k of Object.keys(PRODUCT_TEXTS)) texts[k] = String(b.texts?.[k] || "").replace(/\s+/g, " ").trim().slice(0, PRODUCT_MAX[k]);
+  const group = (Array.isArray(b.group) ? b.group : []).filter((g) => PRODUCT_GROUPS.includes(g));
+  const minAge = b.minAge == null || b.minAge === "" ? 0 : Math.round(Number(b.minAge));
+  if (!texts.name) return { error: "Give the product a name." };
+  if (!group.length) return { error: "Choose where divers find it on the booking page." };
+  if (!(minAge >= 0 && minAge <= 99)) return { error: "Enter a minimum age between 0 and 99." };
+  return { texts, group, minAge };
+}
+
+const PRODUCT_PROMPT = `You translate the texts of one product of a dive centre (a course, a dive trip or another activity) for its booking page and its WhatsApp assistant. The texts in <texts> are written by the dive centre, in any language. Return them in English (en) and in French (fr), German (de), Spanish (es), Dutch (nl), Thai (th), Chinese simplified (zh), Russian (ru), Italian (it) and Korean (ko). Keep the meaning and keep it short; keep prices, numbers, times, names and brands exactly as they are. Keep common diving terms as divers use them in that language (Open Water, Advanced, fun dive, Nitrox, Discover Scuba Diving). In the language the centre wrote in, keep their own wording and only fix obvious typos. Give every key of <texts>, also when its text is short. Answer with one JSON object only, no other text: {"en": {<same keys>}, "fr": {…}, "de": {…}, "es": {…}, "nl": {…}, "th": {…}, "zh": {…}, "ru": {…}, "it": {…}, "ko": {…}}`;
+// { en: {name: …}, fr: {…}, … } for the given texts, or null (no key, or Claude failed).
+async function translateProduct(env, texts) {
+  const todo = Object.fromEntries(Object.entries(texts).filter(([, v]) => v));
+  if (!Object.keys(todo).length) return {};
+  if (!env.ANTHROPIC_API_KEY) return null;
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2026-10-21" },
+      body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 6000, system: PRODUCT_PROMPT, messages: [{ role: "user", content: `<texts>\n${JSON.stringify(todo, null, 1)}\n</texts>` }] }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || d.stop_reason === "refusal") { console.error("product translate", r.status, JSON.stringify(d).slice(0, 300)); return null; }
+    const raw = (d.content || []).filter((c) => c.type === "text").map((c) => c.text).join("");
+    const out = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1));
+    return out && typeof out.en === "object" ? out : null;
+  } catch (e) { console.error("product translate", e.message); return null; }
+}
+// Airtable fields for the texts: base field = English (or the centre's own words without a translation), "Name FR" … per language.
+function textFields(texts, tr) {
+  const fields = {};
+  for (const [k, v] of Object.entries(texts)) {
+    const f = PRODUCT_TEXTS[k];
+    fields[f] = v ? String(tr?.en?.[k] || v).slice(0, 600) : "";
+    for (const L of PRODUCT_LANGS) if (tr) fields[`${f} ${L}`] = v ? String(tr[L.toLowerCase()]?.[k] || "").slice(0, 600) : "";
+  }
+  if ("level" in texts) fields["Prerequisites"] = fields["Level"]; // older texts and Mia read Prerequisites
+  return fields;
+}
+
+// POST (no id) or PATCH a Products record. A field Airtable refuses (doesn't exist yet, or is a formula)
+// is left out and the write is tried again, except the fields every product needs.
+const PRODUCT_NEEDED = ["Center", "Code", "Name", "Price THB"];
+async function writeProduct(env, id, fields) {
+  const f = { ...fields }, skipped = [];
+  for (let i = 0; i < 60; i++) {
+    const res = await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Products${id ? "/" + id : ""}`, {
+      method: id ? "PATCH" : "POST",
+      headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ fields: f, typecast: true }),
+    });
+    if (res.ok) { if (skipped.length) console.log("product: skipped fields", skipped.join(", ")); return { id: (await res.json()).id, skipped }; }
+    const t = await res.text();
+    const name = (t.match(/(?:field|Field)[^"]*\\?"([^"\\]+)\\?"/) || t.match(/\\"([^"\\]+)\\"/) || [])[1];
+    if (res.status !== 422 || !name || !(name in f) || PRODUCT_NEEDED.includes(name)) throw new Error(`Airtable Products: ${res.status} ${t}`);
+    delete f[name]; skipped.push(name);
+  }
+  throw new Error("Airtable Products: too many fields refused");
+}
+
+// A short code for the link and for Mia, from the English name: "Night dive" → NIGHTDIVE, unique per center.
+function productCode(name, taken) {
+  const base = String(name).normalize("NFKD").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+  const stem = base.length >= 2 ? base : "X";
+  for (let n = 1; n < 100; n++) {
+    const code = n === 1 && stem !== "X" ? stem : (stem.slice(0, 10) + n);
+    if (!taken.includes(code) && !STANDARD_CODES.includes(code)) return code;
+  }
+  return "X" + Date.now().toString(36).toUpperCase().slice(-6);
+}
+const mostCommon = (list) => {
+  const n = {}; list.forEach((v) => { n[v] = (n[v] || 0) + 1; });
+  return Object.keys(n).sort((a, b) => n[b] - n[a])[0];
+};
+
+async function createProduct(env, center, email, b) {
+  const v = productInput(b);
+  if (v.error) return json({ error: v.error }, 400);
+  const price = Math.round(Number(b.price));
+  if (!(price >= 100 && price <= 500000)) return json({ error: "Enter a price between 100 and 500,000 THB." }, 400);
+  let siblings, template;
+  try {
+    [siblings, template] = await Promise.all([
+      at(env, "Products", { formula: `FIND('${q(center.slug)}', ARRAYJOIN({C slug}))` }),
+      at(env, "Messages", { formula: `AND({Key} = 'reply.course', ARRAYJOIN({C slug}) & '' = '${q(center.slug)}')`, fields: ["Key"], max: 1 }).catch(() => []),
+    ]);
+  } catch (e) { console.error("product new", e.message); return json({ error: "Could not save. Try again." }, 502); }
+  siblings = siblings.filter((r) => [].concat(r.fields["C slug"] || []).map(String).includes(center.slug));
+  if (siblings.length >= 60) return json({ error: "Maximum 60 products." }, 400);
+  const tr = await translateProduct(env, v.texts);
+  const code = productCode(tr?.en?.name || v.texts.name, siblings.map((r) => String(first(r.fields["Code"]) || "").toUpperCase()));
+  // Commission and deposit as for the center's similar products: fun dives for "Certified" only, otherwise courses.
+  const byCode = (c) => siblings.find((r) => String(first(r.fields["Code"]) || "").toUpperCase() === c)?.fields || {};
+  const like = v.group.length === 1 && v.group[0] === "Certified" ? byCode("FUN") : byCode("OW");
+  const pcts = siblings.map((r) => Number(first(r.fields["Commission pct"])) || 0).filter(Boolean);
+  const pct = Number(first(like["Commission pct"])) || Number(mostCommon(pcts)) || 0;
+  const fixed = [...new Set(siblings.map((r) => Number(first(r.fields["Deposit fixed THB"])) || 0))];
+  const cutoffs = siblings.map((r) => Number(first(r.fields["Cutoff hour"]))).filter((n) => n >= 0 && n <= 23);
+  const prefix = String(first(siblings[0]?.fields["Import key"]) || "").split("/")[0] || center.slug;
+  const fields = {
+    Center: [center.id], Code: code, "Price THB": price, Active: b.active !== false, Group: v.group,
+    "Min age": v.minAge || null, "Cutoff hour": Number(mostCommon(cutoffs)) || 15, "Import key": `${prefix}/${code}`,
+    ...textFields(v.texts, tr),
+  };
+  if (pct) fields["Commission pct"] = pct;
+  if (fixed.length === 1 && fixed[0] > 0) fields["Deposit fixed THB"] = fixed[0]; // the center has one fixed deposit for everything
+  if (template[0]) fields["Template"] = [template[0].id];
+  let out;
+  try { out = await writeProduct(env, null, fields); }
+  catch (e) { console.error("product new", e.message); return json({ error: "Could not save. Try again." }, 502); }
+  await logChange(env, center, email, `new product ${fields.Name} (${code}): ${price.toLocaleString("en-US")} THB, for ${v.group.join(", ")}`);
+  return json({ ok: true, id: out.id, code, translated: !!tr });
+}
+
+async function saveDetails(env, center, email, b, p) {
+  const v = productInput(b);
+  if (v.error) return json({ error: v.error }, 400);
+  // Only texts that changed are translated again, so the checked translations of the standard products stay.
+  const old = (k) => String(first(p[PRODUCT_TEXTS[k]]) || (k === "level" ? first(p["Prerequisites"]) || "" : ""));
+  const changed = Object.fromEntries(Object.entries(v.texts).filter(([k, x]) => x !== old(k)));
+  const tr = await translateProduct(env, changed);
+  const fields = { Group: v.group, "Min age": v.minAge || null, ...textFields(changed, tr) };
+  try { await writeProduct(env, b.id, fields); }
+  catch (e) { console.error("product details", e.message); return json({ error: "Could not save. Try again." }, 502); }
+  const what = Object.keys(changed).map((k) => k === "notIncluded" ? "not included" : k === "level" ? "who can join" : k);
+  const oldGroup = [].concat(p["Group"] || []).join(", ");
+  if (oldGroup !== v.group.join(", ")) what.push(`for ${v.group.join(", ")}`);
+  if ((Number(first(p["Min age"])) || 0) !== v.minAge) what.push(`min age ${v.minAge || "none"}`);
+  if (what.length) await logChange(env, center, email, `${first(p["Name"]) || first(p["Code"])}: ${what.join(", ")}`);
+  return json({ ok: true, translated: tr !== null });
+}
+
+// Only the center's own products can be removed; a standard product is switched off with "Bookable online".
+// A product with bookings stays (the bookings point to it).
+async function deleteProduct(env, center, email, id, p) {
+  const code = String(first(p["Code"]) || "").toUpperCase();
+  if (STANDARD_CODES.includes(code)) return json({ error: "Standard products can't be removed. Switch off Bookable online instead." }, 400);
+  if ([].concat(p["Bookings"] || []).length) return json({ error: "This product has bookings, so it stays. Switch off Bookable online instead." }, 400);
+  const res = await fetch(`https://api.airtable.com/v0/${env.AIRTABLE_BASE}/Products/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${env.AIRTABLE_TOKEN}` } });
+  if (!res.ok) { console.error("product delete", res.status, await res.text()); return json({ error: "Could not remove. Try again." }, 502); }
+  await logChange(env, center, email, `removed product ${first(p["Name"]) || code} (${code})`);
   return json({ ok: true });
 }
 
@@ -5407,6 +5580,18 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .pedit input[type=checkbox]{width:18px;height:18px;accent-color:#0A2029}
 .pedit .pact{display:flex;gap:8px;margin-top:16px}
 .pedit .mchips{gap:6px}
+.pedit textarea,.pedit input[type=number]{font:inherit;font-size:14px;color:var(--deep);border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--paper-2);resize:vertical}
+.pedit h4{margin:0 0 12px;font-size:15px}
+.pedit > label{display:grid;gap:4px;font-size:13px;color:var(--muted);margin-top:12px}
+.pedit .pact .sp{flex:1}
+.pedit .danger{color:var(--bad, #B3261E)}
+.pform{background:var(--paper-2);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:12px}
+.pform .pedit{max-width:680px}
+.pform h4 .muted{color:var(--muted);font-weight:400;font-size:13px}
+.pform .pedit input[type=text],.pform .pedit textarea{width:100%;box-sizing:border-box}
+.ptable .pd{font:inherit;font-size:13px;background:none;border:0;padding:0 0 0 6px;color:var(--deep-2, #14404D);text-decoration:underline;cursor:pointer}
+.pnew{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}
+.pnew .d{margin:0;font-size:13px}
 @media (max-width:760px){.people .pedit{padding-left:2px}.pedit .pgrid{grid-template-columns:1fr}}
 /* Support (25 Oct): empty state across the page, centred */
 #supp .empty-card{max-width:none;align-items:center;text-align:center;padding:40px 24px}
@@ -5547,6 +5732,8 @@ header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-sh
       <h3>${T("Products and prices")}</h3>
       <p class="d">${T("What divers pay and until when they can book online. The online deposit is your commission to Talay; divers pay the rest at your shop. Changes reach {a} and the booking page within about two minutes.", { a: A })}</p>
       <div class="bscroll"><table class="ptable"><thead><tr><th>${T("Product")}</th><th>${T("Price (THB)")}</th><th>${T("Deposit")}</th><th>${T("Book until (day before)")}</th><th>${T("Max divers per day")}</th><th>${T("Bookable online")}</th><th></th></tr></thead><tbody id="prods"></tbody></table></div>
+      <div id="pEdit"></div>
+      <div class="pnew"><button class="ghost" id="pAdd" type="button">+ ${T("Add a product")}</button><span class="d">${T("Something you offer that isn't listed, like a night dive or a snorkel trip? Add it here. {a} and your booking page pick it up straight away.", { a: A })}</span></div>
       <div class="smsg" id="pMsg"></div>
     </div>
     <div class="scard adm">
@@ -6429,14 +6616,61 @@ function zoneClient(cfg) {
     };
     f.querySelector(".pn").focus();
   }
+  // Product details (texts, who it is for) and new products. Texts may be written in any language:
+  // the server translates them into the ten languages.
+  var GROUP_T = [["New", t("Never dived")], ["Certified", t("Certified")], ["Level up", t("Level up (next course)")]];
+  function editProduct(row, p) {
+    $("#pEdit").innerHTML = "";
+    var isNew = !p; p = p || { texts: {}, group: [], own: true, active: true, minAge: 0 };
+    var x = p.texts, tr = document.createElement("div"); tr.className = "pform";
+    var inp = function (cls, label, v, max, ph) { return "<label>" + label + '<input type="text" class="' + cls + '" maxlength="' + max + '" value="' + esc(v || "") + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : "") + "></label>"; };
+    var area = function (cls, label, v, max, ph) { return "<label>" + label + '<textarea class="' + cls + '" rows="2" maxlength="' + max + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : "") + ">" + esc(v || "") + "</textarea></label>"; };
+    tr.innerHTML = '<div class="pedit">' +
+      "<h4>" + (isNew ? t("New product") : esc(p.name) + ' <span class="muted">' + esc(p.code) + "</span>") + "</h4>" +
+      '<div class="pgrid">' + inp("xn", t("Name"), x.name, 80, t("e.g. Night dive")) +
+      (isNew ? "<label>" + t("Price (THB)") + '<input type="number" class="xp" min="100" step="50" inputmode="numeric"></label>' : "") +
+      inp("xd", t("Duration"), x.duration, 60, t("e.g. 1 evening")) + inp("xc", t("Check-in"), x.checkin, 120, t("e.g. 17:30 at the shop")) +
+      inp("xl", t("Who can join?"), x.level, 200, t("e.g. Open Water or higher")) +
+      "<label>" + t("Minimum age") + '<input type="number" class="xa" min="0" max="99" step="1" inputmode="numeric" value="' + (p.minAge || "") + '"></label></div>' +
+      '<div class="plab">' + t("Where divers find it on the booking page") + "</div>" + chipRow("group", GROUP_T, p.group, true) +
+      area("xs", t("Short description"), x.description, 400, t("e.g. One dive after sunset with a torch, to see the reef come alive at night.")) +
+      area("xi", t("What's included"), x.included, 400, t("e.g. guide, torch, all gear")) +
+      inp("xo", t("Not included"), x.notIncluded, 300, t("e.g. marine park fee 200 THB")) +
+      (isNew ? '<label class="pev"><input type="checkbox" class="xb" checked> ' + t("Bookable online") + "</label>" : "") +
+      '<p class="d">' + t("Write in any language. {a}, the booking page and the zone get it in all ten languages.", { a: cfg.assistant }) + "</p>" +
+      '<div class="pact"><button type="button" class="btn psv">' + t("Save") + '</button><button type="button" class="ghost pcx">' + t("Cancel") + "</button>" +
+      (p.own && !isNew ? '<span class="sp"></span><button type="button" class="ghost danger pdl">' + t("Remove product") + "</button>" : "") + "</div></div>";
+    $("#pEdit").appendChild(tr);
+    tr.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    tr.querySelectorAll(".mchips .chip").forEach(function (c) { c.onclick = function () { c.classList.toggle("on"); }; });
+    var v = function (c) { var el = tr.querySelector("." + c); return el ? el.value : ""; };
+    tr.querySelector(".pcx").onclick = function () { tr.remove(); };
+    tr.querySelector(".psv").onclick = function () {
+      var btn = this, name = v("xn").trim();
+      var body = { action: "product", mode: isNew ? "new" : "details", id: p.id, minAge: v("xa"),
+        group: [].map.call(tr.querySelectorAll(".mchips .chip.on"), function (c) { return c.dataset.v; }),
+        texts: { name: name, duration: v("xd"), checkin: v("xc"), level: v("xl"), description: v("xs"), included: v("xi"), notIncluded: v("xo") } };
+      if (isNew) { body.price = Number(v("xp")); body.active = tr.querySelector(".xb").checked; }
+      btn.textContent = t("Saving and translating…");
+      save(body, "#pMsg", t("{x} saved.", { x: name }), btn).finally(function () { btn.textContent = t("Save"); });
+    };
+    var del = tr.querySelector(".pdl");
+    if (del) del.onclick = function () {
+      if (!confirm(t("Remove {x}? Divers can no longer book it.", { x: p.name }))) return;
+      save({ action: "product", mode: "delete", id: p.id }, "#pMsg", t("Removed."), this);
+    };
+    tr.querySelector(".xn").focus();
+  }
+  $("#pAdd").onclick = function () { if (sdata && sdata.admin) editProduct(null, null); };
   function loadSettings() {
     return api("settings").then(function (d) {
       sdata = d;
       $("#adminNote").hidden = d.admin;
       document.querySelectorAll(".scard.adm").forEach(function (c) { c.classList.toggle("ro", !d.admin); });
+      $("#pEdit").innerHTML = "";
       $("#prods").innerHTML = d.products.map(function (p) {
         var hours = ""; for (var h = 8; h <= 22; h++) hours += '<option value="' + h + '"' + (h === p.cutoff ? " selected" : "") + ">" + h + ":00</option>";
-        return '<tr class="' + (p.active ? "" : "off") + '" data-id="' + esc(p.id) + '" data-pct="' + (p.fixed ? 0 : p.pct) + '" data-dep="' + Math.round(p.deposit) + '"><td class="nm">' + esc(p.name) + '<br><span class="muted">' + esc(p.code) + "</span></td>" +
+        return '<tr class="' + (p.active ? "" : "off") + '" data-id="' + esc(p.id) + '" data-pct="' + (p.fixed ? 0 : p.pct) + '" data-dep="' + Math.round(p.deposit) + '"><td class="nm">' + esc(p.name) + '<br><span class="muted">' + esc(p.code) + '</span> <button class="pd" type="button">' + t("Details") + "</button></td>" +
           '<td data-l="' + t("Price (THB)") + '"><input type="number" min="100" step="50" value="' + p.price + '" class="pp" inputmode="numeric"></td>' +
           '<td class="muted dep" data-l="' + t("Deposit") + '">' + Math.round(p.deposit).toLocaleString(NUM) + " THB</td>" +
           '<td data-l="' + t("Book until (day before)") + '"><select class="pc">' + hours + "</select></td>" +
@@ -6444,6 +6678,7 @@ function zoneClient(cfg) {
           '<td data-l="' + t("Bookable online") + '"><input type="checkbox" class="pa"' + (p.active ? " checked" : "") + "></td>" +
           '<td class="tlinks"><button class="btn ps" type="button" hidden>' + t("Save") + '</button></td></tr>';
       }).join("");
+      $("#prods").querySelectorAll("tr").forEach(function (tr, i) { tr.querySelector(".pd").onclick = function () { editProduct(tr, d.products[i]); }; });
       $("#prods").querySelectorAll("tr").forEach(function (tr) {
         var pp = tr.querySelector(".pp"), changed = function () { tr.querySelector(".ps").hidden = false; };
         tr.querySelector(".pc").onchange = changed; tr.querySelector(".pa").onchange = changed; tr.querySelector(".pm").oninput = changed;
