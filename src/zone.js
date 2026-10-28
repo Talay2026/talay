@@ -4903,13 +4903,13 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 }
 
 #supp{flex-direction:column;overflow-y:auto}
-.tlist{display:grid;gap:8px}
+.tlist{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
 .titem{display:flex;gap:12px;align-items:center;width:100%;text-align:left;font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer}
 .titem:hover{border-color:var(--deep)}
 .titem .tt{flex:1;min-width:0}
 .titem .tt b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .titem .tt small{color:var(--muted)}
-.ts{font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px;white-space:nowrap;border:1px solid var(--line)}
+.ts{flex:none;font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px;white-space:nowrap;border:1px solid var(--line)}
 .ts.New{background:var(--paper-2)}
 .ts.In-progress{background:var(--mia)}
 .ts.Waiting-for-you{background:var(--sand);color:#0A2029;border-color:var(--sand)}
@@ -5709,6 +5709,18 @@ header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-sh
  #convos .list .item:hover:not(.on){background:rgba(255,255,255,.55)}
  #convos .list .tools input{background-color:var(--card)}
 }
+/* Dark mode (29 Oct): same colour per sender as in light mode (Mia teal, team blue), banner without a light block */
+@media (prefers-color-scheme:dark){
+ .m.Mia{background:#16393C}
+ .m.Mia .who{color:#7CC3CC}
+ .m.Team{background:#1B3550;color:var(--deep)}
+ .m.Team small,.m.Team a{color:var(--muted)}
+ .m.Team .who{color:#93B8E0}
+ .paused{background:#33261C;border-top-color:#4D3624;color:#F1D9C6}
+ .paused .pi{background:#4D3624;color:#F1D9C6}
+ .paused .pt b{color:#FBE6D4}
+}
+@media (max-width:760px){.pane .head .sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 @media (max-width:760px){#books .btable.bday tr.grp{background:none;border:0;padding:12px 2px 4px;margin:0}#books .btable.bday tr.grp td{background:none;padding:0;justify-content:flex-start;text-align:left}#books .btable.bday .tname{flex-direction:column;align-items:flex-start;gap:0}}
 .minis.strip{gap:0;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
 .minis.strip .mini{background:none;border:0;border-radius:0;box-shadow:none;padding:14px 20px}
@@ -6195,7 +6207,6 @@ function zoneClient(cfg) {
       lastChat = key;
       var L = d.lead, l = left(d.closesAt);
       var actions = "";
-      if (d.hasLead && L.human) actions += '<button class="ghost hb" id="handback">▶ ' + t("Let {a} take over", { a: esc(cfg.assistant) }) + "</button>";
       if (d.hasLead && d.needsYou && !L.human) actions += '<button class="ghost" id="handled">' + t("Mark as handled") + "</button>";
       var facts = fact(t("Channel"), L.channel && L.channel !== "WhatsApp" ? L.channel : "") + fact(t("Language"), L.language && langName(L.language)) + fact(t("Level"), human(L.cert || (d.history && d.history.cert))) + fact(t("On the island"), prettyDates(L.dates)) +
         fact(t("Group"), L.group) + fact(t("Interested in"), /^rec[A-Za-z0-9]{14}$/.test(L.interested) ? "" : L.interested) + fact("WhatsApp", L.contact && L.name && L.contact !== L.name ? prettyPhone(L.contact) : "") +
@@ -6301,7 +6312,6 @@ function zoneClient(cfg) {
       var box = $("#msgs");
       var place = function () { box.scrollTop = keepTop === null ? box.scrollHeight : keepTop; };
       place(); requestAnimationFrame(place); setTimeout(place, 250);
-      if ($("#handback")) $("#handback").onclick = function () { act("handback", this); };
       if ($("#handback2")) $("#handback2").onclick = function () { act("handback", this); };
       if (d.hasLead) teamRow(d);
       if ($("#handled")) $("#handled").onclick = function () { act("handled", this); };
@@ -6628,7 +6638,7 @@ function zoneClient(cfg) {
             var links = [];
             if (b.chat) links.push('<a href="#" data-chat="' + esc(b.chat) + '">' + tr("Chat") + "</a>");
             if (b.manage && !isCx(b) && b.date >= td) links.push('<a href="' + esc(b.manage) + '" target="_blank" rel="noopener">' + tr("Move / cancel") + "</a>");
-            var wa = b.phone ? '<a class="tel" href="https://wa.me/' + esc(b.phone.replace(/[^0-9]/g, "")) + '" target="_blank" rel="noopener">' + esc(b.phone) + "</a>" : "";
+            var wa = b.phone ? '<a class="tel" href="https://wa.me/' + esc(b.phone.replace(/[^0-9]/g, "")) + '" target="_blank" rel="noopener">' + esc(prettyPhone(b.phone)) + "</a>" : "";
             return '<tr class="' + (isCx(b) ? "cx" : "") + '"><td data-l="' + tr("Name") + '" class="tname">' + esc(b.name) + '<small class="ref">' + esc(b.ref) + (b.slot ? " · " + esc(t(b.slot)) : "") + "</small>" +
               (orders[b.order] > 1 ? '<small class="ref">' + tn(orders[b.order], "1 activity in this order", "{n} activities in this order") + "</small>" : "") +
               (b.note ? '<small class="ref">“' + esc(b.note) + "”</small>" : "") + '</td><td data-l="' + tr("Phone") + '">' + wa + '</td><td class="num" data-l="' + tr("Divers") + '">' + b.divers +
@@ -6940,7 +6950,7 @@ function zoneClient(cfg) {
     $("#blist").innerHTML = '<p class="d" style="color:var(--muted);font-size:14px;margin:0 0 10px">' + t("These divers chose a date and went to the payment page, but didn't pay. A friendly reminder often brings them back.") + "</p>" +
       '<div class="bscroll"><table class="btable"><thead><tr><th>' + t("Diver") + "</th><th>" + t("Product") + "</th><th>" + t("For") + '</th><th class="num">' + t("Divers") + '</th><th class="num">' + t("Value") + "</th><th>" + t("Left") + '</th><th class="noprint"></th></tr></thead><tbody>' +
       list.map(function (i, k) {
-        var who = esc(i.name || i.phone || t("Unknown diver")) + (i.phone && i.name !== i.phone ? '<br><small style="color:var(--muted)">' + esc(i.phone) + "</small>" : "");
+        var who = esc(i.name || prettyPhone(i.phone) || t("Unknown diver")) + (i.phone && i.name !== i.phone ? '<br><small style="color:var(--muted)">' + esc(prettyPhone(i.phone)) + "</small>" : "");
         var act = [];
         if (i.booked) act.push('<span class="st ok">' + t("Booked since") + "</span>");
         else if (i.chat && i.canMessage) act.push('<a href="#" data-remind="' + k + '">' + t("Send reminder") + "</a>");
@@ -6993,7 +7003,7 @@ function zoneClient(cfg) {
         var act = [];
         if (i.chat && i.canMessage) act.push('<a href="#" data-amsg="' + k + '">' + t("Send a message") + "</a>");
         if (i.chat) act.push('<a href="#" data-achat="' + k + '">' + t("Chat") + "</a>");
-        else if (i.phone) act.push(esc(i.phone));
+        else if (i.phone) act.push(esc(prettyPhone(i.phone)));
         return '<tr><td class="tname" data-l="' + t("Diver") + '">' + who + '</td><td data-l="' + t("When") + '">' + when + '</td><td data-l="' + t("Interested in") + '">' + esc(i.interested || "–") +
           '</td><td data-l="' + t("Level") + '">' + esc(human(i.cert) || "–") + '</td><td class="num" data-l="' + t("Group") + '">' + esc(i.group || "1") + '</td><td class="keep noprint tlinks">' + act.join(" ") + "</td></tr>";
       }).join("") + "</tbody></table></div>" +
@@ -7107,11 +7117,16 @@ function zoneClient(cfg) {
 
   // ---- Pretty names and facts
   var isPhone = function (s) { return /^\+?[\d\s()-]{6,}$/.test(String(s || "").trim()); };
+  // Dialling codes of 1 or 2 digits; every other code has 3 digits. A number that already has spaces stays as written.
+  var DIAL2 = "20 27 30 31 32 33 34 36 39 40 41 43 44 45 46 47 48 49 51 52 53 54 55 56 57 58 60 61 62 63 64 65 66 81 82 84 86 90 91 92 93 94 95 98".split(" ");
   function prettyPhone(s) {
-    var d = String(s || "").replace(/[^\d]/g, "");
-    if (!d) return String(s || "");
-    var cc = d.length > 10 ? d.slice(0, d.length - 9) : "", rest = cc ? d.slice(cc.length) : d;
-    return (cc ? "+" + cc + " " : "") + rest.replace(/(\d{3})(?=\d)/g, "$1 ").trim();
+    var raw = String(s || "").trim(), d = raw.replace(/[^\d]/g, "");
+    if (!d) return raw;
+    if (/\d\s+\d/.test(raw)) return raw;
+    if (!/^(\+|00)/.test(raw) && d.length <= 10) return d.replace(/(\d{3})(?=\d{3})/g, "$1 ");
+    if (raw.indexOf("00") === 0) d = d.slice(2);
+    var cc = d[0] === "1" || d[0] === "7" ? d[0] : DIAL2.indexOf(d.slice(0, 2)) > -1 ? d.slice(0, 2) : d.slice(0, 3), rest = d.slice(cc.length);
+    return "+" + cc + " " + rest.replace(/(\d{3})(?=\d{2})/g, "$1 ");
   }
   function dname(name, contact) { var n = name || contact || t("Diver"); return isPhone(n) ? prettyPhone(n) : n; }
   var LANGN = { en: "English", nl: "Dutch", fr: "French", de: "German", es: "Spanish", it: "Italian", pt: "Portuguese", th: "Thai", zh: "Chinese", ru: "Russian", ko: "Korean" };
