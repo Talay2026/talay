@@ -830,7 +830,7 @@ const thaiDate = (ms) => new Date(ms + 7 * 3600 * 1000).toISOString().slice(0, 1
 
 async function bookings(env, center) {
   const now = Date.now();
-  const from = thaiDate(now - 31 * DAY), to = thaiDate(now + 91 * DAY);
+  const from = thaiDate(now - 62 * DAY), to = thaiDate(now + 124 * DAY); // the calendar shows last month up to 3 months ahead
   const [recs, cf] = await Promise.all([at(env, "Bookings", {
     formula: `AND(${ofCenter(center)}, ` +
       `IS_AFTER({Activity date}, DATETIME_PARSE('${from}', 'YYYY-MM-DD')), ` +
@@ -5268,6 +5268,7 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .cd:hover{border-color:var(--sand)}
 .cd.wk{background:var(--paper-2)}
 .cd.past{opacity:.55}
+.cd.out{opacity:.4;background:none}
 .cd.today{border-color:var(--sand);box-shadow:0 0 0 2px rgba(220,164,74,.28)}
 .cd.full{background:repeating-linear-gradient(135deg,var(--card),var(--card) 8px,var(--paper-2) 8px,var(--paper-2) 16px)}
 .cdh{display:flex;align-items:center;gap:6px}
@@ -5492,12 +5493,12 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .dgrid3{align-items:stretch}
 .dgrid3 > .panel{margin:0;display:flex;flex-direction:column}
 .dgrid3 > .panel .hnote{margin-top:auto;padding-top:12px}
-/* Phone (25 Oct): diver details folded away so the chat has room */
-.cimore{display:none}
+/* Diver details above the chat fold away with one Details button in the head (28 Oct; folded by default on a phone) */
+.cimore{display:inline-flex;align-items:center;gap:4px;flex:none;font:inherit;font-size:13px;font-weight:600;color:var(--muted);background:none;border:0;border-radius:6px;padding:3px 4px;cursor:pointer}
+.cimore:hover{color:var(--deep)}
+.cimore svg,.bkt svg{transition:transform .15s}
+.cimore[aria-expanded="true"] svg,.bkt[aria-expanded="true"] svg{transform:rotate(180deg)}
 @media (max-width:760px){
- .cimore{display:inline-flex;align-items:center;gap:4px;justify-self:start;font:inherit;font-size:13px;font-weight:600;color:var(--muted);background:none;border:0;padding:2px 0;cursor:pointer}
- .cinfo.open .cimore svg{transform:rotate(180deg)}
- .cinfo:not(.open) .facts,.cinfo:not(.open) .teamrow,.cinfo:not(.open) .hist{display:none}
  .night.big .nstats b{font-size:26px}
  .night.big .nstats span{font-size:12px;line-height:1.35;display:block}
 }
@@ -5648,6 +5649,17 @@ header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-sh
 .cinfo .bkm:hover{text-decoration:underline;background:none}
 .composer .note:empty{display:none}
 @media (max-width:760px){.pane .head{padding:12px 16px 4px}.cinfo{padding:0 16px 12px}.cinfo .facts{flex-wrap:wrap;overflow:visible;white-space:normal}}
+.cinfo:not(.open){display:none}
+.bkt{flex:none;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;margin:-4px -6px -4px 0;border:0;border-radius:6px;background:none;color:var(--muted);cursor:pointer}
+.bkt:hover{color:var(--deep);background:var(--paper)}
+.cinfo .bkc.fold{padding:5px 12px}
+.bkc.fold .bki,.bkc.fold small,.bkc.fold .bkd{display:none}
+.bkc.fold .bkb b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cinfo > *,.bkwrap > *{min-width:0}
+.hist .hh{display:flex;align-items:center;gap:8px}
+.hist .hh b{flex:1;min-width:0}
+.hist.fold .hs,.hist.fold .bkp,.hist.fold .hn{display:none}
+@media (max-width:760px){.bkc.fold{flex-wrap:nowrap}.bkc.fold .bkb{flex-basis:auto}.bkc.fold .bkw{margin-left:0}}
 </style></head>
 <body>
 <header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>${T("Customer zone")}</small></span></div><span class="sp"></span>${switcher}<div class="htools">${superadmin ? `<a href="/zone/admin" title="Talay HQ">Talay HQ</a>` : ""}<button class="lnk hlang" id="hlang" type="button" title="${T("Language")}" aria-haspopup="menu" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg><span class="sl">${(ZONE_LANGS.find(l => l[0] === lang) || ZONE_LANGS[0])[1]}</span><svg class="chev sl" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">${T("Sign out")}</span></a><div class="soc"><a href="https://www.instagram.com/talay.io/" target="_blank" rel="noopener" title="${T("Talay on Instagram")}" aria-label="${T("Talay on Instagram")}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.5 6.5h.01"/></svg></a><a href="https://www.facebook.com/profile.php?id=61594947457744" target="_blank" rel="noopener" title="${T("Talay on Facebook")}" aria-label="${T("Talay on Facebook")}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg></a></div></div></header><div class="lmenu" id="lmenu" role="menu" hidden>${ZONE_LANGS.map(([code, name]) => `<button type="button" role="menuitemradio" aria-checked="${code === lang}" data-l="${code}"${code === lang ? ' class="on"' : ""}><span class="code">${code}</span>${name}<svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7"/></svg></button>`).join("")}</div>
@@ -5706,7 +5718,7 @@ header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-sh
   <div class="calwrap">
     <div class="calbar">
       <h2 id="calTitle"></h2>
-      <div class="calnav"><button class="ghost" type="button" data-cw="-4" aria-label="${T("Previous")}">‹</button><button class="ghost" type="button" data-cw="0">${T("Today")}</button><button class="ghost" type="button" data-cw="4" aria-label="${T("Next")}">›</button></div>
+      <div class="calnav"><button class="ghost" type="button" data-cw="-1" aria-label="${T("Previous")}">‹</button><button class="ghost" type="button" data-cw="0">${T("Today")}</button><button class="ghost" type="button" data-cw="1" aria-label="${T("Next")}">›</button></div>
     </div>
     <div id="calCards" class="cards"></div>
     <div id="calBody"><div class="skel"><i></i><i></i><i></i></div></div>
@@ -5815,6 +5827,9 @@ header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-sh
 // Runs in the browser (inserted with toString), so it may not use anything from this module.
 function zoneClient(cfg) {
   var current = null, lastList = "", lastChat = "", filter = "open", items = [], needSeen = null, chatSeenAt = null, freshNext = false, freshList = false;
+  // Diver details above the chat: open when a chat opens (folded on a phone), one Details button folds it all;
+  // the booking and Earlier blocks also fold one by one into a single line. Reset for every chat.
+  var ciOpen = null, bkFold = {};
   var soundOn = true, audio = null;
   try { soundOn = localStorage.getItem("talay-sound") !== "off"; } catch (e) {}
   var $ = function (s) { return document.querySelector(s); };
@@ -6012,7 +6027,7 @@ function zoneClient(cfg) {
 
   // ---- chat
   function openChat(id) {
-    current = id; lastChat = ""; chatSeenAt = null;
+    current = id; lastChat = ""; chatSeenAt = null; ciOpen = null; bkFold = {};
     var it = items.filter(function (c) { return c.id === id; })[0]; if (it) markSeen(id, it.lastAt);
     var row = document.querySelector('.item[data-id="' + id + '"]'); if (row) { row.classList.remove("unread"); var u = row.querySelector(".udot"); if (u) u.remove(); }
     if (filter === "open" || filter === "need") badge(items);
@@ -6058,18 +6073,21 @@ function zoneClient(cfg) {
       // Translate shows on the diver's messages when the diver writes in another language than the zone (or the language isn't known yet).
       // Leads → Language can be out of date, so Translate shows on every diver message and the
       // reply is translated into the language of the diver's last message.
+      var ciO = ciOpen === null ? !matchMedia("(max-width:760px)").matches : ciOpen;
+      var bk = bookingCard(d.bookings, d.history), hasInfo = !!(facts || d.hasLead || bk);
       var lastDiver = ""; d.messages.forEach(function (m) { if (m.dir === "Customer" && m.text && !/^📎 /.test(m.text)) lastDiver = m.text; });
       $("#pane").innerHTML =
         '<div class="head"><button class="back" aria-label="Back">‹</button>' + avatar(L.name || L.contact, d.cc) + '<div><b>' + esc(dname(L.name, L.contact)) + "</b>" +
         (l.t ? '<div class="sub">' + esc(l.t) + "</div>" : "") + "</div>" +
         (d.needsYou ? '<span class="tag need">' + t("Needs you") + "</span>" : "") +
         ((d.bookings || []).filter(function (b) { return !/cancel|refund/i.test(b.status); }).length > 1 ? '<span class="tag ret">' + t("Returning diver") + "</span>" : "") +
+        (hasInfo ? '<button type="button" class="cimore" id="ciMore" aria-expanded="' + ciO + '" aria-controls="cinfo" title="' + t("Diver details") + '">' + t("Details") + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>' : "") +
         '<div class="actions">' + actions + "</div></div>" +
-        '<div class="cinfo"><button type="button" class="cimore" id="ciMore" aria-expanded="false">' + t("Diver details") + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>' + (facts ? '<div class="facts">' + facts + "</div>" : "") +
+        '<div class="cinfo' + (ciO ? " open" : "") + '" id="cinfo">' + (facts ? '<div class="facts">' + facts + "</div>" : "") +
         (d.hasLead ? '<div class="teamrow"><button type="button" class="asg" id="assign" aria-haspopup="menu" aria-expanded="false" title="' + t("Assigned to") + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span id="asgName">' + esc(L.assigned ? (L.assigned === String(cfg.email || "").toLowerCase() ? t("You") : person(L.assigned)) : t("Not assigned")) + '</span><svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>' +
           '<button type="button" class="nbtn' + (L.note ? " has" : "") + '" id="nOpen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>' + (L.note ? esc(L.note.length > 70 ? L.note.slice(0, 70) + "…" : L.note) : t("Add a team note")) + "</button>" +
           '<div class="nbox" id="nBox" hidden><textarea id="nTxt" rows="3" maxlength="2000" placeholder="' + t("Only your team sees this, never the diver. E.g. wants to be in the same group as her friend.") + '">' + esc(L.note) + '</textarea><div class="nact"><span class="nmsg" id="nMsg"></span><button type="button" class="ghost" id="nCancel">' + t("Cancel") + '</button><button type="button" class="btn primary" id="nSave">' + t("Save") + "</button></div></div></div>" : "") +
-        bookingCard(d.bookings, d.history) + "</div>" +
+        bk + "</div>" +
         '<div class="msgs" id="msgs">' + (function () {
           var prevDay = "";
           return d.messages.map(function (m, idx) {
@@ -6129,7 +6147,14 @@ function zoneClient(cfg) {
             .catch(function (e) { b.disabled = false; b.textContent = e.message; });
         };
       });
-      $("#ciMore").onclick = function () { var c = this.parentNode, o = !c.classList.contains("open"); c.classList.toggle("open", o); this.setAttribute("aria-expanded", String(o)); };
+      if ($("#ciMore")) $("#ciMore").onclick = function () {
+        var c = $("#cinfo"), o = !c.classList.contains("open");
+        ciOpen = o; c.classList.toggle("open", o); this.setAttribute("aria-expanded", String(o));
+        if (o) { bkFold = {}; c.querySelectorAll(".fold").forEach(function (x) { x.classList.remove("fold"); x.querySelector("[data-fold]").setAttribute("aria-expanded", "true"); }); }
+      };
+      $("#pane").querySelectorAll("[data-fold]").forEach(function (b) {
+        b.onclick = function () { var k = b.dataset.fold, f = !bkFold[k]; bkFold[k] = f; b.closest(".bkc,.hist").classList.toggle("fold", f); b.setAttribute("aria-expanded", String(!f)); };
+      });
       $(".back").onclick = function () { current = null; document.body.classList.remove("inchat"); $("#convos").classList.remove("open"); document.querySelectorAll(".item").forEach(function (b) { b.classList.remove("on"); }); };
       var box = $("#msgs");
       var place = function () { box.scrollTop = keepTop === null ? box.scrollHeight : keepTop; };
@@ -6884,13 +6909,15 @@ function zoneClient(cfg) {
     var past = list.filter(function (b) { return up.indexOf(b) < 0; });
     var fmt = function (iso) { return new Date(iso + "T12:00:00Z").toLocaleDateString(LOC, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }); };
     var money = function (v) { return Math.round(v).toLocaleString(NUM) + " THB"; };
+    var chev = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
     var ico = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
+    var fold = function (k) { return '<button type="button" class="bkt" data-fold="' + esc(k) + '" aria-expanded="' + !bkFold[k] + '" title="' + t("Details") + '" aria-label="' + t("Details") + '">' + chev + "</button>"; };
     var card = function (b) {
       var days = Math.round((Date.parse(b.date) - Date.parse(today)) / 86400000);
       var when = days === 0 ? t("Today") : days === 1 ? t("Tomorrow") : t("In {n} days", { n: days });
-      return '<div class="bkc"><span class="bki">' + ico + '</span><div class="bkb"><b>' + esc(b.product) + " · " + esc(fmt(b.date)) + " · " + tn(b.divers, "1 diver", "{n} divers") +
-        "</b><small>" + t("{d} paid online · {b} at the shop", { d: money(b.deposit), b: money(b.balance) }) + " · " + esc(b.ref) + '</small></div><span class="bkw">' + when + "</span>" +
-        (b.manage ? '<a class="ghost bkm" href="' + esc(b.manage) + '" target="_blank" rel="noopener">' + t("Move / cancel") + "</a>" : "") + "</div>";
+      return '<div class="bkc' + (bkFold["b" + b.ref] ? " fold" : "") + '"><span class="bki">' + ico + '</span><div class="bkb"><b>' + esc(b.product) + " · " + esc(fmt(b.date)) + '<span class="bkd"> · ' + tn(b.divers, "1 diver", "{n} divers") +
+        "</span></b><small>" + t("{d} paid online · {b} at the shop", { d: money(b.deposit), b: money(b.balance) }) + " · " + esc(b.ref) + '</small></div><span class="bkw">' + when + "</span>" +
+        (b.manage ? '<a class="ghost bkm" href="' + esc(b.manage) + '" target="_blank" rel="noopener">' + t("Move / cancel") + "</a>" : "") + fold("b" + b.ref) + "</div>";
     };
     var pastLine = past.length ? '<div class="bkp">' + (up.length ? t("Earlier") + ": " : t("Booked before") + ": ") + past.slice(0, 3).map(function (b) {
       return esc(b.product) + " (" + esc(fmt(b.date)) + (cx(b) ? ", " + t("cancelled") : "") + ")";
@@ -6901,11 +6928,9 @@ function zoneClient(cfg) {
       var live = list.filter(function (b) { return !cx(b); });
       var since = Date.parse(h.since || "") || 0;
       if (live.length) since = Math.min(since || Infinity, Date.parse(live[live.length - 1].date + "T12:00:00Z"));
-      var top = [
-        since ? t("Diver since {d}", { d: new Date(since).toLocaleDateString(LOC, { month: "long", year: "numeric" }) }) : "",
-        live.length ? tn(live.length, "1 booking", "{n} bookings") + " · " + money(live.reduce(function (a, b) { return a + (b.total || 0); }, 0)) : t("No booking yet"),
-      ].filter(Boolean).join(" · ");
-      hist = '<div class="hist"><b>' + esc(top) + "</b>" + pastLine.replace('class="bkp"', 'class="bkp hp"') +
+      var top = live.length ? tn(live.length, "1 booking", "{n} bookings") + " · " + money(live.reduce(function (a, b) { return a + (b.total || 0); }, 0)) : t("No booking yet");
+      var sinceT = since ? t("Diver since {d}", { d: new Date(since).toLocaleDateString(LOC, { month: "long", year: "numeric" }) }) : "";
+      hist = '<div class="hist' + (bkFold.h ? " fold" : "") + '"><div class="hh"><b>' + (sinceT ? '<span class="hs">' + esc(sinceT) + " · </span>" : "") + esc(top) + "</b>" + fold("h") + "</div>" + pastLine.replace('class="bkp"', 'class="bkp hp"') +
         notes.map(function (n) {
           return '<div class="hn" title="' + esc(n.text) + '">' + t("Earlier note") + " (" + esc(new Date(n.at).toLocaleDateString(LOC, { day: "numeric", month: "short" })) + "): " + esc(n.text.length > 90 ? n.text.slice(0, 90) + "…" : n.text) + "</div>";
         }).join("") + "</div>";
@@ -7020,8 +7045,9 @@ function zoneClient(cfg) {
   loadToday();
   setInterval(function () { if (!document.hidden && $("#today").classList.contains("on")) loadToday(); }, 60000);
 
-  // ---- Calendar: four weeks at a time, Monday first. Click a day for its bookings and to mark it full.
-  var calStart = null, calDay = "";
+  // ---- Calendar: one calendar month at a time, Monday first. Click a day for its bookings and to mark it full.
+  var calMonth = "", calDay = "";
+  function addMonths(ym, n) { var d = new Date(ym + "-01T12:00:00Z"); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 7); }
   function monday(iso) { return addDays(iso, -((new Date(iso + "T12:00:00Z").getUTCDay() + 6) % 7)); }
   function shortDay(iso) { return new Date(iso + "T12:00:00Z").toLocaleDateString(LOC, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }); }
   var FULL_T = { "": t("Bookable"), AM: t("Morning full"), PM: t("Afternoon full"), DAY: t("Day full") };
@@ -7040,33 +7066,36 @@ function zoneClient(cfg) {
   document.querySelectorAll("[data-cw]").forEach(function (b) {
     b.onclick = function () {
       if (!bdata) return;
-      var w = Number(b.dataset.cw);
-      calStart = w ? addDays(calStart, 7 * w) : monday(bdata.today);
+      var m = Number(b.dataset.cw);
+      calMonth = m ? addMonths(calMonth, m) : bdata.today.slice(0, 7);
       renderCalendar();
     };
   });
   function renderCalendar() {
     if (!bdata) { $("#calCards").innerHTML = ""; $("#calBody").innerHTML = '<div class="skel"><i></i><i></i></div>'; return; }
-    var td = bdata.today, first = monday(addDays(td, -28)), last = monday(addDays(td, 84)); // what /bookings returns
-    if (!calStart) calStart = monday(td);
-    var days = [];
-    for (var i = 0; i < 28; i++) days.push(addDays(calStart, i));
+    var td = bdata.today, now = td.slice(0, 7); // /bookings returns last month up to 3 months ahead
+    if (!calMonth) calMonth = now;
+    var m1 = calMonth + "-01", mEnd = addDays(addMonths(calMonth, 1) + "-01", -1);
+    var calStart = monday(m1), days = [];
+    for (var i = 0; addDays(calStart, i) <= mEnd || i % 7; i++) days.push(addDays(calStart, i));
+    var inMonth = function (dd) { return dd.slice(0, 7) === calMonth; };
     var by = calByDay(), full = bdata.full || {};
     var divers = function (dd) { return (by[dd] || []).reduce(function (a, b) { return a + b.divers; }, 0); };
     var fmt = function (iso, o) { return new Date(iso + "T12:00:00Z").toLocaleDateString(LOC, Object.assign({ timeZone: "UTC" }, o)); };
-    $("#calTitle").textContent = fmt(days[0], { day: "numeric", month: "short" }) + " – " + fmt(days[27], { day: "numeric", month: "short", year: "numeric" });
-    $('[data-cw="-4"]').disabled = calStart <= first;
-    $('[data-cw="4"]').disabled = addDays(calStart, 28) > last;
+    var title = fmt(m1, { month: "long", year: "numeric" });
+    $("#calTitle").textContent = title.charAt(0).toUpperCase() + title.slice(1);
+    $('[data-cw="-1"]').disabled = calMonth <= addMonths(now, -1);
+    $('[data-cw="1"]').disabled = calMonth >= addMonths(now, 3);
     var best = null, total = 0, nfull = 0;
-    days.forEach(function (dd) { var v = divers(dd); total += v; if (v && (!best || v > best[1])) best = [dd, v]; if (full[dd]) nfull++; });
-    $("#calCards").innerHTML = '<div class="cardn"><small>' + t("Divers in these 4 weeks") + "</small><b>" + total + "</b></div>" +
+    days.filter(inMonth).forEach(function (dd) { var v = divers(dd); total += v; if (v && (!best || v > best[1])) best = [dd, v]; if (full[dd]) nfull++; });
+    $("#calCards").innerHTML = '<div class="cardn"><small>' + t("Divers this month") + "</small><b>" + total + "</b></div>" +
       '<div class="cardn"><small>' + t("Busiest day") + "</small><b>" + (best ? esc(shortDay(best[0])) : "–") + "</b></div>" +
       '<div class="cardn"><small>' + t("Days full") + "</small><b>" + nfull + "</b></div>";
     var cell = function (dd, idx) {
       var list = by[dd] || [], tot = divers(dd), dt = new Date(dd + "T12:00:00Z"), wk = dt.getUTCDay() === 0 || dt.getUTCDay() === 6;
-      var num = dd.slice(8) === "01" || idx === 0 ? fmt(dd, { day: "numeric", month: "short" }) : String(dt.getUTCDate());
+      var num = dd.slice(8) === "01" && !inMonth(dd) ? fmt(dd, { day: "numeric", month: "short" }) : String(dt.getUTCDate());
       var shown = list.slice(0, 3);
-      return '<button type="button" class="cd' + (dd === td ? " today" : "") + (dd < td ? " past" : "") + (wk ? " wk" : "") + (full[dd] ? " full" : "") + '" data-cday="' + dd + '" aria-label="' + esc(dayLabel(dd)) + '">' +
+      return '<button type="button" class="cd' + (dd === td ? " today" : "") + (dd < td ? " past" : "") + (wk ? " wk" : "") + (inMonth(dd) ? "" : " out") + (full[dd] ? " full" : "") + '" data-cday="' + dd + '" aria-label="' + esc(dayLabel(dd)) + '">' +
         '<span class="cdh"><b>' + esc(num) + "</b>" + (tot ? '<span class="ctot">' + tot + "</span>" : "") + "</span>" +
         (full[dd] ? '<span class="cfl">' + esc(FULL_T[full[dd]]) + "</span>" : "") +
         shown.map(function (b) { var k = slotKey(b); return '<span class="cb s' + k + '"><b>' + esc(b.product) + "</b><small>" + tn(b.divers, "1 diver", "{n} divers") + (slotName(k) ? " · " + esc(slotName(k)) : "") + "</small></span>"; }).join("") +
@@ -7075,7 +7104,7 @@ function zoneClient(cfg) {
     var head = "";
     for (var w = 0; w < 7; w++) head += '<span class="cwd">' + esc(fmt(addDays(calStart, w), { weekday: "short" })) + "</span>";
     // Phone: the same weeks as a list of days that have something on them.
-    var agenda = days.filter(function (dd) { return dd >= td && ((by[dd] || []).length || full[dd] || dd === td); }).map(function (dd) {
+    var agenda = days.filter(function (dd) { return inMonth(dd) && dd >= td && ((by[dd] || []).length || full[dd] || dd === td); }).map(function (dd) {
       var list = by[dd] || [];
       return '<button type="button" class="ag' + (dd === td ? " today" : "") + '" data-cday="' + dd + '"><span class="agd"><b>' + esc(fmt(dd, { weekday: "short", day: "numeric", month: "short" })) + "</b>" +
         (full[dd] ? '<span class="cfl">' + esc(FULL_T[full[dd]]) + "</span>" : "") + (divers(dd) ? '<span class="ctot">' + divers(dd) + "</span>" : "") + "</span>" +
