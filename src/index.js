@@ -1262,7 +1262,8 @@ function plusDays(iso, days) {
 //   Products: Time slot ("Morning or afternoon", "Morning", "Afternoon", "Full day"), Days (number),
 //             Max group (number), Dives (number), Max depth, Level (+ FR/DE/ES/NL), Bring (+ FR/DE/ES/NL),
 //             Not included (+ FR/DE/ES/NL), Short (label in the plan, default the Code),
-//             Group (who it is for: New, Certified and/or Level up; several allowed), Max per day (number)
+//             Group (who it is for: New, Certified and/or Level up; several allowed), Max per day (number),
+//             Description (+ FR/DE/ES/NL/TH/ZH/RU/IT/KO; a short line on top of "What's included")
 //   Centers:  Photos (first one on top), Google rating, Google reviews, Closed dates (2026-12-24, 2026-12-25),
 //             Timezone (default Asia/Bangkok), Multi booking (checkbox: "Book another one" and one payment for all)
 
@@ -1381,6 +1382,7 @@ function productView(p, c, lang) {
       depth: String(first(p["Max depth"]) || ""),
       duration: cap(tr(p, "Duration", lang).v),
       level: cap(level),
+      desc: cap(tr(p, "Description", lang).v),
       inc: cap(tr(p, "Included", lang).v),
       not: cap(tr(p, "Not included", lang).v),
       bring: cap(tr(p, "Bring", lang).v),
@@ -1637,7 +1639,7 @@ const BOOK_JS = String.raw`
     const add = (k, v) => { if (v) rows.push("<div><dt>" + esc(s.info[k]) + "</dt><dd>" + esc(v) + "</dd></div>"); };
     add("dives", i.dives); add("depth", i.depth); add("duration", i.duration || (p.days > 1 ? fill(s.daysN, "n", p.days) : ""));
     add("level", i.level); add("inc", i.inc); add("not", i.not); add("bring", i.bring || s.bringDefault); add("checkIn", i.checkIn);
-    return '<details class="info"><summary>' + esc(s.infoTitle) + "</summary><dl>" + rows.join("") + "</dl></details>";
+    return '<details class="info"><summary>' + esc(s.infoTitle) + "</summary>" + (i.desc ? '<p class="desc">' + esc(i.desc) + "</p>" : "") + "<dl>" + rows.join("") + "</dl></details>";
   }
   function actCard(p, it) {
     const on = it.code === p.code;
@@ -2154,6 +2156,7 @@ a.book.chat{display:flex;align-items:center;justify-content:center;text-decorati
 .info summary::-webkit-details-marker{display:none}
 .info summary::after{content:" +";color:var(--sand)}
 .info[open] summary::after{content:" −"}
+.info .desc{margin:.5rem 0 0;font-size:.88rem}
 .info dl{margin:.5rem 0 .2rem;display:grid;gap:.3rem;font-size:.88rem}
 .info dl div{display:grid;grid-template-columns:7rem 1fr;gap:.6rem}
 .info dt{color:var(--muted)}
