@@ -5299,7 +5299,7 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .calnav .ghost:disabled{opacity:.35;cursor:default}
 .calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
 .cwd{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:0 4px 2px}
-.cd{min-height:118px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;align-items:stretch;gap:4px;font:inherit;color:inherit;text-align:left;cursor:pointer;min-width:0}
+.cd{min-height:96px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;align-items:stretch;gap:4px;font:inherit;color:inherit;text-align:left;cursor:pointer;min-width:0}
 .cd:hover{border-color:var(--sand)}
 .cd.wk{background:var(--paper-2)}
 .cd.past{opacity:.55}
@@ -5318,6 +5318,18 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .cb.sAM,.crow.sAM{border-left-color:var(--sand);background:rgba(220,164,74,.15)}
 .cb.sPM,.crow.sPM{border-left-color:#2E8FA0;background:rgba(46,143,160,.13)}
 .cb.sDAY,.crow.sDAY{border-left-color:var(--deep);background:rgba(127,140,145,.12)}
+/* Calendar cells (29 Oct): one line per booking, divers first, full name on up to 2 lines */
+.calgrid .cb{flex-direction:row;align-items:flex-start;gap:6px;padding:3px 7px}
+.calgrid .cb i{font-style:normal;font-size:12px;font-weight:800;line-height:1.25;flex:none}
+.calgrid .cb b{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.cd.past{opacity:.45;min-height:58px}
+.cd.past .ctot{background:var(--paper-2);color:var(--muted)}
+.clg{display:inline-flex;align-items:center;gap:5px;margin-right:14px}
+.clg i{width:10px;height:10px;border-radius:3px;border-left:3px solid var(--line)}
+.clg i.sAM{border-left-color:var(--sand);background:rgba(220,164,74,.3)}
+.clg i.sPM{border-left-color:#2E8FA0;background:rgba(46,143,160,.25)}
+.calhint{display:flex;flex-wrap:wrap;align-items:center;row-gap:4px}
+.calhint .clg:last-of-type{margin-right:auto}
 .cmore{font-size:11px;color:var(--muted);font-weight:600;padding-left:4px}
 .cnone{color:var(--muted);font-size:13px}
 .calhint{color:var(--muted);font-size:12.5px;margin:12px 2px 0}
@@ -7210,12 +7222,14 @@ function zoneClient(cfg) {
     var cell = function (dd, idx) {
       var list = by[dd] || [], tot = divers(dd), dt = new Date(dd + "T12:00:00Z"), wk = dt.getUTCDay() === 0 || dt.getUTCDay() === 6;
       var num = dd.slice(8) === "01" && !inMonth(dd) ? fmt(dd, { day: "numeric", month: "short" }) : String(dt.getUTCDate());
-      var shown = list.slice(0, 3);
+      // Past days only show their total, so the days ahead stand out. One line per booking: number of divers first,
+      // the full product name on up to 2 lines, the colour says morning or afternoon (legend under the grid).
+      var past = dd < td, shown = past ? [] : list.slice(0, 4);
       return '<button type="button" class="cd' + (dd === td ? " today" : "") + (dd < td ? " past" : "") + (wk ? " wk" : "") + (inMonth(dd) ? "" : " out") + (full[dd] ? " full" : "") + '" data-cday="' + dd + '" aria-label="' + esc(dayLabel(dd)) + '">' +
-        '<span class="cdh"><b>' + esc(num) + "</b>" + (tot ? '<span class="ctot">' + tot + "</span>" : "") + "</span>" +
-        (full[dd] ? '<span class="cfl">' + esc(FULL_T[full[dd]]) + "</span>" : "") +
-        shown.map(function (b) { var k = slotKey(b); return '<span class="cb s' + k + '"><b>' + esc(b.product) + "</b><small>" + tn(b.divers, "1 diver", "{n} divers") + (slotName(k) ? " · " + esc(slotName(k)) : "") + "</small></span>"; }).join("") +
-        (list.length > 3 ? '<span class="cmore">' + t("+{n} more", { n: list.length - 3 }) + "</span>" : "") + "</button>";
+        '<span class="cdh"><b>' + esc(num) + "</b>" + (tot ? '<span class="ctot">' + tn(tot, "1 diver", "{n} divers") + "</span>" : "") + "</span>" +
+        (full[dd] && !past ? '<span class="cfl">' + esc(FULL_T[full[dd]]) + "</span>" : "") +
+        shown.map(function (b) { var k = slotKey(b); return '<span class="cb s' + k + '" title="' + esc(b.product + " · " + (slotName(k) || tn(b.divers, "1 diver", "{n} divers"))) + '"><i>' + b.divers + "</i><b>" + esc(b.product) + "</b></span>"; }).join("") +
+        (list.length > shown.length && !past ? '<span class="cmore">' + t("+{n} more", { n: list.length - shown.length }) + "</span>" : "") + "</button>";
     };
     var head = "";
     for (var w = 0; w < 7; w++) head += '<span class="cwd">' + esc(fmt(addDays(calStart, w), { weekday: "short" })) + "</span>";
@@ -7227,7 +7241,7 @@ function zoneClient(cfg) {
         (list.length ? list.map(function (b) { var k = slotKey(b); return '<span class="cb s' + k + '"><b>' + esc(b.product) + "</b><small>" + tn(b.divers, "1 diver", "{n} divers") + (slotName(k) ? " · " + esc(slotName(k)) : "") + "</small></span>"; }).join("") : '<span class="cnone">' + t("No bookings on this day.") + "</span>") + "</button>";
     }).join("");
     $("#calBody").innerHTML = '<div class="calgrid">' + head + days.map(cell).join("") + '</div><div class="agenda">' + (agenda || '<div class="bempty">' + t("No bookings in this period.") + "</div>") + "</div>" +
-      '<p class="calhint">' + t("Click a day to see its bookings or to mark it as full.") + "</p>";
+      '<p class="calhint"><span class="clg"><i class="sAM"></i>' + t("Morning") + '</span><span class="clg"><i class="sPM"></i>' + t("Afternoon") + "</span>" + t("Click a day to see its bookings or to mark it as full.") + "</p>";
     $("#calBody").querySelectorAll("[data-cday]").forEach(function (b) { b.onclick = function () { openDay(b.dataset.cday); }; });
     if (calDay) openDay(calDay);
   }
