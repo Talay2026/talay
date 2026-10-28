@@ -5675,6 +5675,14 @@ html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 button,a,.item,.chip,label{touch-action:manipulation}
 nav,button,.item,.chip,.day,.who{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .items,.msgs,.bwrap,.swrap,.twrap,.calwrap,.cinfo{overscroll-behavior:contain}
+/* A page never slides sideways on a phone: only rows built to scroll (chips, filters) do.
+   Grid columns may shrink below what a form field asks for (Safari gives fields a wide minimum). */
+@media (max-width:760px){
+ .view{overflow-x:hidden}
+ #sett .ptable tr{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+ #sett .ptable select,#sett .ptable input[type=number]{width:100%;max-width:100%;min-width:0}
+ .scard,.tcard,.cardn,.kpi{min-width:0;overflow-wrap:anywhere}
+}
 @media (hover:none){
  button,.item{transition:transform .12s ease,background-color .12s ease,opacity .12s ease}
  .btn:active,.ghost:active,.chip:active,.composer button:active{transform:scale(.96)}
