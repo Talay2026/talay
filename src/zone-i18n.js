@@ -539,6 +539,18 @@ export const ZONE_ROWS = [
   ["Saving and translating…", "Guardando y traduciendo…", "Enregistrement et traduction…", "Speichern und übersetzen…", "Opslaan en vertalen…"],
   ["Remove {x}? Divers can no longer book it.", "¿Quitar {x}? Los buceadores ya no podrán reservarlo.", "Supprimer {x} ? Les plongeurs ne pourront plus le réserver.", "{x} entfernen? Taucher können es dann nicht mehr buchen.", "{x} verwijderen? Duikers kunnen het dan niet meer boeken."],
   ["Details", "Detalles", "Détails", "Details", "Details"],
+  ["What to bring", "Qué traer", "À apporter", "Mitbringen", "Wat meebrengen"],
+  ["e.g. swimwear, a towel and sunscreen", "p. ej. bañador, toalla y protector solar", "ex. maillot de bain, serviette et crème solaire", "z. B. Badesachen, Handtuch und Sonnencreme", "bv. zwemkleding, een handdoek en zonnecrème"],
+  ["On the booking page", "En la página de reservas", "Sur la page de réservation", "Auf der Buchungsseite", "Op de boekingspagina"],
+  ["Time slot", "Franja horaria", "Créneau", "Zeitfenster", "Tijdslot"],
+  ["Not asked", "No se pregunta", "Pas demandé", "Nicht gefragt", "Niet gevraagd"],
+  ["Morning or afternoon", "Mañana o tarde", "Matin ou après-midi", "Vormittag oder Nachmittag", "Voormiddag of namiddag"],
+  ["Number of days", "Número de días", "Nombre de jours", "Anzahl Tage", "Aantal dagen"],
+  ["Max divers per group", "Máx. buceadores por grupo", "Plongeurs max. par groupe", "Max. Taucher pro Gruppe", "Max. duikers per groep"],
+  ["Dives", "Inmersiones", "Plongées", "Tauchgänge", "Duiken"],
+  ["Max depth", "Profundidad máx.", "Profondeur max.", "Max. Tiefe", "Max. diepte"],
+  ["e.g. 18 m", "p. ej. 18 m", "ex. 18 m", "z. B. 18 m", "bv. 18 m"],
+  ["Price and booking", "Precio y reserva", "Prix et réservation", "Preis und Buchung", "Prijs en boeken"],
 ];
 
 // { es: { English: Spanish, … }, fr: …, de: …, nl: …, th: … }
@@ -1066,6 +1078,18 @@ export const ZONE_TH = {
   "Saving and translating…": "กำลังบันทึกและแปล…",
   "Remove {x}? Divers can no longer book it.": "ลบ {x} ไหม? นักดำน้ำจะจองไม่ได้อีก",
   "Details": "รายละเอียด",
+  "What to bring": "สิ่งที่ต้องนำมา",
+  "e.g. swimwear, a towel and sunscreen": "เช่น ชุดว่ายน้ำ ผ้าเช็ดตัว และครีมกันแดด",
+  "On the booking page": "ในหน้าจอง",
+  "Time slot": "ช่วงเวลา",
+  "Not asked": "ไม่ถาม",
+  "Morning or afternoon": "เช้าหรือบ่าย",
+  "Number of days": "จำนวนวัน",
+  "Max divers per group": "นักดำน้ำสูงสุดต่อกลุ่ม",
+  "Dives": "จำนวนไดฟ์",
+  "Max depth": "ความลึกสูงสุด",
+  "e.g. 18 m": "เช่น 18 ม.",
+  "Price and booking": "ราคาและการจอง",
 };
 ZONE_TEXT.th = ZONE_TH;
 Object.assign(ZONE_TEXT, ZONE_MORE);

@@ -1749,6 +1749,7 @@ async function settings(env, center) {
       own: !STANDARD_CODES.includes(String(first(p["Code"]) || "").toUpperCase()),
       group: [].concat(p["Group"] || []).filter((g) => PRODUCT_GROUPS.includes(g)),
       minAge: Number(first(p["Min age"])) || 0,
+      ...productFacts(p),
       texts: Object.fromEntries(Object.entries(PRODUCT_TEXTS).map(([k, f]) =>
         [k, String(first(p[f]) || (k === "level" ? first(p["Prerequisites"]) || "" : ""))])),
     };
@@ -2003,18 +2004,32 @@ async function saveProduct(env, center, email, b) {
 const STANDARD_CODES = ["DSD", "OW", "AOW", "AD", "FUN", "FUN10", "DDS", "REF"];
 const PRODUCT_GROUPS = ["New", "Certified", "Level up"];
 const PRODUCT_LANGS = ["FR", "DE", "ES", "NL", "TH", "ZH", "RU", "IT", "KO"];
-const PRODUCT_TEXTS = { name: "Name", description: "Description", duration: "Duration", checkin: "Check-in", level: "Level", included: "Included", notIncluded: "Not included" };
-const PRODUCT_MAX = { name: 80, description: 400, duration: 60, checkin: 120, level: 200, included: 400, notIncluded: 300 };
+const PRODUCT_TEXTS = { name: "Name", description: "Description", duration: "Duration", checkin: "Check-in", level: "Level", included: "Included", notIncluded: "Not included", bring: "Bring" };
+const PRODUCT_MAX = { name: 80, description: 400, duration: 60, checkin: 120, level: 200, included: 400, notIncluded: 300, bring: 300 };
+// Booking page facts that need no translation (Products fields of the booking page, see src/index.js).
+const PRODUCT_SLOTS = ["Morning", "Afternoon", "Morning or afternoon", "Full day"];
+const PRODUCT_NUMS = { days: ["Days", 14], maxGroup: ["Max group", 50], dives: ["Dives", 50] };
+function productFacts(p) {
+  const out = { slot: String(first(p["Time slot"]) || ""), depth: String(first(p["Max depth"]) || "") };
+  for (const [k, [f]] of Object.entries(PRODUCT_NUMS)) out[k] = Number(first(p[f])) || 0;
+  return out;
+}
 
-function productInput(b) {
+function productInput(b, needGroup = true) {
   const texts = {};
   for (const k of Object.keys(PRODUCT_TEXTS)) texts[k] = String(b.texts?.[k] || "").replace(/\s+/g, " ").trim().slice(0, PRODUCT_MAX[k]);
   const group = (Array.isArray(b.group) ? b.group : []).filter((g) => PRODUCT_GROUPS.includes(g));
   const minAge = b.minAge == null || b.minAge === "" ? 0 : Math.round(Number(b.minAge));
   if (!texts.name) return { error: "Give the product a name." };
-  if (!group.length) return { error: "Choose where divers find it on the booking page." };
+  if (needGroup && !group.length) return { error: "Choose where divers find it on the booking page." };
   if (!(minAge >= 0 && minAge <= 99)) return { error: "Enter a minimum age between 0 and 99." };
-  return { texts, group, minAge };
+  const facts = { "Time slot": PRODUCT_SLOTS.includes(b.slot) ? b.slot : null, "Max depth": String(b.depth || "").trim().slice(0, 20) };
+  for (const [k, [f, max]] of Object.entries(PRODUCT_NUMS)) {
+    const n = b[k] == null || b[k] === "" ? 0 : Math.round(Number(b[k]));
+    if (!(n >= 0 && n <= max)) return { error: `Enter a number between 0 and ${max}.` };
+    facts[f] = n || null;
+  }
+  return { texts, group, minAge, facts };
 }
 
 const PRODUCT_PROMPT = `You translate the texts of one product of a dive centre (a course, a dive trip or another activity) for its booking page and its WhatsApp assistant. The texts in <texts> are written by the dive centre, in any language. Return them in English (en) and in French (fr), German (de), Spanish (es), Dutch (nl), Thai (th), Chinese simplified (zh), Russian (ru), Italian (it) and Korean (ko). Keep the meaning and keep it short; keep prices, numbers, times, names and brands exactly as they are. Keep common diving terms as divers use them in that language (Open Water, Advanced, fun dive, Nitrox, Discover Scuba Diving). In the language the centre wrote in, keep their own wording and only fix obvious typos. Give every key of <texts>, also when its text is short. Answer with one JSON object only, no other text: {"en": {<same keys>}, "fr": {…}, "de": {…}, "es": {…}, "nl": {…}, "th": {…}, "zh": {…}, "ru": {…}, "it": {…}, "ko": {…}}`;
@@ -2109,8 +2124,10 @@ async function createProduct(env, center, email, b) {
   const prefix = String(first(siblings[0]?.fields["Import key"]) || "").split("/")[0] || center.slug;
   const fields = {
     Center: [center.id], Code: code, "Price THB": price, Active: b.active !== false, Group: v.group,
-    "Min age": v.minAge || null, "Cutoff hour": Number(mostCommon(cutoffs)) || 15, "Import key": `${prefix}/${code}`,
-    ...textFields(v.texts, tr),
+    "Min age": v.minAge || null, "Import key": `${prefix}/${code}`,
+    "Cutoff hour": b.cutoff >= 0 && b.cutoff <= 23 && b.cutoff !== "" && b.cutoff != null ? Math.round(Number(b.cutoff)) : Number(mostCommon(cutoffs)) || 15,
+    "Max per day": Math.round(Number(b.maxDay)) > 0 ? Math.min(Math.round(Number(b.maxDay)), 500) : null,
+    ...v.facts, ...textFields(v.texts, tr),
   };
   if (pct) fields["Commission pct"] = pct;
   if (fixed.length === 1 && fixed[0] > 0) fields["Deposit fixed THB"] = fixed[0]; // the center has one fixed deposit for everything
@@ -2122,20 +2139,29 @@ async function createProduct(env, center, email, b) {
   return json({ ok: true, id: out.id, code, translated: !!tr });
 }
 
+// A standard product may keep Group empty: the booking page then places it by its code and name.
 async function saveDetails(env, center, email, b, p) {
-  const v = productInput(b);
+  const v = productInput(b, !STANDARD_CODES.includes(String(first(p["Code"]) || "").toUpperCase()));
   if (v.error) return json({ error: v.error }, 400);
   // Only texts that changed are translated again, so the checked translations of the standard products stay.
   const old = (k) => String(first(p[PRODUCT_TEXTS[k]]) || (k === "level" ? first(p["Prerequisites"]) || "" : ""));
   const changed = Object.fromEntries(Object.entries(v.texts).filter(([k, x]) => x !== old(k)));
   const tr = await translateProduct(env, changed);
-  const fields = { Group: v.group, "Min age": v.minAge || null, ...textFields(changed, tr) };
+  const fields = { ...(v.group.length ? { Group: v.group } : {}), "Min age": v.minAge || null, ...v.facts, ...textFields(changed, tr) };
   try { await writeProduct(env, b.id, fields); }
   catch (e) { console.error("product details", e.message); return json({ error: "Could not save. Try again." }, 502); }
+  // Price, deadline, max per day and "bookable online" go the same way as from the table (deposit, Centers price, log).
+  if (b.price != null) {
+    const r = await saveProduct(env, center, email, { id: b.id, price: b.price, cutoff: b.cutoff, active: b.active, maxDay: b.maxDay });
+    if (!r.ok) return r;
+  }
+  const oldFacts = productFacts(p), newFacts = productFacts(fields);
+  const factsChanged = Object.keys(oldFacts).filter((k) => String(oldFacts[k]) !== String(newFacts[k]));
   const what = Object.keys(changed).map((k) => k === "notIncluded" ? "not included" : k === "level" ? "who can join" : k);
   const oldGroup = [].concat(p["Group"] || []).join(", ");
-  if (oldGroup !== v.group.join(", ")) what.push(`for ${v.group.join(", ")}`);
+  if (v.group.length && oldGroup !== v.group.join(", ")) what.push(`for ${v.group.join(", ")}`);
   if ((Number(first(p["Min age"])) || 0) !== v.minAge) what.push(`min age ${v.minAge || "none"}`);
+  if (factsChanged.length) what.push(factsChanged.map((k) => ({ slot: "time slot", depth: "max depth", days: "days", maxGroup: "max group", dives: "dives" })[k]).join(", "));
   if (what.length) await logChange(env, center, email, `${first(p["Name"]) || first(p["Code"])}: ${what.join(", ")}`);
   return json({ ok: true, translated: tr !== null });
 }
@@ -5600,7 +5626,10 @@ details.stmt > .panel{border:0;border-top:1px solid var(--line);border-radius:0;
 .pform .pedit{max-width:680px}
 .pform h4 .muted{color:var(--muted);font-weight:400;font-size:13px}
 .pform .pedit input[type=text],.pform .pedit textarea{width:100%;box-sizing:border-box}
-.ptable .pd{font:inherit;font-size:13px;background:none;border:0;padding:0 0 0 6px;color:var(--deep-2, #14404D);text-decoration:underline;cursor:pointer}
+.ptable .pd{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:13px;font-weight:600;margin-top:6px;background:var(--paper-2);border:1px solid var(--line);border-radius:999px;padding:4px 11px;color:var(--deep);cursor:pointer}
+.ptable .pd svg{color:var(--sand)}
+.ptable .pd:hover{border-color:var(--sand)}
+.pedit select{font:inherit;font-size:14px;color:var(--deep);border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--paper-2)}
 .pnew{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}
 .pnew .d{margin:0;font-size:13px}
 @media (max-width:760px){.people .pedit{padding-left:2px}.pedit .pgrid{grid-template-columns:1fr}}
@@ -6724,11 +6753,13 @@ function zoneClient(cfg) {
     var isNew = !p; p = p || { texts: {}, group: [], own: true, active: true, minAge: 0 };
     var x = p.texts, tr = document.createElement("div"); tr.className = "pform";
     var inp = function (cls, label, v, max, ph) { return "<label>" + label + '<input type="text" class="' + cls + '" maxlength="' + max + '" value="' + esc(v || "") + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : "") + "></label>"; };
+    var num = function (cls, label, v, max) { return "<label>" + label + '<input type="number" class="' + cls + '" min="0" max="' + max + '" step="1" inputmode="numeric" value="' + (v || "") + '"></label>'; };
+    var cut = isNew ? ((sdata.products[0] || {}).cutoff || 15) : p.cutoff, hours = "";
+    for (var h = 8; h <= 22; h++) hours += '<option value="' + h + '"' + (h === cut ? " selected" : "") + ">" + h + ":00</option>";
     var area = function (cls, label, v, max, ph) { return "<label>" + label + '<textarea class="' + cls + '" rows="2" maxlength="' + max + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : "") + ">" + esc(v || "") + "</textarea></label>"; };
     tr.innerHTML = '<div class="pedit">' +
       "<h4>" + (isNew ? t("New product") : esc(p.name) + ' <span class="muted">' + esc(p.code) + "</span>") + "</h4>" +
       '<div class="pgrid">' + inp("xn", t("Name"), x.name, 80, t("e.g. Night dive")) +
-      (isNew ? "<label>" + t("Price (THB)") + '<input type="number" class="xp" min="100" step="50" inputmode="numeric"></label>' : "") +
       inp("xd", t("Duration"), x.duration, 60, t("e.g. 1 evening")) + inp("xc", t("Check-in"), x.checkin, 120, t("e.g. 17:30 at the shop")) +
       inp("xl", t("Who can join?"), x.level, 200, t("e.g. Open Water or higher")) +
       "<label>" + t("Minimum age") + '<input type="number" class="xa" min="0" max="99" step="1" inputmode="numeric" value="' + (p.minAge || "") + '"></label></div>' +
@@ -6736,7 +6767,17 @@ function zoneClient(cfg) {
       area("xs", t("Short description"), x.description, 400, t("e.g. One dive after sunset with a torch, to see the reef come alive at night.")) +
       area("xi", t("What's included"), x.included, 400, t("e.g. guide, torch, all gear")) +
       inp("xo", t("Not included"), x.notIncluded, 300, t("e.g. marine park fee 200 THB")) +
-      (isNew ? '<label class="pev"><input type="checkbox" class="xb" checked> ' + t("Bookable online") + "</label>" : "") +
+      inp("xg", t("What to bring"), x.bring, 300, t("e.g. swimwear, a towel and sunscreen")) +
+      '<div class="plab">' + t("On the booking page") + "</div>" +
+      '<div class="pgrid"><label>' + t("Time slot") + '<select class="xt"><option value="">' + t("Not asked") + "</option>" +
+        [["Morning", t("Morning")], ["Afternoon", t("Afternoon")], ["Morning or afternoon", t("Morning or afternoon")], ["Full day", t("Full day")]].map(function (o) { return '<option value="' + o[0] + '"' + (p.slot === o[0] ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join("") + "</select></label>" +
+        num("xy", t("Number of days"), p.days, 14) + num("xm", t("Max divers per group"), p.maxGroup, 50) + num("xv", t("Dives"), p.dives, 50) +
+        inp("xe", t("Max depth"), p.depth, 20, t("e.g. 18 m")) + "</div>" +
+      '<div class="plab">' + t("Price and booking") + "</div>" +
+      '<div class="pgrid"><label>' + t("Price (THB)") + '<input type="number" class="xp" min="100" step="50" inputmode="numeric" value="' + (p.price || "") + '"></label>' +
+        "<label>" + t("Book until (day before)") + '<select class="xk">' + hours + "</select></label>" +
+        "<label>" + t("Max divers per day") + '<input type="number" class="xx" min="1" max="500" step="1" inputmode="numeric" value="' + (p.maxDay || "") + '" placeholder="' + t("No limit") + '"></label></div>' +
+      '<label class="pev"><input type="checkbox" class="xb"' + (p.active ? " checked" : "") + "> " + t("Bookable online") + "</label>" +
       '<p class="d">' + t("Write in any language. {a}, the booking page and the zone get it in all ten languages.", { a: cfg.assistant }) + "</p>" +
       '<div class="pact"><button type="button" class="btn psv">' + t("Save") + '</button><button type="button" class="ghost pcx">' + t("Cancel") + "</button>" +
       (p.own && !isNew ? '<span class="sp"></span><button type="button" class="ghost danger pdl">' + t("Remove product") + "</button>" : "") + "</div></div>";
@@ -6749,8 +6790,9 @@ function zoneClient(cfg) {
       var btn = this, name = v("xn").trim();
       var body = { action: "product", mode: isNew ? "new" : "details", id: p.id, minAge: v("xa"),
         group: [].map.call(tr.querySelectorAll(".mchips .chip.on"), function (c) { return c.dataset.v; }),
-        texts: { name: name, duration: v("xd"), checkin: v("xc"), level: v("xl"), description: v("xs"), included: v("xi"), notIncluded: v("xo") } };
-      if (isNew) { body.price = Number(v("xp")); body.active = tr.querySelector(".xb").checked; }
+        texts: { name: name, duration: v("xd"), checkin: v("xc"), level: v("xl"), description: v("xs"), included: v("xi"), notIncluded: v("xo"), bring: v("xg") },
+        slot: v("xt"), days: v("xy"), maxGroup: v("xm"), dives: v("xv"), depth: v("xe"),
+        price: Number(v("xp")), cutoff: Number(v("xk")), maxDay: Number(v("xx")) || 0, active: tr.querySelector(".xb").checked };
       btn.textContent = t("Saving and translating…");
       save(body, "#pMsg", t("{x} saved.", { x: name }), btn).finally(function () { btn.textContent = t("Save"); });
     };
@@ -6770,7 +6812,7 @@ function zoneClient(cfg) {
       $("#pEdit").innerHTML = "";
       $("#prods").innerHTML = d.products.map(function (p) {
         var hours = ""; for (var h = 8; h <= 22; h++) hours += '<option value="' + h + '"' + (h === p.cutoff ? " selected" : "") + ">" + h + ":00</option>";
-        return '<tr class="' + (p.active ? "" : "off") + '" data-id="' + esc(p.id) + '" data-pct="' + (p.fixed ? 0 : p.pct) + '" data-dep="' + Math.round(p.deposit) + '"><td class="nm">' + esc(p.name) + '<br><span class="muted">' + esc(p.code) + '</span> <button class="pd" type="button">' + t("Details") + "</button></td>" +
+        return '<tr class="' + (p.active ? "" : "off") + '" data-id="' + esc(p.id) + '" data-pct="' + (p.fixed ? 0 : p.pct) + '" data-dep="' + Math.round(p.deposit) + '"><td class="nm">' + esc(p.name) + '<br><span class="muted">' + esc(p.code) + '</span><br><button class="pd" type="button"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>' + t("Edit") + "</button></td>" +
           '<td data-l="' + t("Price (THB)") + '"><input type="number" min="100" step="50" value="' + p.price + '" class="pp" inputmode="numeric"></td>' +
           '<td class="muted dep" data-l="' + t("Deposit") + '">' + Math.round(p.deposit).toLocaleString(NUM) + " THB</td>" +
           '<td data-l="' + t("Book until (day before)") + '"><select class="pc">' + hours + "</select></td>" +
