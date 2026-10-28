@@ -513,6 +513,10 @@ export const ZONE_ZH = {
   "Max depth": "最大深度",
   "e.g. 18 m": "例如 18 米",
   "Price and booking": "价格与预订",
+  "AM": "上午",
+  "PM": "下午",
+  "Show past weeks ({n})": "显示过去的周 ({n})",
+  "Hide past weeks": "隐藏过去的周",
 };
 
 // Russian
@@ -1027,6 +1031,10 @@ export const ZONE_RU = {
   "Max depth": "Макс. глубина",
   "e.g. 18 m": "например, 18 м",
   "Price and booking": "Цена и бронирование",
+  "AM": "Утро",
+  "PM": "День",
+  "Show past weeks ({n})": "Показать прошедшие недели ({n})",
+  "Hide past weeks": "Скрыть прошедшие недели",
 };
 
 // Italian
@@ -1541,6 +1549,10 @@ export const ZONE_IT = {
   "Max depth": "Profondità max",
   "e.g. 18 m": "es. 18 m",
   "Price and booking": "Prezzo e prenotazione",
+  "AM": "Matt.",
+  "PM": "Pom.",
+  "Show past weeks ({n})": "Mostra settimane passate ({n})",
+  "Hide past weeks": "Nascondi settimane passate",
 };
 
 // Korean
@@ -2055,4 +2067,8 @@ export const ZONE_KO = {
   "Max depth": "최대 수심",
   "e.g. 18 m": "예: 18 m",
   "Price and booking": "가격 및 예약",
+  "AM": "오전",
+  "PM": "오후",
+  "Show past weeks ({n})": "지난 주 보기 ({n})",
+  "Hide past weeks": "지난 주 숨기기",
 };

@@ -840,7 +840,7 @@ const thaiDate = (ms) => new Date(ms + 7 * 3600 * 1000).toISOString().slice(0, 1
 async function bookings(env, center) {
   const now = Date.now();
   const from = thaiDate(now - 62 * DAY), to = thaiDate(now + 124 * DAY); // the calendar shows last month up to 3 months ahead
-  const [recs, cf] = await Promise.all([at(env, "Bookings", {
+  const [recs, cf, prods] = await Promise.all([at(env, "Bookings", {
     formula: `AND(${ofCenter(center)}, ` +
       `IS_AFTER({Activity date}, DATETIME_PARSE('${from}', 'YYYY-MM-DD')), ` +
       `IS_BEFORE({Activity date}, DATETIME_PARSE('${to}', 'YYYY-MM-DD')))`,
@@ -849,7 +849,10 @@ async function bookings(env, center) {
       "Time slot", "Note", "Stripe session ID"],
     sort: [{ field: "Activity date", direction: "asc" }],
     max: 1000,
-  }), centerRecord(env, center).catch(() => ({}))]);
+  }), centerRecord(env, center).catch(() => ({})),
+  at(env, "Products", { formula: `FIND('${q(center.slug)}', ARRAYJOIN({C slug}))`, fields: ["Name", "Code", "Category", "Group"] }).catch(() => [])]);
+  const groupOf = {}; // product name → "new" | "cert" | "up", for the colours in the calendar
+  for (const r of prods) groupOf[String(first(r.fields["Name"]) || "")] = calGroup(r.fields);
 
   // Link each booking to its WhatsApp conversation via the phone number.
   const phones = [...new Set(recs.map((r) => String(first(r.fields["Payer phone"]) || "")).filter((p) => /^\+?[0-9 ]{6,20}$/.test(p)))];
@@ -877,6 +880,7 @@ async function bookings(env, center) {
       return {
         ref: first(f["Ref"]) || "", date: first(f["Activity date"]) || "",
         product: String(first(f["P name"]) || ""), divers: n(f["Group size"]) || 1,
+        group: groupOf[String(first(f["P name"]) || "")] || "",
         name: first(f["Payer name"]) || "", phone,
         total: n(f["Total value THB"]), deposit: n(f["Deposit paid THB"]), balance: n(f["Balance at shop"]),
         refunded: n(f["Refunded THB"]), status: first(f["Status"]) || "", late: !!f["Late change"],
@@ -891,6 +895,20 @@ async function bookings(env, center) {
 
 
 
+
+// Who a product is for, for the calendar colours: Products → Group (New before Level up before Certified),
+// else guessed from code, name and category like the booking page does (productGroups in src/index.js).
+function calGroup(p) {
+  const set = [].concat(p["Group"] || []).join(",").toLowerCase();
+  if (/new|beginner/.test(set)) return "new";
+  if (/level|advanc/.test(set)) return "up";
+  if (/certif/.test(set)) return "cert";
+  const v = `${first(p["Code"]) || ""} ${first(p["Name"]) || ""} ${first(p["Category"]) || ""}`.toLowerCase();
+  if (/refresh|review/.test(v)) return "cert";
+  const fun = /fun ?dive|dive trip|package|\bpack\b|\d+\s*-?\s*pack|\bfun\b/.test(v);
+  if (fun) return "cert";
+  return /advanced|\baow\b|rescue|special|deep|nitrox|wreck|night|navigation|buoyancy|adventure|divemaster|\bdds\b/.test(v) ? "up" : "new";
+}
 
 // Days the center marked as full: Centers → "Full dates" (long text), one line per day:
 // "2026-11-26" (whole day), "2026-11-26 AM" or "2026-11-26 PM". The booking page (src/index.js) reads the same field.
@@ -5319,15 +5337,21 @@ nav .count{background:var(--sand);color:#09262F;font-weight:700}
 .cb.sPM,.crow.sPM{border-left-color:#2E8FA0;background:rgba(46,143,160,.13)}
 .cb.sDAY,.crow.sDAY{border-left-color:var(--deep);background:rgba(127,140,145,.12)}
 /* Calendar cells (29 Oct): one line per booking, divers first, full name on up to 2 lines */
-.calgrid .cb{flex-direction:row;align-items:flex-start;gap:6px;padding:3px 7px}
+.calgrid .cb,.agenda .cb{flex-direction:row;align-items:flex-start;gap:6px;padding:3px 7px}
+.cb.gnew,.clg i.gnew{border-left-color:#DCA44A;background:rgba(220,164,74,.16)}
+.cb.gcert,.clg i.gcert{border-left-color:#2E8FA0;background:rgba(46,143,160,.14)}
+.cb.gup,.clg i.gup{border-left-color:#8A63C9;background:rgba(138,99,201,.14)}
+.cb em{margin-left:auto;flex:none;font-style:normal;font-size:10.5px;font-weight:700;color:var(--muted);line-height:1.5}
+.agenda .cb i{font-style:normal;font-size:13px;font-weight:800;flex:none}
+.agenda .cb b{font-size:13px;white-space:normal}
+.cpast{grid-column:1/-1;font:inherit;font-size:13px;font-weight:600;color:var(--muted);background:var(--paper-2);border:1px dashed var(--line);border-radius:10px;padding:7px 12px;cursor:pointer;text-align:left}
+.cpast:hover{color:var(--deep)}
 .calgrid .cb i{font-style:normal;font-size:12px;font-weight:800;line-height:1.25;flex:none}
 .calgrid .cb b{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 .cd.past{opacity:.45;min-height:58px}
 .cd.past .ctot{background:var(--paper-2);color:var(--muted)}
 .clg{display:inline-flex;align-items:center;gap:5px;margin-right:14px}
 .clg i{width:10px;height:10px;border-radius:3px;border-left:3px solid var(--line)}
-.clg i.sAM{border-left-color:var(--sand);background:rgba(220,164,74,.3)}
-.clg i.sPM{border-left-color:#2E8FA0;background:rgba(46,143,160,.25)}
 .calhint{display:flex;flex-wrap:wrap;align-items:center;row-gap:4px}
 .calhint .clg:last-of-type{margin-right:auto}
 .cmore{font-size:11px;color:var(--muted);font-weight:600;padding-left:4px}
@@ -7174,12 +7198,13 @@ function zoneClient(cfg) {
   setInterval(function () { if (!document.hidden && $("#today").classList.contains("on")) loadToday(); }, 60000);
 
   // ---- Calendar: one calendar month at a time, Monday first. Click a day for its bookings and to mark it full.
-  var calMonth = "", calDay = "";
+  var calMonth = "", calDay = "", calPast = false;
   function addMonths(ym, n) { var d = new Date(ym + "-01T12:00:00Z"); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 7); }
   function monday(iso) { return addDays(iso, -((new Date(iso + "T12:00:00Z").getUTCDay() + 6) % 7)); }
   function shortDay(iso) { return new Date(iso + "T12:00:00Z").toLocaleDateString(LOC, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }); }
   var FULL_T = { "": t("Bookable"), AM: t("Morning full"), PM: t("Afternoon full"), DAY: t("Day full") };
   function slotKey(b) { var x = String(b.slot || "").toUpperCase(); return x === "AM" || x === "PM" ? x : "DAY"; }
+  var CAL_G = { New: "new", Certified: "cert", "Level up": "up" };
   function slotName(k) { return k === "AM" ? t("Morning") : k === "PM" ? t("Afternoon") : ""; }
   function calByDay() {
     var by = {};
@@ -7195,7 +7220,7 @@ function zoneClient(cfg) {
     b.onclick = function () {
       if (!bdata) return;
       var m = Number(b.dataset.cw);
-      calMonth = m ? addMonths(calMonth, m) : bdata.today.slice(0, 7);
+      calMonth = m ? addMonths(calMonth, m) : bdata.today.slice(0, 7); calPast = false;
       renderCalendar();
     };
   });
@@ -7222,27 +7247,42 @@ function zoneClient(cfg) {
     var cell = function (dd, idx) {
       var list = by[dd] || [], tot = divers(dd), dt = new Date(dd + "T12:00:00Z"), wk = dt.getUTCDay() === 0 || dt.getUTCDay() === 6;
       var num = dd.slice(8) === "01" && !inMonth(dd) ? fmt(dd, { day: "numeric", month: "short" }) : String(dt.getUTCDate());
-      // Past days only show their total, so the days ahead stand out. One line per booking: number of divers first,
-      // the full product name on up to 2 lines, the colour says morning or afternoon (legend under the grid).
+      // Past days only show their total, so the days ahead stand out.
       var past = dd < td, shown = past ? [] : list.slice(0, 4);
       return '<button type="button" class="cd' + (dd === td ? " today" : "") + (dd < td ? " past" : "") + (wk ? " wk" : "") + (inMonth(dd) ? "" : " out") + (full[dd] ? " full" : "") + '" data-cday="' + dd + '" aria-label="' + esc(dayLabel(dd)) + '">' +
         '<span class="cdh"><b>' + esc(num) + "</b>" + (tot ? '<span class="ctot">' + tn(tot, "1 diver", "{n} divers") + "</span>" : "") + "</span>" +
         (full[dd] && !past ? '<span class="cfl">' + esc(FULL_T[full[dd]]) + "</span>" : "") +
-        shown.map(function (b) { var k = slotKey(b); return '<span class="cb s' + k + '" title="' + esc(b.product + " · " + (slotName(k) || tn(b.divers, "1 diver", "{n} divers"))) + '"><i>' + b.divers + "</i><b>" + esc(b.product) + "</b></span>"; }).join("") +
+        shown.map(blk).join("") +
         (list.length > shown.length && !past ? '<span class="cmore">' + t("+{n} more", { n: list.length - shown.length }) + "</span>" : "") + "</button>";
     };
+    // One line per booking: number of divers first, the full product name on up to 2 lines, AM / PM when it has a time slot;
+    // the colour says who it is for (Products → Group), see the legend under the grid.
+    function blk(b) {
+      var k = slotKey(b);
+      return '<span class="cb g' + esc(b.group || "x") + '" title="' + esc(b.product + " · " + tn(b.divers, "1 diver", "{n} divers") + (slotName(k) ? " · " + slotName(k) : "")) + '"><i>' + b.divers + "</i><b>" + esc(b.product) + "</b>" +
+        (k !== "DAY" ? "<em>" + t(k) + "</em>" : "") + "</span>";
+    }
+    // This month: weeks before this week fold into one line, so the calendar starts at this week.
+    var thisMon = monday(td), nPast = calMonth === now ? Math.floor(days.filter(function (dd) { return dd < thisMon; }).length / 7) : 0;
+    var weeks = days.map(function (dd, i) {
+      if (i >= nPast * 7) return cell(dd, i);
+      if (i === 0) return '<button type="button" class="cpast" id="calPast" aria-expanded="' + calPast + '">' + (calPast ? t("Hide past weeks") : t("Show past weeks ({n})", { n: nPast })) + "</button>" + (calPast ? cell(dd, i) : "");
+      return calPast ? cell(dd, i) : "";
+    }).join("");
     var head = "";
     for (var w = 0; w < 7; w++) head += '<span class="cwd">' + esc(fmt(addDays(calStart, w), { weekday: "short" })) + "</span>";
     // Phone: the same weeks as a list of days that have something on them.
     var agenda = days.filter(function (dd) { return inMonth(dd) && dd >= td && ((by[dd] || []).length || full[dd] || dd === td); }).map(function (dd) {
       var list = by[dd] || [];
       return '<button type="button" class="ag' + (dd === td ? " today" : "") + '" data-cday="' + dd + '"><span class="agd"><b>' + esc(fmt(dd, { weekday: "short", day: "numeric", month: "short" })) + "</b>" +
-        (full[dd] ? '<span class="cfl">' + esc(FULL_T[full[dd]]) + "</span>" : "") + (divers(dd) ? '<span class="ctot">' + divers(dd) + "</span>" : "") + "</span>" +
-        (list.length ? list.map(function (b) { var k = slotKey(b); return '<span class="cb s' + k + '"><b>' + esc(b.product) + "</b><small>" + tn(b.divers, "1 diver", "{n} divers") + (slotName(k) ? " · " + esc(slotName(k)) : "") + "</small></span>"; }).join("") : '<span class="cnone">' + t("No bookings on this day.") + "</span>") + "</button>";
+        (full[dd] ? '<span class="cfl">' + esc(FULL_T[full[dd]]) + "</span>" : "") + (divers(dd) ? '<span class="ctot">' + tn(divers(dd), "1 diver", "{n} divers") + "</span>" : "") + "</span>" +
+        (list.length ? list.map(blk).join("") : '<span class="cnone">' + t("No bookings on this day.") + "</span>") + "</button>";
     }).join("");
-    $("#calBody").innerHTML = '<div class="calgrid">' + head + days.map(cell).join("") + '</div><div class="agenda">' + (agenda || '<div class="bempty">' + t("No bookings in this period.") + "</div>") + "</div>" +
-      '<p class="calhint"><span class="clg"><i class="sAM"></i>' + t("Morning") + '</span><span class="clg"><i class="sPM"></i>' + t("Afternoon") + "</span>" + t("Click a day to see its bookings or to mark it as full.") + "</p>";
+    $("#calBody").innerHTML = '<div class="calgrid">' + head + weeks + '</div><div class="agenda">' + (agenda || '<div class="bempty">' + t("No bookings in this period.") + "</div>") + "</div>" +
+      '<p class="calhint">' + GROUP_T.map(function (g) { return '<span class="clg"><i class="g' + CAL_G[g[0]] + '"></i>' + esc(g[1]) + "</span>"; }).join("") +
+      '<span class="clg"><b>' + t("AM") + "</b> " + t("Morning") + '</span><span class="clg"><b>' + t("PM") + "</b> " + t("Afternoon") + "</span>" + t("Click a day to see its bookings or to mark it as full.") + "</p>";
     $("#calBody").querySelectorAll("[data-cday]").forEach(function (b) { b.onclick = function () { openDay(b.dataset.cday); }; });
+    if ($("#calPast")) $("#calPast").onclick = function () { calPast = !calPast; renderCalendar(); };
     if (calDay) openDay(calDay);
   }
   function openDay(dd) {
