@@ -7,7 +7,6 @@ export const ZEE_CSS = `
 body.zee{background:#1F4B5A}
 body.zee::before,body.zee::after{display:none}
 body.zee .wrap{position:relative;z-index:1}
-@media (max-width:560px){body.zee .wrap{padding-right:2.9rem}}
 /* Boxes a bit more solid on the moving background, fields and calendar clearly fillable (Jonas, 28 Oct) */
 body.zee .center{background:rgba(9,38,47,.66);border-color:rgba(247,243,234,.16)}
 body.zee .item{background:rgba(12,44,54,.62);border-color:rgba(247,243,234,.24)}
@@ -77,6 +76,7 @@ body.zee .slots button.on{background:#DCA44A;border-color:#DCA44A}
 .z-ray{transform-origin:45% 50%;animation:zRay 2.4s ease-in-out infinite}
 .z-drift{animation:zDrift ease-in-out infinite alternate}
 .z-wig{transform-origin:70% 50%;animation:zWig ease-in-out infinite alternate}
+@media (max-width:560px){.zmeter{display:none}} /* too present on a phone (Jonas, 28 Oct); stays on wider screens next to the content */
 @media (prefers-reduced-motion:reduce){.zrays,.zca,.zcb,.zcoral,.zfish *{animation:none!important}.zfish .zl{display:none}}
 `;
 
