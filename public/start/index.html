@@ -74,6 +74,10 @@ input:focus,textarea:focus,select:focus{outline:3px solid var(--sand-2);border-c
 .prod .f > label{font-size:14px}
 .prod input,.prod textarea{background:#fff}
 .prod .opts label{background:#fff}
+.prod.own{border-style:dashed;border-color:var(--sand)}
+.linkbtn{font:inherit;font-size:14px;background:none;border:0;color:var(--bad);text-decoration:underline;cursor:pointer;padding:4px 2px}
+.addown{margin:4px 0 6px}
+.ownhelp{color:var(--muted);font-size:14px;margin:0 0 18px}
 
 .navbtns{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:26px;padding-top:18px;border-top:1px solid var(--line);flex-wrap:wrap}
 .btn{display:inline-flex;align-items:center;gap:10px;border-radius:999px;padding:13px 24px;font:inherit;font-weight:700;font-size:16px;border:0;cursor:pointer;background:var(--deep);color:var(--paper)}
@@ -161,7 +165,7 @@ footer{color:var(--muted);font-size:14px;padding:16px 0 40px;display:flex;justif
 <script>
 const TURNSTILE_SITEKEY = "0x4AAAAAAFXZnn0VWocS_nWR";  // Cloudflare Turnstile site key (public, same as the homepage)
 const STORE = "talay-intake-v1";
-const FORM_VERSION = 2;
+const FORM_VERSION = 3; // 3 (28 Oct): own products p_X1_…, with group and description, listed in custom_products
 
 // The questions. Keys are stable: the Airtable conversion depends on them, so never rename a key.
 // type: text, email, tel, url, number, area (textarea), one (radio), many (checkboxes); sub = a small heading.
@@ -359,7 +363,8 @@ function fieldHtml(f, prefix = "") {
   const ph = f.ph ? ` placeholder="${esc(L(f.ph))}"` : "";
   if (t === "one" || t === "many") {
     const it = t === "one" ? "radio" : "checkbox";
-    const opts = f.opts.map(o => `<label><input type="${it}" name="${name}" value="${esc(o)}"${f.req ? " data-req" : ""}> ${esc(L(o))}</label>`).join("");
+    // An option is a text, or [value, label] when the saved value differs from what people see.
+    const opts = f.opts.map(o => { const [v, lab] = Array.isArray(o) ? o : [o, o]; return `<label><input type="${it}" name="${name}" value="${esc(v)}"${f.req ? " data-req" : ""}> ${esc(L(lab))}</label>`; }).join("");
     return `<div class="f" data-group="${name}"${showAttr(f)}><span class="lbl">${esc(L(f.label))}${req}${help}</span><div class="opts">${opts}</div></div>`;
   }
   if (t === "area") return `<div class="f"${showAttr(f)}><label for="${id}">${esc(L(f.label))}${req}${help}</label><textarea id="${id}" name="${name}"${ph}${f.req ? " required" : ""}></textarea></div>`;
@@ -384,10 +389,38 @@ function productHtml(p) {
   </div>`;
 }
 
+// Own products: a centre adds what isn't in the list with "+ Add your own product". Same fields as the
+// products above, plus where it belongs on the booking page (Products → Group: New, Certified, Level up)
+// and a short description. Keys p_X1_…, p_X2_…; the ids in use are kept in custom_products ("X1,X3").
+const GROUP_OPTS = [["New", L("Never dived")], ["Certified", L("I have a certification")], ["Level up", L("Learn more (next course)")]];
+function ownHtml(id) {
+  const pre = "p_" + id + "_";
+  return `<div class="prod own" data-own="${id}">
+    <input type="hidden" name="${pre}offer" value="yes">
+    <div class="top"><b>${esc(L("Your own product"))}</b>
+      <div class="opts"><label><input type="checkbox" name="${pre}online" value="yes" checked> ${esc(L("Bookable online"))}</label><button type="button" class="linkbtn" data-del="${id}">${esc(L("Remove"))}</button></div></div>
+    <div class="body">
+    ${fieldHtml({ k: "name", label: "Name of the product", req: true, ph: "e.g. Night dive" }, pre)}
+    ${fieldHtml({ k: "group", label: "Where should divers find it?", type: "many", req: true, help: L("The choice divers make on your booking page. Pick more than one if it fits."), opts: GROUP_OPTS }, pre)}
+    <div class="grid2">
+      ${fieldHtml({ k: "price", label: "Price (THB)", type: "number", ph: "e.g. 11000" }, pre)}
+      ${fieldHtml({ k: "duration", label: "Duration", ph: "e.g. 1 evening" }, pre)}
+      ${fieldHtml({ k: "checkin", label: "Check-in time", ph: "e.g. 8:00" }, pre)}
+      ${fieldHtml({ k: "min_age", label: "Minimum age", type: "number", ph: "12" }, pre)}
+    </div>
+    ${fieldHtml({ k: "requirements", label: "Who can join?", ph: "e.g. Open Water or higher" }, pre)}
+    ${fieldHtml({ k: "description", label: "Short description", type: "area", ph: "e.g. One dive after sunset with a torch, to see the reef come alive at night." }, pre)}
+    ${fieldHtml({ k: "included", label: "What's included", ph: "e.g. guide, torch, all gear" }, pre)}
+    ${fieldHtml({ k: "not_included", label: "Not included", ph: "e.g. meals, marine park fee 200 THB" }, pre)}</div>
+  </div>`;
+}
+const ownIds = d => String(d.custom_products || "").split(",").filter(id => /^X\d{1,2}$/.test(id));
+const productCodes = d => PRODUCTS.map(p => p.code).concat(ownIds(d));
+
 const STEPS = SECTIONS.length;
 $("#sections").innerHTML = SECTIONS.map((s, i) => `<section class="step" id="s-${s.id}" data-step="${i}" hidden>
   <p class="kicker">${esc(L("Step {n} of {total}", { n: i + 1, total: STEPS }))}</p><h2>${esc(L(s.title))}</h2><p class="why">${esc(L(s.why))}</p>
-  ${s.products ? PRODUCTS.map(productHtml).join("") + fieldHtml({ k: "price_notes", label: "Anything else about prices?", type: "area", ph: "e.g. prices go up 10% from 1 December" }) : ""}
+  ${s.products ? PRODUCTS.map(productHtml).join("") + `<h3 class="sub">${esc(L("Your own products"))}</h3><p class="ownhelp">${esc(L("Something that isn't in the list, like a night dive, a snorkel trip or another course? Add it here. Your assistant and your booking page then show it like the others, in every language."))}</p><div id="own"></div><input type="hidden" name="custom_products" value=""><button type="button" class="btn ghost addown" id="addOwn">+ ${esc(L("Add your own product"))}</button>` + fieldHtml({ k: "price_notes", label: "Anything else about prices?", type: "area", ph: "e.g. prices go up 10% from 1 December" }) : ""}
   ${s.review ? `<h3 class="sub">${esc(L("Your answers"))}</h3><ul class="review" id="review"></ul>` : ""}
   ${(s.fields || []).map(f => fieldHtml(f)).join("")}
   ${s.review ? `<div class="f" id="ts"></div><p class="why">${esc(L("After sending, we set everything up and you test it first. Nothing goes live until you say go."))}</p>` : ""}
@@ -408,6 +441,33 @@ form.querySelectorAll(".prod").forEach(card => {
   offer.addEventListener("change", sync); card._sync = sync;
 });
 
+// Own products: add, remove, and rebuild the cards from saved answers
+function setOwn(ids) {
+  form.custom_products.value = ids.join(",");
+  [...$("#own").children].forEach(c => { if (!ids.includes(c.dataset.own)) c.remove(); });
+  ids.forEach(id => { if (!$("#own").querySelector(`[data-own="${id}"]`)) $("#own").insertAdjacentHTML("beforeend", ownHtml(id)); });
+}
+function addOwn() {
+  const ids = ownIds(collect());
+  if (ids.length >= 20) return;
+  const id = "X" + (Math.max(0, ...ids.map(x => Number(x.slice(1)))) + 1);
+  setOwn(ids.concat(id));
+  form.dispatchEvent(new Event("input"));
+  const card = $("#own").lastElementChild;
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
+  card.querySelector("input[type=text]").focus({ preventScroll: true });
+}
+form.addEventListener("click", e => {
+  if (e.target.closest("#addOwn")) { e.preventDefault(); addOwn(); return; }
+  const del = e.target.closest("[data-del]");
+  if (del) {
+    e.preventDefault();
+    if (!confirm(L("Remove this product?"))) return;
+    setOwn(ownIds(collect()).filter(id => id !== del.dataset.del));
+    form.dispatchEvent(new Event("input"));
+  }
+});
+
 // Collect answers: one value per key, checkboxes joined into a list
 function collect() {
   const out = {};
@@ -420,6 +480,7 @@ function collect() {
   return out;
 }
 function restore(data) {
+  setOwn(ownIds(data));
   form.querySelectorAll("input,textarea,select").forEach(el => {
     if (!(el.name in data)) return;
     const v = data[el.name];
@@ -427,7 +488,7 @@ function restore(data) {
     else if (el.type === "checkbox") el.checked = Array.isArray(v) && v.includes(el.value);
     else el.value = v;
   });
-  form.querySelectorAll(".prod").forEach(c => c._sync());
+  form.querySelectorAll(".prod").forEach(c => c._sync && c._sync());
 }
 
 // Follow-up questions: only shown when the answer they depend on is chosen
@@ -460,7 +521,7 @@ function refresh(d = collect()) {
     const st = stepState(i, d);
     all += st.total; done += st.answered;
     const btn = $("#stepnav").children[i].firstElementChild;
-    const complete = !st.missing.length && (s.products ? PRODUCTS.some(p => d["p_" + p.code + "_price"]) : st.answered > 0);
+    const complete = !st.missing.length && (s.products ? productCodes(d).some(c => d["p_" + c + "_price"]) : st.answered > 0);
     btn.classList.toggle("done", complete && i !== current);
     btn.classList.toggle("miss", !!st.missing.length && touched.has(i) && i !== current);
     const dot = btn.querySelector(".dot");
@@ -477,7 +538,7 @@ function renderReview(d) {
   $("#review").innerHTML = SECTIONS.map((s, i) => {
     if (s.review) return "";
     const st = stepState(i, d);
-    const priced = PRODUCTS.filter(p => (d["p_" + p.code + "_offer"] || []).length && d["p_" + p.code + "_price"]).length;
+    const priced = productCodes(d).filter(c => (d["p_" + c + "_offer"] || []).length && d["p_" + c + "_price"]).length;
     const txt = st.missing.length ? `<span class="st bad">${esc(L("{n} required missing", { n: st.missing.length }))}</span>`
       : s.products ? `<span class="st${priced ? " ok" : ""}">${esc(priced ? L("{n} with a price", { n: priced }) : L("no prices yet"))}</span>`
       : `<span class="st${st.answered ? " ok" : ""}">${esc(L("{a} of {t} answered", { a: st.answered, t: st.total }))}</span>`;

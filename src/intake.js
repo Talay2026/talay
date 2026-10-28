@@ -82,6 +82,8 @@ export async function handleIntake(request, env, ctx) {
 }
 
 // One line per answer that was filled in, products grouped, for reading in Airtable.
+// Own products of the centre (p_X1_…, form version 3) also show where they belong on the booking page
+// (group: New, Certified, Level up) and their description.
 function summary(a) {
   const lines = [];
   const products = {};
@@ -94,7 +96,8 @@ function summary(a) {
   lines.push("", "PRODUCTS");
   for (const [code, p] of Object.entries(products)) {
     if (!p.offer) { lines.push(`${code}: not offered`); continue; }
-    lines.push(`${code}: ${p.name || "-"} · ${p.price || "?"} THB · ${p.duration || "-"} · check-in ${p.checkin || "-"} · online ${p.online ? "yes" : "no"} · min age ${p.min_age || "-"} · who ${p.requirements || "-"} · includes ${p.included || "-"} · not included ${p.not_included || "-"}`);
+    const own = /^X\d+$/.test(code) ? ` (own product, for ${p.group || "-"}: ${p.description || "no description"})` : "";
+    lines.push(`${code}${own}: ${p.name || "-"} · ${p.price || "?"} THB · ${p.duration || "-"} · check-in ${p.checkin || "-"} · online ${p.online ? "yes" : "no"} · min age ${p.min_age || "-"} · who ${p.requirements || "-"} · includes ${p.included || "-"} · not included ${p.not_included || "-"}`);
   }
   return lines.join("\n");
 }
