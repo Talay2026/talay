@@ -14,6 +14,7 @@ import { handleZone, runHqAlerts, runOutreachSync, handlePush, handleWeekly } fr
 import { handleDemo } from "./demo.js"; // demo requests from the homepage form: talay.io/api/demo
 import { handleIntake } from "./intake.js"; // onboarding form for a new centre: talay.io/start -> talay.io/api/intake
 import { handleNotify, handleDiver } from "./notify.js"; // WhatsApp and push to dive center staff, called by Make: talay.io/api/notify
+import { ZEE_CSS, ZEE_JS } from "./zee.js"; // booking page background with sea animals (design by Lars)
 import { MORE_LANGS, MORE_LOCALES, MORE_SEP, MORE_LABEL, MORE_CLOSED, moreTexts } from "./booking-langs.js"; // th, zh, ru, it, ko
 
 const CACHE_SECONDS = 120; // limits Airtable API calls; logo links stay valid
@@ -669,7 +670,7 @@ export default {
       const ref = (url.searchParams.get("c") || "").slice(0, 64);
       const taken = await takenSeats(env, ctx, found.center, found.products.filter((p) => p["Active"]));
       return page(bookingPage(found.center, found.products, slug, env, lang,
-        /^[A-Za-z0-9_-]{1,64}$/.test(ref) ? ref : "", linkItems(url), taken), 200, lang, T[lang].pageTitle, true, "sea");
+        /^[A-Za-z0-9_-]{1,64}$/.test(ref) ? ref : "", linkItems(url), taken), 200, lang, T[lang].pageTitle, true, "sea zee");
     } catch (err) {
       console.error(err);
       return page(problem(T[lang].loadFail, lang), 502, lang);
@@ -1537,7 +1538,9 @@ ${unknown.map((n) => `<p class="warn">${esc(t.unknown(n))}</p>`).join("")}
 ${powered(lang, "booking")}
 
 <script id="data" type="application/json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>
-<script>${BOOK_JS}</script>`;
+<script>${BOOK_JS}</script>
+<style>${ZEE_CSS}</style>
+<script>${ZEE_JS}</script>`;
 }
 
 // Browser code of the booking page (plain string: no template literals inside).
