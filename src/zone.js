@@ -103,9 +103,10 @@ export async function handleZone(request, env, ctx) {
     if (p === "/zone/api/push-latest") {
       const d = await conversations(env, center, "open");
       const need = d.conversations.filter((c) => c.needsYou || c.waitingMin > 0);
-      if (!need.length) return json({ title: "", body: "" });
+      if (!need.length) return json({ title: "", body: "", n: 0 });
       const c = need[0];
       return json({
+        n: need.length, c: need.length === 1 ? c.id : "",
         title: need.length > 1 ? `${need.length} divers need your team` : `${c.name || "A diver"} needs your team`,
         body: need.length > 1 ? `Latest: ${c.name || "a diver"}: “${String(c.preview || "").slice(0, 80)}”` : `“${String(c.preview || "").slice(0, 100)}”`,
       });
@@ -149,7 +150,8 @@ function zoneAsset(url) {
     const n = (url.searchParams.get("n") || "Talay").replace(/[^\p{L}\p{N} .&'-]/gu, "").slice(0, 40) || "Talay";
     return new Response(JSON.stringify({
       name: n + " · Talay", short_name: n.length > 12 ? n.split(" ")[0] : n,
-      start_url: "/zone", scope: "/zone", display: "standalone",
+      id: "/zone", start_url: "/zone", scope: "/zone", display: "standalone",
+      display_override: ["standalone"], launch_handler: { client_mode: "focus-existing" },
       background_color: "#0A2029", theme_color: "#0A2029",
       icons: [
         { src: "/zone/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
@@ -169,20 +171,27 @@ self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 // Push without payload: look up who needs the team, else show a general message.
 self.addEventListener("push", (e) => {
   e.waitUntil((async () => {
-    let title = "A diver needs your team", body = "Open Conversations → Needs you.";
+    let title = "A diver needs your team", body = "Open Conversations → Needs you.", c = "";
     try {
       const r = await fetch("/zone/api/push-latest", { credentials: "same-origin", cache: "no-store" });
-      if (r.ok) { const d = await r.json(); if (d.title) { title = d.title; body = d.body || body; } }
+      if (r.ok) {
+        const d = await r.json();
+        if (d.title) { title = d.title; body = d.body || body; c = d.c || ""; }
+        // The number on the app icon, also while the app is closed.
+        if (self.navigator.setAppBadge) { try { if (d.n) await self.navigator.setAppBadge(d.n); else await self.navigator.clearAppBadge(); } catch (err) {} }
+      }
     } catch (err) {}
-    await self.registration.showNotification(title, { body, icon: "/zone/icon-192.png", badge: "/zone/icon-192.png", tag: "talay-needs-you", renotify: true, data: { url: "/zone" } });
+    await self.registration.showNotification(title, { body, icon: "/zone/icon-192.png", badge: "/zone/icon-192.png", tag: "talay-needs-you", renotify: true, data: { c } });
   })());
 });
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
   e.waitUntil((async () => {
+    // Straight to that diver's chat when one diver needs the team.
+    const c = (e.notification.data && e.notification.data.c) || "";
     const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    for (const c of all) { if (c.url.includes("/zone")) { await c.focus(); return; } }
-    await self.clients.openWindow("/zone");
+    for (const w of all) { if (w.url.includes("/zone")) { await w.focus(); if (c) w.postMessage({ open: c }); return; } }
+    await self.clients.openWindow(c ? "/zone?c=" + encodeURIComponent(c) : "/zone");
   })());
 });
 self.addEventListener("fetch", (e) => {
@@ -5660,6 +5669,37 @@ header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-sh
 .hist .hh b{flex:1;min-width:0}
 .hist.fold .hs,.hist.fold .bkp,.hist.fold .hn{display:none}
 @media (max-width:760px){.bkc.fold{flex-wrap:nowrap}.bkc.fold .bkb{flex-basis:auto}.bkc.fold .bkw{margin-left:0}}
+/* Feels like an app on the phone (28 Oct): no tap flash or double-tap zoom, buttons give way under a finger,
+   lists do not drag the whole page, a chat slides in and out, swipe from the left edge or pull the list to refresh */
+html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+button,a,.item,.chip,label{touch-action:manipulation}
+nav,button,.item,.chip,.day,.who{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.items,.msgs,.bwrap,.swrap,.twrap,.calwrap,.cinfo{overscroll-behavior:contain}
+@media (hover:none){
+ button,.item{transition:transform .12s ease,background-color .12s ease,opacity .12s ease}
+ .btn:active,.ghost:active,.chip:active,.composer button:active{transform:scale(.96)}
+ nav button:active i{transform:scale(.88)}
+ nav button i{transition:transform .12s ease}
+ .item:active{background:var(--paper)}
+}
+.list{position:relative}
+#ptr{position:absolute;left:50%;top:0;z-index:5;width:36px;height:36px;margin-left:-18px;border-radius:50%;background:var(--card);box-shadow:0 2px 10px rgba(9,38,47,.18);display:grid;place-items:center;color:var(--sand);opacity:0;transform:translateY(-44px);pointer-events:none}
+.m.sending{opacity:.7}
+.m.sending small{font-style:italic}
+#ptr.go svg{animation:ptrspin .8s linear infinite}
+@keyframes ptrspin{to{transform:rotate(360deg)}}
+@media (max-width:760px){
+ #convos.open .pane{animation:paneIn .26s cubic-bezier(.2,.8,.2,1)}
+ #convos.back-anim .list{animation:listIn .26s cubic-bezier(.2,.8,.2,1)}
+ #convos .pane.drag{transition:none;box-shadow:-8px 0 24px rgba(9,38,47,.18)}
+ #convos .pane.snap{transition:transform .2s ease}
+ #convos.peek{position:relative}
+ #convos.peek .list{display:flex;position:absolute;inset:0;z-index:0}
+ #convos.peek .pane{position:relative;z-index:1}
+}
+@keyframes paneIn{from{transform:translateX(100%)}to{transform:none}}
+@keyframes listIn{from{transform:translateX(-25%);opacity:.6}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){#convos.open .pane,#convos.back-anim .list{animation:none}}
 </style></head>
 <body>
 <header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>${T("Customer zone")}</small></span></div><span class="sp"></span>${switcher}<div class="htools">${superadmin ? `<a href="/zone/admin" title="Talay HQ">Talay HQ</a>` : ""}<button class="lnk hlang" id="hlang" type="button" title="${T("Language")}" aria-haspopup="menu" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg><span class="sl">${(ZONE_LANGS.find(l => l[0] === lang) || ZONE_LANGS[0])[1]}</span><svg class="chev sl" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">${T("Sign out")}</span></a><div class="soc"><a href="https://www.instagram.com/talay.io/" target="_blank" rel="noopener" title="${T("Talay on Instagram")}" aria-label="${T("Talay on Instagram")}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.5 6.5h.01"/></svg></a><a href="https://www.facebook.com/profile.php?id=61594947457744" target="_blank" rel="noopener" title="${T("Talay on Facebook")}" aria-label="${T("Talay on Facebook")}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg></a></div></div></header><div class="lmenu" id="lmenu" role="menu" hidden>${ZONE_LANGS.map(([code, name]) => `<button type="button" role="menuitemradio" aria-checked="${code === lang}" data-l="${code}"${code === lang ? ' class="on"' : ""}><span class="code">${code}</span>${name}<svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7"/></svg></button>`).join("")}</div>
@@ -5692,6 +5732,7 @@ header .brand .logo{width:42px;height:42px;padding:2px;background:#F4F0E6;box-sh
         <button class="chip" data-f="all" title="${T("All (30 days)")}">${T("All")}</button>
       </div>
     </div>
+    <div id="ptr" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></div>
     <div class="items" id="list"><div class="skel list"><i></i><i></i><i></i><i></i></div></div>
   </div>
   <div class="pane" id="pane"><div class="placeholder">${T("Pick a conversation.")}<br><br>${T("<b>Open</b> shows every diver who wrote in the last 24 hours: WhatsApp, Instagram and Messenger only let you reply freely within that window. <b>Needs you</b> means {a} handed it over to your team.", { a: A })}</div></div>
@@ -5900,6 +5941,8 @@ function zoneClient(cfg) {
     var tabN = list.filter(function (c) { return c.needsYou || c.waitingMin > 0 || unread(c); }).length;
     document.title = (tabN ? "(" + tabN + ") " : "") + cfg.center + " · Talay";
     tabIcon(tabN > 0);
+    // The number on the app icon of the home-screen app: divers who wait for the team.
+    try { if (navigator.setAppBadge) { if (n) navigator.setAppBadge(n).catch(function () {}); else navigator.clearAppBadge().catch(function () {}); } } catch (e) {}
     var ids = need.map(function (c) { return c.id; });
     if (needSeen && ids.some(function (id) { return needSeen.indexOf(id) < 0; })) beep();
     needSeen = ids;
@@ -5972,7 +6015,7 @@ function zoneClient(cfg) {
   function loadList() {
     var view = filter === "open" || filter === "need" ? "open" : "all";
     var fr = freshList ? "&fresh=1" : ""; freshList = false;
-    api("conversations?view=" + view + fr).then(function (d) {
+    return api("conversations?view=" + view + fr).then(function (d) {
       if (view === "open") badge(d.conversations);
       var key = view + JSON.stringify(d.conversations);
       var cur = current && d.conversations.filter(function (c) { return c.id === current; })[0];
@@ -6032,10 +6075,22 @@ function zoneClient(cfg) {
     var row = document.querySelector('.item[data-id="' + id + '"]'); if (row) { row.classList.remove("unread"); var u = row.querySelector(".udot"); if (u) u.remove(); }
     if (filter === "open" || filter === "need") badge(items);
     document.querySelectorAll(".item").forEach(function (b) { b.classList.toggle("on", b.dataset.id === id); });
-    $("#convos").classList.add("open"); document.body.classList.add("inchat");
+    $("#convos").classList.remove("back-anim"); $("#convos").classList.add("open"); document.body.classList.add("inchat");
+    // On a phone an open chat is a step in the history, so the back button or gesture closes the chat, not the app.
+    if (phone()) { try { if (history.state && history.state.chat) history.replaceState({ chat: id }, ""); else history.pushState({ chat: id }, ""); } catch (e) {} }
     $("#pane").innerHTML = '<div class="skel pad"><i></i><i></i><i></i></div>';
     loadChat(true);
   }
+  function phone() { return window.matchMedia("(max-width:760px)").matches; }
+  function closeChat() {
+    if (!current) return;
+    current = null; document.body.classList.remove("inchat");
+    var cv = $("#convos"); cv.classList.remove("open"); if (phone()) cv.classList.add("back-anim");
+    document.querySelectorAll(".item").forEach(function (b) { b.classList.remove("on"); });
+  }
+  // The back arrow goes through the history when the chat put a step there, so both stay in step.
+  function goBack() { if (history.state && history.state.chat) history.back(); else closeChat(); }
+  window.addEventListener("popstate", function () { if (current && !(history.state && history.state.chat)) closeChat(); });
   function fact(label, v) { return v ? "<span>" + label + " <b>" + esc(v) + "</b></span>" : ""; }
 
   function loadChat(scroll) {
@@ -6155,7 +6210,7 @@ function zoneClient(cfg) {
       $("#pane").querySelectorAll("[data-fold]").forEach(function (b) {
         b.onclick = function () { var k = b.dataset.fold, f = !bkFold[k]; bkFold[k] = f; b.closest(".bkc,.hist").classList.toggle("fold", f); b.setAttribute("aria-expanded", String(!f)); };
       });
-      $(".back").onclick = function () { current = null; document.body.classList.remove("inchat"); $("#convos").classList.remove("open"); document.querySelectorAll(".item").forEach(function (b) { b.classList.remove("on"); }); };
+      $(".back").onclick = goBack;
       var box = $("#msgs");
       var place = function () { box.scrollTop = keepTop === null ? box.scrollHeight : keepTop; };
       place(); requestAnimationFrame(place); setTimeout(place, 250);
@@ -6393,15 +6448,26 @@ function zoneClient(cfg) {
     img.src = src;
   }
   function send() {
-    var t = $("#txt"), b = $("#send"), n = $("#note"), v = t.value.trim();
+    var ta = $("#txt"), b = $("#send"), n = $("#note"), raw = ta.value, v = raw.trim();
     if ((!v && !pending) || b.disabled) return;
     var sig = ($("#sig").value || "").trim(); if (v && sig && $("#sigon").checked) v += "\n– " + sig;
     b.disabled = true; b.classList.add("busy");
     var body = { c: current, text: v };
     if (pending) body.file = { name: pending.name, type: pending.type, data: pending.data };
+    // Show the message in the chat straight away, like a messaging app; the real one replaces it once it is sent.
+    var box = $("#msgs"), ghost = null;
+    if (box) {
+      ghost = document.createElement("div"); ghost.className = "m Team sending";
+      ghost.innerHTML = '<span class="who">' + esc(t("Team")) + "</span>" + (pending ? '<span class="mfile">📎 ' + esc(pending.name) + "</span>" + (v ? "\n" : "") : "") + esc(v) + "<small>" + esc(t("Sending…")) + "</small>";
+      box.appendChild(ghost); box.scrollTop = box.scrollHeight;
+      ta.value = ""; ta.style.height = "";
+    }
     post("reply", body).then(function () {
-      t.value = ""; pending = null; lastChat = ""; lastList = ""; freshNext = true; freshList = true; loadChat(true); loadList();
-    }).catch(function (e) { n.textContent = e.message; n.className = "note err"; })
+      ta.value = ""; pending = null; lastChat = ""; lastList = ""; freshNext = true; freshList = true; loadChat(true); loadList();
+    }).catch(function (e) {
+      if (ghost) { ghost.remove(); if (!ta.value) ta.value = raw; }
+      n.textContent = e.message; n.className = "note err";
+    })
       .finally(function () { b.disabled = false; b.classList.remove("busy"); });
   }
 
@@ -7507,6 +7573,71 @@ function zoneClient(cfg) {
     $("#instX").onclick = function () { try { localStorage.setItem("talay-install-hide", "1"); } catch (e) {} bar.remove(); };
   }
   setTimeout(showInstall, 1500);
+  // A tap on a notification opens that diver's chat when the zone is already open.
+  if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", function (e) {
+    var c = e.data && e.data.open;
+    if (!c || !/^[A-Za-z0-9:_-]{1,64}$/.test(c)) return;
+    var cb = document.querySelector('nav button[data-v="convos"]'); if (cb && !cb.classList.contains("on")) cb.click();
+    openChat(c);
+  });
+
+  // ---- gestures on a touch screen
+  // Swipe right from the left edge of an open chat to go back to the list. Not in Safari on an
+  // iPhone outside the home-screen app: there Safari's own edge swipe already goes back.
+  (function swipeBack() {
+    var ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (ios && !standalone) return;
+    var pane = $("#pane"), x0 = 0, y0 = 0, t0 = 0, dx = 0, on = false, locked = false;
+    pane.addEventListener("touchstart", function (e) {
+      if (!phone() || !current || e.touches.length !== 1) return;
+      var tch = e.touches[0]; if (tch.clientX > 28) return;
+      x0 = tch.clientX; y0 = tch.clientY; t0 = Date.now(); dx = 0; on = true; locked = false;
+    }, { passive: true });
+    pane.addEventListener("touchmove", function (e) {
+      if (!on) return;
+      var tch = e.touches[0], mx = tch.clientX - x0, my = tch.clientY - y0;
+      if (!locked) { if (Math.abs(my) > 10 && Math.abs(my) > Math.abs(mx)) { on = false; return; } if (mx < 8) return; locked = true; pane.classList.add("drag"); $("#convos").classList.add("peek"); }
+      dx = Math.max(0, mx); pane.style.transform = "translateX(" + dx + "px)";
+      e.preventDefault();
+    }, { passive: false });
+    function end() {
+      if (!on) return; on = false;
+      if (!locked) return;
+      var fast = dx / Math.max(1, Date.now() - t0) > 0.5, go = dx > pane.clientWidth / 3 || (fast && dx > 40);
+      pane.classList.remove("drag"); pane.classList.add("snap");
+      pane.style.transform = go ? "translateX(100%)" : "";
+      setTimeout(function () {
+        pane.classList.remove("snap"); pane.style.transform = ""; $("#convos").classList.remove("peek");
+        if (go) goBack();
+      }, 200);
+    }
+    pane.addEventListener("touchend", end); pane.addEventListener("touchcancel", end);
+  })();
+  // Pull the conversation list down to refresh it.
+  (function pullRefresh() {
+    var box = $("#list"), ptr = $("#ptr"), y0 = 0, dy = 0, on = false, busy = false, MAX = 80;
+    box.addEventListener("touchstart", function (e) {
+      if (busy || box.scrollTop > 0 || e.touches.length !== 1) return;
+      y0 = e.touches[0].clientY; dy = 0; on = true; ptr.style.top = box.offsetTop + "px";
+    }, { passive: true });
+    box.addEventListener("touchmove", function (e) {
+      if (!on) return;
+      dy = e.touches[0].clientY - y0;
+      if (dy <= 0 || box.scrollTop > 0) { ptr.style.opacity = 0; ptr.style.transform = ""; if (dy < 0) on = false; return; }
+      var d = Math.min(MAX, dy * 0.5);
+      ptr.style.opacity = Math.min(1, d / 50); ptr.style.transform = "translateY(" + (d - 36) + "px) rotate(" + (d * 4) + "deg)";
+      if (e.cancelable) e.preventDefault();
+    }, { passive: false });
+    function end() {
+      if (!on) return; on = false;
+      if (Math.min(MAX, dy * 0.5) < 56) { ptr.style.opacity = 0; ptr.style.transform = ""; return; }
+      busy = true; ptr.classList.add("go"); ptr.style.transform = "translateY(16px)";
+      freshList = true; lastList = "";
+      var done = function () { busy = false; ptr.classList.remove("go"); ptr.style.opacity = 0; ptr.style.transform = ""; };
+      var pr = loadList(); if (pr && pr.then) pr.then(done, done); else done();
+    }
+    box.addEventListener("touchend", end); box.addEventListener("touchcancel", end);
+  })();
 
   // ---- full screen height on iPhone home-screen apps
   // iOS sometimes reports a viewport that is shorter than the screen (by the height of the
