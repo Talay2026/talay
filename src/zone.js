@@ -559,7 +559,8 @@ async function chat(env, center, id) {
     }).catch(() => [])).map((r) => ({ id: r.id, createdTime: r.createdTime, fields: r.fields })));
     const old = rows.filter((r) => !cur || r.id !== cur.id).sort((a, b) => Date.parse(b.createdTime) - Date.parse(a.createdTime));
     const all = cur ? rows.concat(rows.some((r) => r.id === cur.id) ? [] : [cur]) : rows;
-    const since = all.reduce((m, r) => Math.min(m, Date.parse(r.createdTime) || m), Date.parse(cur?.createdTime || 0) || Date.now());
+    // Date.parse(0) reads "0" as the year 2000, so a missing createdTime must never reach it.
+    const since = Math.min(Date.now(), ...all.map((r) => Date.parse(r?.createdTime || "")).filter(Number.isFinite));
     const note = String(lead.note || "").trim();
     return {
       since: new Date(since).toISOString(), chats: old.length,
@@ -7145,7 +7146,8 @@ function zoneClient(cfg) {
     if (past.length || h.chats) {
       var live = list.filter(function (b) { return !cx(b); });
       var since = Date.parse(h.since || "") || 0;
-      if (live.length) since = Math.min(since || Infinity, Date.parse(live[live.length - 1].date + "T12:00:00Z"));
+      var firstDate = live.length ? Date.parse(live[live.length - 1].date + "T12:00:00Z") : NaN;
+      if (isFinite(firstDate)) since = Math.min(since || Infinity, firstDate);
       var top = live.length ? tn(live.length, "1 booking", "{n} bookings") + " · " + money(live.reduce(function (a, b) { return a + (b.total || 0); }, 0)) : t("No booking yet");
       var sinceT = since ? t("Diver since {d}", { d: new Date(since).toLocaleDateString(LOC, { month: "long", year: "numeric" }) }) : "";
       hist = '<div class="hist' + (bkFold.h ? " fold" : "") + '"><div class="hh"><b>' + (sinceT ? '<span class="hs">' + esc(sinceT) + " · </span>" : "") + esc(top) + "</b>" + fold("h") + "</div>" + pastLine.replace('class="bkp"', 'class="bkp hp"') +
