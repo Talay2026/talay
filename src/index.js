@@ -724,6 +724,9 @@ function descriptorSuffix(name) {
 
 // The items of an order travel in Stripe metadata "items": CODE|date|slot|divers|price|deposit;CODE|…
 // (prices as they were at payment). Orders from before 26 Oct only have the single-product fields.
+// Products → Commission pct is a fraction (0.15) in Airtable; also accept 15.
+const pctOf = (p) => { const v = Number(first(p["Commission pct"])) || 0; return v > 1 ? v / 100 : v; };
+
 function orderItems(m) {
   const list = String(m.items || "").split(";").filter(Boolean).map((x) => {
     const [code, date, slot, n, price, deposit] = x.split("|");
@@ -863,6 +866,9 @@ async function orderInfo(env, ctx, url) {
       shown: tr(p, "Name", lang).v || first(p["Name"]) || m.product_name || x.code,
       activity_date: x.date, days: productDays(p), time_slot: SLOT_EN[x.slot] || "", divers: x.divers,
       total_thb: x.price * x.divers, deposit_thb: x.deposit * x.divers, balance_thb: (x.price - x.deposit) * x.divers,
+      // Talay's commission (price × Commission pct). A fixed deposit can be higher: Talay pays the
+      // difference out to the center. Without a percentage, the deposit is the commission, as before.
+      commission_thb: pctOf(p) > 0 ? Math.min(Math.round(x.price * pctOf(p)), x.deposit) * x.divers : x.deposit * x.divers,
     };
   });
   const total = items.reduce((a, x) => a + x.total_thb, 0), paid = items.reduce((a, x) => a + x.deposit_thb, 0);
