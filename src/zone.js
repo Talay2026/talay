@@ -3438,6 +3438,9 @@ function adminApp(email, role) {
     ["aanmeldingen", "Aanmeldingen", "intake"], ["systeem", "Systeem", "system"],
   ];
   if (role === "owner") nav.push(["team", "Team", "team"]);
+  // 31 Oct: three groups instead of 13 loose items; Beheer is folded until you need it.
+  // Zoeken only shows on the phone: on a computer the search box sits at the top of every page.
+  const NAV_GROUPS = [["Dagelijks", ["overzicht", "inbox", "zoeken", "centra", "boekingen"]], ["Verkoop", ["pijplijn", "mail", "website", "conversie"]], ["Beheer", ["commissie", "kosten", "aanmeldingen", "systeem", "team"], true]];
   const cfg = { email, role, icons: HQ_ICONS };
   return `<!doctype html><html lang="nl"><head>${HEAD}
 <title>Talay HQ</title>
@@ -3469,6 +3472,15 @@ button,input,select,textarea{font:inherit;color:inherit}
 .tools a,.tools label{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:9px;color:#B7C7CB;font-size:13.5px;text-decoration:none;cursor:pointer}
 .tools a:hover,.tools label:hover{background:rgba(247,243,234,.07);color:#F7F3EA}
 .nav a.mob,.top .chk.mob{display:none}
+.ngrp{display:flex;flex-direction:column;gap:2px}
+.ngrp + .ngrp{margin-top:10px}
+.nh{display:flex;align-items:center;gap:6px;width:100%;padding:6px 12px 4px;border:0;background:none;color:#7F979C;font:inherit;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;text-align:left}
+button.nh{cursor:pointer;border-radius:8px}
+button.nh:hover{color:#F7F3EA}
+.nh .chev{transition:transform .15s}
+.ngrp.fold .nh .chev{transform:rotate(-90deg)}
+.ngrp.fold > a{display:none}
+.ngrp.fold:has(.count:not([hidden]),.dot:not([hidden])) > .nh::after{content:"";width:7px;height:7px;border-radius:50%;background:#F2847A;margin-left:2px}
 .tools .who{font-size:12px;color:#7F979C;padding:6px 12px 0;overflow-wrap:anywhere}
 main{min-width:0}
 .top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:20px 28px 0}
@@ -3488,6 +3500,7 @@ main{min-width:0}
  .nav{flex-direction:row;overflow-x:auto;scrollbar-width:none;padding:0 10px 8px}
  .nav::-webkit-scrollbar{display:none}
  .nav a{flex:none;padding:7px 11px;font-size:14px}
+ .ngrp{display:contents}.nh{display:none}.ngrp.fold > a{display:flex}.ngrp > a.mob{display:flex}
  .nav a .count{margin-left:6px}.nav a .dot{margin-left:6px}
  .tools{display:none}
  .nav a.mob{display:flex}
@@ -3534,6 +3547,21 @@ select.in,input.in{border:1px solid var(--line);background:var(--card);border-ra
 .alert b{display:block;font-size:14.5px}
 .alert .x{flex:1;min-width:0}
 .alert a{font-weight:700}
+details.hint{margin:8px 0 12px;font-size:13px;color:var(--muted)}
+details.hint > summary{display:inline-flex;align-items:center;gap:5px;cursor:pointer;list-style:none;font-weight:600;font-size:12.5px;color:var(--muted)}
+details.hint > summary::-webkit-details-marker{display:none}
+details.hint > summary:hover{color:var(--deep)}
+details.hint > p.muted{margin:6px 0 0 !important}
+.alert.compact{padding:10px 14px;font-size:13.5px}
+.alert.compact b{display:inline;font-size:13.5px;margin-right:4px}
+.alert.compact .ai{position:relative;padding-left:14px}
+.alert.compact .ai + .ai{margin-top:4px}
+.alert.compact .ai::before{content:"";position:absolute;left:0;top:.5em;width:7px;height:7px;border-radius:50%;background:currentColor}
+.alert.compact.bad,.alert.compact.warn{background:var(--card);color:var(--deep);border:1px solid var(--line);box-shadow:var(--shadow)}
+.alert.compact.bad{border-left:4px solid var(--bad)}.alert.compact.warn{border-left:4px solid var(--warn)}
+.alert.compact .ai.bad b,.alert.compact .ai.bad::before{color:var(--bad)}.alert.compact .ai.warn b,.alert.compact .ai.warn::before{color:var(--warn)}
+.alert.compact .ai a{color:inherit}
+.alert.compact.ok .x{padding-left:0}
 .pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap;background:var(--paper);color:var(--muted);border:1px solid var(--line)}
 .pill.ok{background:var(--okbg);color:var(--ok);border-color:transparent}.pill.warn{background:var(--warnbg);color:var(--warn);border-color:transparent}.pill.bad{background:var(--badbg);color:var(--bad);border-color:transparent}
 .pill.sand{background:var(--sand);color:#09262F;border-color:transparent}
@@ -3653,7 +3681,12 @@ dialog.dlg::backdrop{background:rgba(9,38,47,.45)}
 <aside class="side">
   <div class="brand"><svg width="30" height="30" viewBox="0 0 100 100" aria-hidden="true"><path d="M 12 50 A 38 38 0 0 0 88 50 Z" fill="#DCA44A"/><circle cx="50" cy="50" r="38" fill="none" stroke="#F7F3EA" stroke-width="10"/><line x1="6" y1="50" x2="94" y2="50" stroke="#F7F3EA" stroke-width="10" stroke-linecap="round"/></svg>
   <span><b>Talay HQ</b><small>${role === "owner" ? "Eigenaar" : "Medewerker"}</small></span></div>
-  <nav class="nav" id="nav">${nav.map(([k, label, ic]) => `<a href="#/${k}" data-k="${k}">${hqIcon(ic)}<span>${label}</span><span class="count" id="n-${k}" hidden></span></a>`).join("")}<a class="mob" href="/zone">${hqIcon("zone")}<span>Klantenzone</span></a><a class="mob" href="/cdn-cgi/access/logout">${hqIcon("out")}<span>Afmelden</span></a></nav>
+  <nav class="nav" id="nav">${NAV_GROUPS.map(([g, keys, fold]) => {
+    const items = keys.map((k) => nav.find((x) => x[0] === k)).filter(Boolean);
+    if (!items.length) return "";
+    const head = fold ? `<button type="button" class="nh" id="nfold" aria-expanded="false">${g}<svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>` : `<div class="nh">${g}</div>`;
+    return `<div class="ngrp${fold ? " fold" : ""}" id="ng-${g.toLowerCase()}">${head}${items.map(([k, label, ic]) => `<a href="#/${k}" data-k="${k}"${k === "zoeken" ? ' class="mob"' : ""}>${hqIcon(ic)}<span>${label}</span><span class="count" id="n-${k}" hidden></span></a>`).join("")}</div>`;
+  }).join("")}<a class="mob" href="/zone">${hqIcon("zone")}<span>Klantenzone</span></a><a class="mob" href="/cdn-cgi/access/logout">${hqIcon("out")}<span>Afmelden</span></a></nav>
   <div class="tools">
     <label><input type="checkbox" id="withTest"> Ook demo/test meetellen</label>
     <a href="/zone">${hqIcon("zone")} Klantenzone</a>
@@ -3779,9 +3812,9 @@ function hqClient(cfg) {
 
   // ---------- bar chart (one series, hover tooltip) ----------
   var charts = {};
-  function chart(id, values, fmt, day0, endLabel) {
+  function chart(id, values, fmt, day0, endLabel, height) {
     charts[id] = { values: values, fmt: fmt, day0: day0 };
-    var max = Math.max.apply(null, values.concat([1])), n = values.length, W = 600, H = 150, pb = 18;
+    var max = Math.max.apply(null, values.concat([1])), n = values.length, W = 600, H = height || 150, pb = 18;
     var bw = W / n, h = "";
     values.forEach(function (v, i) {
       var bh = v ? Math.max(3, (v / max) * (H - pb - 6)) : 0, x = i * bw + 1, w = Math.max(2, bw - 2);
@@ -3792,7 +3825,7 @@ function hqClient(cfg) {
     var d0 = new Date(Date.parse(day0) + 12 * 36e5), dN = new Date(Date.parse(day0) + (n - 1) * 864e5);
     h += '<text class="axis" x="0" y="' + (H - 3) + '">' + esc(date(d0.toISOString())) + "</text>";
     h += '<text class="axis" x="' + W + '" y="' + (H - 3) + '" text-anchor="end">' + esc(endLabel || "vandaag") + "</text>";
-    return '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" data-chart="' + id + '" role="img" aria-label="Staafdiagram per dag, laatste ' + n + ' dagen">' + h + "</svg>";
+    return '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" style="height:' + H + 'px" data-chart="' + id + '" role="img" aria-label="Staafdiagram per dag, laatste ' + n + ' dagen">' + h + "</svg>";
   }
   document.addEventListener("pointermove", function (e) {
     var tip = $("#tip"), t = e.target;
@@ -3841,9 +3874,9 @@ function hqClient(cfg) {
         kpi("Antwoordtijd", secs(reply), '<span class="d">mediaan, ' + LABEL[state.per] + "</span>") + "</div>";
       h += '<div class="grid2 sec">' +
         '<div class="card"><h2>Nieuwe gesprekken per dag</h2><div class="chart"><div class="tot"><b>' + nf.format(conv30) + "</b> in 30 dagen</div>" +
-          chart("conv", daily.map(function (d) { return d[0]; }), function (v) { return nf.format(v) + " gesprekken"; }, ov.day0) + "</div></div>" +
+          chart("conv", daily.map(function (d) { return d[0]; }), function (v) { return nf.format(v) + " gesprekken"; }, ov.day0, "", 90) + "</div></div>" +
         '<div class="card"><h2>Boekingswaarde per dag</h2><div class="chart"><div class="tot"><b>' + thb(val30) + "</b> in 30 dagen</div>" +
-          chart("val", daily.map(function (d) { return d[2]; }), thb, ov.day0) + "</div></div></div>";
+          chart("val", daily.map(function (d) { return d[2]; }), thb, ov.day0, "", 90) + "</div></div></div>";
       h += '<div class="sec"><h2>Centra, ' + LABEL[state.per] + ' <a href="#/centra">Alle centra →</a></h2><div class="card tw"><table class="t"><thead><tr><th>Center</th><th>Assistent</th><th class="n">Gesprekken</th><th class="n">Boekingen</th><th class="n">Waarde</th><th class="n">Commissie</th><th class="n">Antwoordtijd</th><th>Signalen</th></tr></thead><tbody>' +
         ov.centers.map(function (c) {
           var x = c.periods[state.per], hl = c.health || {}, sig = [];
@@ -3868,19 +3901,18 @@ function hqClient(cfg) {
     var wait = ov.centers.filter(function (c) { return c.health && c.health.waiting && !c.paused; });
     var paused = ov.centers.filter(function (c) { return c.paused && !c.test; });
     var late = ov.centers.filter(function (c) { return c.lateHandovers && (state.withTest || !c.test); });
-    var h = "";
-    if (errs.length) h += '<div class="alert bad"><div class="x"><b>' + esc(ov.centers[0] && errs[0].assistant || "Mia") + ' stuurde het sorry-bericht</b>' +
-      errs.map(function (c) { return esc(c.name) + ": " + c.health.errors + "×"; }).join(" · ") + " in de laatste 24 uur. Kijk eerst naar het API-tegoed van Anthropic en Make (inbound v2).</div></div>";
-    if (wait.length) h += '<div class="alert warn"><div class="x"><b>Duikers zonder antwoord</b>' +
-      wait.map(function (c) { return esc(c.name) + ": " + c.health.waiting; }).join(" · ") + " (langer dan " + ov.waitMin + ' min). <a href="#/inbox">Open de inbox →</a></div></div>';
-    if (late.length) h += '<div class="alert warn"><div class="x"><b>Overdracht zonder reactie</b>' +
-      late.map(function (c) { return esc(c.name) + ": " + c.lateHandovers; }).join(" · ") + ' (langer dan 30 min, niemand van het team nam over). <a href="#/inbox">Open de inbox →</a></div></div>';
-    if (paused.length && full) h += '<div class="alert warn"><div class="x"><b>Gepauzeerd</b>' + paused.map(function (c) { return esc(c.name); }).join(", ") + "</div></div>";
-    if (!h) {
+    // 31 Oct: all signals in one compact box (one line each) instead of a big block per signal.
+    var it = [];
+    if (errs.length) it.push(["bad", esc(errs[0].assistant || "Mia") + " stuurde het sorry-bericht", errs.map(function (c) { return esc(c.name) + ": " + c.health.errors + "×"; }).join(" · ") + " in 24 uur. Kijk eerst naar het API-tegoed van Anthropic en Make (inbound v2)."]);
+    if (wait.length) it.push(["warn", "Duikers zonder antwoord", wait.map(function (c) { return esc(c.name) + ": " + c.health.waiting; }).join(" · ") + " (langer dan " + ov.waitMin + ' min). <a href="#/inbox">Inbox →</a>']);
+    if (late.length) it.push(["warn", "Overdracht zonder reactie", late.map(function (c) { return esc(c.name) + ": " + c.lateHandovers; }).join(" · ") + ' (langer dan 30 min). <a href="#/inbox">Inbox →</a>']);
+    if (paused.length && full) it.push(["warn", "Gepauzeerd", paused.map(function (c) { return esc(c.name); }).join(", ")]);
+    if (!it.length) {
       var replies = ov.centers.reduce(function (a, c) { return a + (c.health ? c.health.replies : 0); }, 0);
-      h = '<div class="alert ok"><div class="x"><b>Alles draait</b>Geen foutmeldingen en geen duikers zonder antwoord in de laatste 24 uur · ' + nf.format(replies) + " antwoorden verstuurd.</div></div>";
+      return '<div class="alert ok compact"><div class="x"><b>Alles draait</b> Geen foutmeldingen en geen duikers zonder antwoord in 24 uur · ' + nf.format(replies) + " antwoorden verstuurd.</div></div>";
     }
-    return h;
+    var lvl = it.some(function (x) { return x[0] === "bad"; }) ? "bad" : "warn";
+    return '<div class="alert compact ' + lvl + '"><div class="x">' + it.map(function (x) { return '<div class="ai ' + x[0] + '"><b>' + x[1] + "</b> " + x[2] + "</div>"; }).join("") + "</div></div>";
   }
 
   // ---------- Inbox ----------
@@ -4596,10 +4628,31 @@ function hqClient(cfg) {
     var h = (location.hash || "#/overzicht").slice(2).split("?")[0].split("/");
     return { k: h[0] || "overzicht", id: h[1] ? decodeURIComponent(h[1]) : "" };
   }
+  // 31 Oct: long grey explanation lines under a page sit behind a small "Uitleg" toggle.
+  function foldHints() {
+    $$("#page p.muted").forEach(function (p) {
+      if (p.dataset.hint || p.closest("#sr") || (p.textContent || "").length < 80) return;
+      p.dataset.hint = "1";
+      var d = document.createElement("details"); d.className = "hint";
+      d.innerHTML = '<summary><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>Uitleg</summary>';
+      p.before(d); d.appendChild(p);
+    });
+  }
+  new MutationObserver(foldHints).observe($("#page"), { childList: true, subtree: true });
+  function setFold(f) {
+    var g = $("#ng-beheer"), b = $("#nfold"); if (!g) return;
+    g.classList.toggle("fold", f); b.setAttribute("aria-expanded", String(!f));
+    try { localStorage.setItem("hq-beheer", f ? "dicht" : "open"); } catch (e) {}
+  }
+  if ($("#nfold")) {
+    $("#nfold").onclick = function () { setFold(!$("#ng-beheer").classList.contains("fold")); };
+    try { if (localStorage.getItem("hq-beheer") === "open") setFold(false); } catch (e) {}
+  }
   var PAGES = { overzicht: pOverview, inbox: pInbox, zoeken: pSearch, pijplijn: pPipeline, mail: pOutreach, centra: pCenters, conversie: pConversion, boekingen: pBookings, commissie: pCommission, kosten: pCosts, website: pWebsite, aanmeldingen: pIntake, systeem: pSystem, team: pTeam };
   function render(fresh) {
     var r = route();
     $$("#nav a").forEach(function (a) { a.classList.toggle("on", a.getAttribute("data-k") === r.k); });
+    var fg = $("#ng-beheer"); if (fg && fg.querySelector('a[data-k="' + r.k + '"]')) setFold(false);
     $("#tip").style.display = "none";
     if (r.k === "centra" && r.id) return pCenter(r.id, fresh);
     (PAGES[r.k] || pOverview)(fresh);
