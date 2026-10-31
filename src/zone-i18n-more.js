@@ -519,6 +519,17 @@ export const ZONE_ZH = {
   "PM": "下午",
   "Show past weeks ({n})": "显示过去的周 ({n})",
   "Hide past weeks": "隐藏过去的周",
+  "Free answers": "自由回答",
+  "When no approved answer fits a question, {a} can write a short answer herself, using only the facts below and general diving knowledge. She never writes prices, bookings, availability, refunds or medical advice: those always go to your team. You still get an alert for every free answer, so you can turn it into an approved answer.": "当没有已批准的回答适合某个问题时，{a} 可以自己写一个简短的回答，只使用下面的信息和一般潜水知识。她从不写价格、预订、空位、退款或医疗建议：这些始终交给你的团队。每个自由回答你仍会收到提醒，方便你把它变成已批准的回答。",
+  "Writes short answers": "会写简短回答",
+  "Only approved answers": "仅限已批准的回答",
+  "Allow free answers": "允许自由回答",
+  "Use only approved answers": "仅使用已批准的回答",
+  "{a} may now write short answers from your facts.": "{a} 现在可以根据你的信息写简短回答。",
+  "{a} only uses approved answers again.": "{a} 重新只使用已批准的回答。",
+  "Facts about your center": "关于你中心的信息",
+  "Dive sites, boats, facilities, seasons, anything {a} may tell divers. No prices: those come from your products.": "潜点、船只、设施、季节，所有 {a} 可以告诉潜水员的内容。不要写价格：价格来自你的产品。",
+  "Facts saved.": "信息已保存。",
 };
 
 // Russian
@@ -1039,6 +1050,17 @@ export const ZONE_RU = {
   "PM": "День",
   "Show past weeks ({n})": "Показать прошедшие недели ({n})",
   "Hide past weeks": "Скрыть прошедшие недели",
+  "Free answers": "Свободные ответы",
+  "When no approved answer fits a question, {a} can write a short answer herself, using only the facts below and general diving knowledge. She never writes prices, bookings, availability, refunds or medical advice: those always go to your team. You still get an alert for every free answer, so you can turn it into an approved answer.": "Если ни один одобренный ответ не подходит к вопросу, {a} может сама написать короткий ответ, используя только факты ниже и общие знания о дайвинге. Она никогда не пишет о ценах, бронированиях, наличии мест, возвратах или медицинских советах: это всегда передаётся вашей команде. Вы по-прежнему получаете уведомление о каждом свободном ответе, чтобы превратить его в одобренный.",
+  "Writes short answers": "Пишет короткие ответы",
+  "Only approved answers": "Только одобренные ответы",
+  "Allow free answers": "Разрешить свободные ответы",
+  "Use only approved answers": "Использовать только одобренные ответы",
+  "{a} may now write short answers from your facts.": "{a} теперь может писать короткие ответы по вашим фактам.",
+  "{a} only uses approved answers again.": "{a} снова использует только одобренные ответы.",
+  "Facts about your center": "Факты о вашем центре",
+  "Dive sites, boats, facilities, seasons, anything {a} may tell divers. No prices: those come from your products.": "Дайв-сайты, лодки, удобства, сезоны, всё, что {a} может рассказать дайверам. Без цен: они берутся из ваших продуктов.",
+  "Facts saved.": "Факты сохранены.",
 };
 
 // Italian
@@ -1559,6 +1581,17 @@ export const ZONE_IT = {
   "PM": "Pom.",
   "Show past weeks ({n})": "Mostra settimane passate ({n})",
   "Hide past weeks": "Nascondi settimane passate",
+  "Free answers": "Risposte libere",
+  "When no approved answer fits a question, {a} can write a short answer herself, using only the facts below and general diving knowledge. She never writes prices, bookings, availability, refunds or medical advice: those always go to your team. You still get an alert for every free answer, so you can turn it into an approved answer.": "Quando nessuna risposta approvata si adatta a una domanda, {a} può scrivere da sola una risposta breve, usando solo le informazioni qui sotto e conoscenze generali sulle immersioni. Non scrive mai prezzi, prenotazioni, disponibilità, rimborsi o consigli medici: queste cose vanno sempre al tuo team. Ricevi comunque un avviso per ogni risposta libera, così puoi trasformarla in una risposta approvata.",
+  "Writes short answers": "Scrive risposte brevi",
+  "Only approved answers": "Solo risposte approvate",
+  "Allow free answers": "Consenti risposte libere",
+  "Use only approved answers": "Usa solo risposte approvate",
+  "{a} may now write short answers from your facts.": "{a} ora può scrivere risposte brevi dalle tue informazioni.",
+  "{a} only uses approved answers again.": "{a} usa di nuovo solo risposte approvate.",
+  "Facts about your center": "Informazioni sul tuo centro",
+  "Dive sites, boats, facilities, seasons, anything {a} may tell divers. No prices: those come from your products.": "Siti di immersione, barche, servizi, stagioni, tutto ciò che {a} può dire ai sub. Niente prezzi: arrivano dai tuoi prodotti.",
+  "Facts saved.": "Informazioni salvate.",
 };
 
 // Korean
@@ -2079,4 +2112,15 @@ export const ZONE_KO = {
   "PM": "오후",
   "Show past weeks ({n})": "지난 주 보기 ({n})",
   "Hide past weeks": "지난 주 숨기기",
+  "Free answers": "자유 답변",
+  "When no approved answer fits a question, {a} can write a short answer herself, using only the facts below and general diving knowledge. She never writes prices, bookings, availability, refunds or medical advice: those always go to your team. You still get an alert for every free answer, so you can turn it into an approved answer.": "승인된 답변 중 질문에 맞는 것이 없으면 {a}가 아래 정보와 일반적인 다이빙 지식만 사용해 짧은 답변을 직접 쓸 수 있습니다. 가격, 예약, 자리 여부, 환불, 의료 조언은 절대 쓰지 않으며 이런 내용은 항상 팀에게 전달됩니다. 자유 답변마다 알림을 계속 받으므로 승인된 답변으로 바꿀 수 있습니다.",
+  "Writes short answers": "짧은 답변 작성",
+  "Only approved answers": "승인된 답변만",
+  "Allow free answers": "자유 답변 허용",
+  "Use only approved answers": "승인된 답변만 사용",
+  "{a} may now write short answers from your facts.": "이제 {a}가 센터 정보로 짧은 답변을 쓸 수 있습니다.",
+  "{a} only uses approved answers again.": "{a}가 다시 승인된 답변만 사용합니다.",
+  "Facts about your center": "센터 정보",
+  "Dive sites, boats, facilities, seasons, anything {a} may tell divers. No prices: those come from your products.": "다이브 사이트, 보트, 시설, 시즌 등 {a}가 다이버에게 알려도 되는 모든 것. 가격은 넣지 마세요: 가격은 상품에서 가져옵니다.",
+  "Facts saved.": "정보가 저장되었습니다.",
 };
