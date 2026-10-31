@@ -50,6 +50,13 @@ section.step h2{font-size:26px;line-height:1.15;margin:0 0 6px;letter-spacing:-.
 .sub{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--deep-2);margin:26px 0 12px;padding-top:18px;border-top:1px solid var(--line)}
 .sub:first-of-type{border-top:0;padding-top:0;margin-top:4px}
 .f{margin:0 0 18px}
+details.more{margin:22px 0 4px;border:1px solid var(--line);border-radius:14px;background:var(--paper,transparent)}
+details.more > summary{cursor:pointer;list-style:none;padding:14px 16px;font-weight:700;font-size:14.5px;display:flex;align-items:center;gap:10px}
+details.more > summary::-webkit-details-marker{display:none}
+details.more > summary::before{content:"";width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s;opacity:.6}
+details.more[open] > summary::before{transform:rotate(45deg)}
+.morebody{padding:0 16px 4px}
+.morebody .sub:first-child{margin-top:4px;border-top:0;padding-top:0}
 .f > label,.f > .lbl{display:block;font-weight:650;font-size:15.5px;margin-bottom:6px}
 .req{color:var(--bad);font-weight:700}
 .help{display:block;color:var(--muted);font-size:13.5px;font-weight:400;margin-top:2px}
@@ -417,12 +424,27 @@ function ownHtml(id) {
 const ownIds = d => String(d.custom_products || "").split(",").filter(id => /^X\d{1,2}$/.test(id));
 const productCodes = d => PRODUCTS.map(p => p.code).concat(ownIds(d));
 
+// 31 Oct: optional extras of a step sit folded under "More (optional, can wait)" at the end of the step.
+// Nothing is lost: answers are saved and sent the same way, and the block opens by itself when it holds an answer.
+const MORE = new Set(["agency_level", "trust", "website_url", "instagram", "review_url", "medical_form_url", "logo_note",
+  "instructor_countries", "choose_instructor", "private_lessons", "channels_later", "group_size", "boat_extra", "boat_extra_note", "season",
+  "upgrade", "discounts", "glasses", "seasick", "travel", "photos", "non_divers", "snorkel", "elearning", "other_courses"]);
+function fieldsHtml(fields) {
+  let main = "", more = "", sub = null, subMain = false, subMore = false;
+  for (const f of fields) {
+    if (f.sub) { sub = f; subMain = subMore = false; continue; }
+    if (MORE.has(f.k)) { if (sub && !subMore) { more += fieldHtml(sub); subMore = true; } more += fieldHtml(f); }
+    else { if (sub && !subMain) { main += fieldHtml(sub); subMain = true; } main += fieldHtml(f); }
+  }
+  return main + (more ? `<details class="more"><summary>${esc(L("More (optional, can wait)"))}</summary><div class="morebody">${more}</div></details>` : "");
+}
+
 const STEPS = SECTIONS.length;
 $("#sections").innerHTML = SECTIONS.map((s, i) => `<section class="step" id="s-${s.id}" data-step="${i}" hidden>
   <p class="kicker">${esc(L("Step {n} of {total}", { n: i + 1, total: STEPS }))}</p><h2>${esc(L(s.title))}</h2><p class="why">${esc(L(s.why))}</p>
   ${s.products ? PRODUCTS.map(productHtml).join("") + `<h3 class="sub">${esc(L("Your own products"))}</h3><p class="ownhelp">${esc(L("Something that isn't in the list, like a night dive, a snorkel trip or another course? Add it here. Your assistant and your booking page then show it like the others, in every language."))}</p><div id="own"></div><input type="hidden" name="custom_products" value=""><button type="button" class="btn ghost addown" id="addOwn">+ ${esc(L("Add your own product"))}</button>` + fieldHtml({ k: "price_notes", label: "Anything else about prices?", type: "area", ph: "e.g. prices go up 10% from 1 December" }) : ""}
   ${s.review ? `<h3 class="sub">${esc(L("Your answers"))}</h3><ul class="review" id="review"></ul>` : ""}
-  ${(s.fields || []).map(f => fieldHtml(f)).join("")}
+  ${fieldsHtml(s.fields || [])}
   ${s.review ? `<div class="f" id="ts"></div><p class="why">${esc(L("After sending, we set everything up and you test it first. Nothing goes live until you say go."))}</p>` : ""}
   <div class="navbtns">
     ${i > 0 ? `<button type="button" class="btn ghost" data-go="${i - 1}">← ${esc(L("Back"))}</button>` : "<span></span>"}
@@ -489,6 +511,9 @@ function restore(data) {
     else el.value = v;
   });
   form.querySelectorAll(".prod").forEach(c => c._sync && c._sync());
+  form.querySelectorAll("details.more").forEach(d => {
+    if ([...d.querySelectorAll("input,textarea")].some(el => el.type === "radio" || el.type === "checkbox" ? el.checked : el.value.trim())) d.open = true;
+  });
 }
 
 // Follow-up questions: only shown when the answer they depend on is chosen
