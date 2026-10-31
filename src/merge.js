@@ -2,9 +2,13 @@
 // after the other. This endpoint lets Claude turn that stack into one natural reply, without
 // changing a single fact. Called by Make right before Webhooks 29: talay.io/api/merge
 //
-// POST form or JSON { key, text, message, language, multi, repeat }
+// POST form or JSON { key, text, message, language, multi, repeat, sent, code }
 // repeat = 1: the guest asks the same thing again and would get the same approved answer
 // twice. Claude says it again, shorter and in other words, and asks what is still unclear.
+// sent (added 1 Nov): what Mia already sent earlier in this chat, as the "Mia reply" codes of
+// Inbox ("product FUN*2 | faq dates + bring"). code: what Mia sends now ("product FUN").
+// With sent, offers and tips that were already given (or no longer fit) are left out, and a
+// product that was already sent in full comes back short (again = 1, also without multi).
 // -> { text, merged, why }   text is always safe to send: the merged reply, or the original.
 //
 // Safety: only the part between [[split]] (intro bubble) and [[buttons]] is rewritten. The
@@ -23,9 +27,13 @@ Rules:
 - Answer in the order the guest asked.
 - Short paragraphs with a blank line between them. Plain text, no markdown. Keep bullets only where the drafts use them.
 - At most one question to the guest, at the very end: keep the closing question from the drafts that moves towards booking.
+- If the guest says they just booked or paid, start with one short, warm line about that (use the thank-you line from the drafts when there is one). Never say a booking is confirmed unless the drafts say so.
+- <already_sent> lists what the assistant already sent earlier in this chat ("product FUN" = the fun dive trip with its price, tips, offers and link; "faq refresher_short" = the refresher advice). Leave out offers and tips that were already given there (for example the 10 fun dives package tip, "ask me for the link", the refresher tip), and tips that no longer fit what the guest already did or said (for example "start with the Scuba Review" when the guest already booked or chose the Scuba Review).
 - Return only the reply.`;
 
 const REPEAT_NOTE = "The guest already got exactly this answer and is asking the same thing again: maybe it did not arrive, or it was too long. Reply warmly and much shorter: at most one short sentence per question, keep every price, deposit and link, drop the rest. You may start with a light, friendly opener such as \"Here it is in short 😊\". End with one warm, open question such as \"Is there anything I can explain better?\" or \"Shall I help you pick a date?\". Never sound impatient: no \"as I said\", no \"what is still unclear\", no apology. The rules above still apply.";
+
+const AGAIN_NOTE = "The guest already got the full information about this product earlier in this chat (see <already_sent>). Now give only what they ask for, usually the link with the price for their group and the deposit: one or two short sentences and the link. Leave out the product description, tips and offers. Keep every price, deposit and link that is not part of an optional offer. No closing question unless the guest asked something open.";
 
 const URL_RE = /https?:\/\/[^\s<>"]+/g;
 const NUM_RE = /\d+(?:[.,:   ]\d+)*/g;
@@ -47,16 +55,32 @@ function missing(part, all) {
   return part.find((x) => !set.has(x)) || "";
 }
 
+// An optional offer or tip: a paragraph without a link that asks the guest something
+// ("Diving more days? Ask me about the 10 fun dives package (9,000 THB)"). Its prices may be
+// left out; every other price, deposit and total must stay.
+function optional(p) {
+  return /[?？]/.test(p) && !links(p).length;
+}
+function protectedMoney(o) {
+  const paras = o.split(/\n\s*\n/);
+  const keep = paras.filter((p) => !optional(p)).flatMap(money);
+  return keep;
+}
+
 // Exported for tests: why a rewrite is not safe, or "" when it is.
-export function checkRewrite(original, rewrite) {
+// guest: the guest's own message; numbers from it (a date like "the 16th") may be used.
+export function checkRewrite(original, rewrite, guest = "") {
   const o = original.trim(), r = String(rewrite || "").trim();
   if (!r) return "empty";
   if (/\[\[|\]\]/.test(r)) return "marker";
   let m;
   if ((m = missing(links(o), links(r)))) return "link left out: " + m;
   if ((m = missing(links(r), links(o)))) return "new link: " + m;
-  if ((m = missing(numbers(r), numbers(o)))) return "new number: " + m; // a changed price shows up here too
-  if ((m = missing(money(o), numbers(r)))) return "price left out: " + m;
+  // A number from the guest's message may be used (a date), never as a price.
+  const oNums = new Set(numbers(o)), gNums = new Set(numbers(String(guest))), rMoney = new Set(money(r));
+  m = numbers(r).find((n) => !oNums.has(n) && !(gNums.has(n) && !rMoney.has(n)));
+  if (m) return "new number: " + m; // a changed price shows up here too
+  if ((m = missing(protectedMoney(o), numbers(r)))) return "price left out: " + m;
   if (r.length > o.length * 1.1 + 40) return "longer";
   if (r.length < o.length * 0.2) return "shorter";
   return "";
@@ -73,6 +97,17 @@ export function splitParts(text) {
   return [head + lead, body.trim(), trail + tail];
 }
 
+// Exported for tests: was this product already sent earlier in the chat? code "product FUN",
+// sent "faq dive_sites | product FUN*2 | product REF" -> true. FUN10 is not FUN.
+export function sentBefore(sent, code) {
+  const c = code.trim().match(/^product\s+([A-Z0-9_]+)/i);
+  if (!c) return false;
+  return sent.split(/[|\n]/).some((x) => {
+    const t = x.trim().match(/^product\s+([A-Z0-9_]+)/i);
+    return !!t && t[1].toUpperCase() === c[1].toUpperCase();
+  });
+}
+
 export async function handleMerge(request, env) {
   const out = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
   // Make sends a form (x-www-form-urlencoded), so long texts with quotes and newlines arrive intact. JSON works too.
@@ -86,11 +121,13 @@ export async function handleMerge(request, env) {
   const keep = (why) => out({ text, merged: false, why });
   const flag = (v) => v === true || v === 1 || /^(1|true|yes)$/i.test(String(v ?? "").trim());
   const multi = flag(p.multi), repeat = flag(p.repeat);
-  if (!multi && !repeat) return keep("single");
+  const sent = String(p.sent ?? "").slice(0, 600);
+  const again = sentBefore(sent, String(p.code ?? ""));
+  if (!multi && !repeat && !again) return keep("single");
   if (!env.ANTHROPIC_API_KEY) return keep("no key");
   const [head, body, tail] = splitParts(text);
   if (!body) return keep("empty");
-  if (!repeat && body.split(/\n\s*\n/).filter((x) => x.trim()).length < 2) return keep("one part");
+  if (!repeat && !again && body.split(/\n\s*\n/).filter((x) => x.trim()).length < 2) return keep("one part");
   if (body.length > 6000) return keep("too long");
 
   const ctrl = new AbortController();
@@ -103,7 +140,7 @@ export async function handleMerge(request, env) {
       headers: { "content-type": "application/json", "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2026-10-21" },
       body: JSON.stringify({
         model: env.MERGE_MODEL || "claude-haiku-5-5", max_tokens: 1500, system: MERGE_PROMPT,
-        messages: [{ role: "user", content: `<guest>\n${String(p.message ?? "").slice(0, 2000)}\n</guest>\n<language>${String(p.language ?? "").slice(0, 10)}</language>\n<drafts>\n${body}\n</drafts>` + (repeat ? `\n<repeat>${REPEAT_NOTE}</repeat>` : "") }],
+        messages: [{ role: "user", content: `<guest>\n${String(p.message ?? "").slice(0, 2000)}\n</guest>\n<language>${String(p.language ?? "").slice(0, 10)}</language>\n<drafts>\n${body}\n</drafts>` + (sent.trim() ? `\n<already_sent>\n${sent}\n</already_sent>` : "") + (repeat ? `\n<repeat>${REPEAT_NOTE}</repeat>` : again ? `\n<again>${AGAIN_NOTE}</again>` : "") }],
       }),
     });
     const d = await r.json().catch(() => ({}));
@@ -115,7 +152,7 @@ export async function handleMerge(request, env) {
   } finally {
     clearTimeout(timer);
   }
-  const why = checkRewrite(body, rewrite);
+  const why = checkRewrite(body, rewrite, p.message);
   if (why) { console.log("merge kept original:", why); return keep(why); }
   return out({ text: head + rewrite + tail, merged: true, why: "" });
 }
