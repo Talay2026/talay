@@ -1991,7 +1991,7 @@ function closedPage(c, p, lang) {
 const LANG_LABEL = { en: "Language", fr: "Langue", de: "Sprache", es: "Idioma", nl: "Taal", ...MORE_LABEL };
 function langMenu(lang) {
   const opts = LANGS.map((l) => `<option value="${l}"${l === lang ? " selected" : ""}>${l.toUpperCase()}</option>`).join("");
-  return `<select class="lang" aria-label="${LANG_LABEL[lang]}" onchange="var u=new window.URL(location.href);u.searchParams.set('l',this.value);location.href=u">${opts}</select>`;
+  return `<select class="lang" data-langmenu aria-label="${LANG_LABEL[lang]}" onchange="var u=new window.URL(location.href);u.searchParams.set('l',this.value);location.href=u">${opts}</select>`;
 }
 
 function notFound(lang) {
@@ -2039,6 +2039,7 @@ function page(body, status = 200, lang = "en", title = "", wide = false, theme =
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>${CSS}</style>
+<script src="/lang-menu.js" defer></script>
 <!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "d3d4dd17ea1747cbaac3011aa000a493"}'></script><!-- End Cloudflare Web Analytics -->
 </head>
 <body${theme ? ` class="${theme}"` : ""}><div class="wrap${wide ? " wide" : ""}">${body}</div></body>
