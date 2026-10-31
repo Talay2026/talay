@@ -570,6 +570,15 @@ export const ZONE_ROWS = [
   ["More options", "Más opciones", "Plus d’options", "Weitere Optionen", "Meer opties"],
   ["More", "Más", "Plus", "Mehr", "Meer"],
   ["Less", "Menos", "Moins", "Weniger", "Minder"],
+  ["Your center", "Tu centro", "Votre centre", "Euer Center", "Jullie center"],
+  ["Island", "Isla", "Île", "Insel", "Eiland"],
+  ["Diving", "Buceo", "Plongée", "Tauchen", "Duiken"],
+  ["Courses start on", "Los cursos empiezan", "Les cours commencent", "Kurse starten", "Cursussen starten op"],
+  ["Contact and links", "Contacto y enlaces", "Contact et liens", "Kontakt und Links", "Contact en links"],
+  ["Emergency number", "Número de emergencias", "Numéro d’urgence", "Notrufnummer", "Noodnummer"],
+  ["Google reviews", "Reseñas de Google", "Avis Google", "Google-Bewertungen", "Google-reviews"],
+  ["Medical form", "Formulario médico", "Formulaire médical", "Medizinischer Fragebogen", "Medisch formulier"],
+  ["What else {a} knows", "Qué más sabe {a}", "Ce que {a} sait encore", "Was {a} sonst noch weiß", "Wat {a} nog weet"],
 ];
 
 // { es: { English: Spanish, … }, fr: …, de: …, nl: …, th: … }
@@ -1128,6 +1137,15 @@ export const ZONE_TH = {
   "More options": "ตัวเลือกเพิ่มเติม",
   "More": "เพิ่มเติม",
   "Less": "ย่อ",
+  "Your center": "ศูนย์ของคุณ",
+  "Island": "เกาะ",
+  "Diving": "การดำน้ำ",
+  "Courses start on": "คอร์สเริ่มวัน",
+  "Contact and links": "ติดต่อและลิงก์",
+  "Emergency number": "เบอร์ฉุกเฉิน",
+  "Google reviews": "รีวิว Google",
+  "Medical form": "แบบฟอร์มทางการแพทย์",
+  "What else {a} knows": "สิ่งอื่นที่ {a} รู้",
 };
 ZONE_TEXT.th = ZONE_TH;
 Object.assign(ZONE_TEXT, ZONE_MORE);

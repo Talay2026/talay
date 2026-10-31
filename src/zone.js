@@ -1787,6 +1787,11 @@ async function settings(env, center) {
     info: {
       assistant: s("Assistant name"), languages: s("Languages spoken"), meeting: s("Meeting point"),
       sites: s("Dive sites"), boats: s("Boat departure times"), emergency: s("Center emergency phone"),
+      // 31 Oct: everything the assistant works with, not only six fields. "Center facts" is the long text
+      // Talay writes for the free answers; centers read it here, changes still go through Talay.
+      island: s("Island"), startDays: s("Course start days"), emergencyNumber: s("Emergency number"),
+      whatsapp: s("WhatsApp number"), instagram: s("Instagram handle"), reviews: s("Google review link"),
+      medical: s("Medical form link"), facts: s("Center facts").slice(0, 6000),
     },
   };
 }
@@ -4924,7 +4929,12 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 .pill.off{background:#FCEBC8;color:#0A2029}
 .info{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;font-size:14px}
 .info dt{color:var(--muted)}
-.info dd{margin:0}
+.info dd{margin:0;overflow-wrap:anywhere}
+.info dt.ih{grid-column:1/-1;margin-top:12px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.info dt.ih:first-child{margin-top:0}
+.info dd.facts{grid-column:1/-1;white-space:pre-line;background:var(--paper-2,var(--paper));border:1px solid var(--line);border-radius:12px;padding:12px 14px;max-height:320px;overflow:auto;font-size:13.5px;line-height:1.5}
+.info dd a{color:var(--deep);font-weight:600}
+@media (max-width:760px){.info{grid-template-columns:1fr;gap:2px}.info dd{margin-bottom:8px}}
 
 .ptable{width:100%;border-collapse:collapse;font-size:14px}
 .ptable th{text-align:left;font-size:12px;color:var(--muted);font-weight:700;padding:6px 8px;border-bottom:1px solid var(--line)}
@@ -7071,8 +7081,21 @@ function zoneClient(cfg) {
       if (document.activeElement !== $("#aEmail")) $("#aEmail").value = d.alert;
       renderTeam(d);
       if ($("#qedit").hidden) renderQuick(d.quick);
-      var I = d.info, rows = [[t("Assistant"), I.assistant], [t("Languages"), I.languages], [t("Meeting point"), I.meeting], [t("Dive sites"), I.sites], [t("Boat times"), I.boats], [t("Emergency phone"), I.emergency]];
-      $("#info").innerHTML = rows.filter(function (r) { return r[1]; }).map(function (r) { return "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>"; }).join("");
+      var I = d.info, list = function (v) { return String(v || "").split(/\s*,\s*/).filter(Boolean).join(", "); };
+      var days = function (v) { // "Monday,Tuesday" → weekday names in the zone language (Monday 1 Jan 2024)
+        var D = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+        return String(v || "").split(/\s*,\s*/).filter(Boolean).map(function (x) { var i = D.indexOf(x.toLowerCase()); return i < 0 ? x : new Date(2024, 0, 1 + i).toLocaleDateString(LOC, { weekday: "long" }); }).join(", ");
+      };
+      var link = function (u) { return /^https?:\/\//.test(u || "") ? '<a href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(u.replace(/^https?:\/\/(www\.)?/, "").slice(0, 48)) + "</a>" : esc(u || ""); };
+      var groups = [
+        [t("Your center"), [[t("Assistant"), esc(I.assistant)], [t("Island"), esc(I.island)], [t("Meeting point"), esc(I.meeting)], [t("Languages"), esc(list(I.languages))]]],
+        [t("Diving"), [[t("Dive sites"), esc(list(I.sites))], [t("Boat times"), esc(list(I.boats))], [t("Courses start on"), esc(days(I.startDays))], [t("Products"), esc((sdata.products || []).filter(function (p) { return p.active; }).map(function (p) { return p.name; }).join(", "))]]],
+        [t("Contact and links"), [[t("Emergency phone"), esc(I.emergency ? prettyPhone(I.emergency) : "")], [t("Emergency number"), esc(I.emergencyNumber)], ["WhatsApp", esc(I.whatsapp ? prettyPhone(I.whatsapp) : "")], ["Instagram", esc(I.instagram)], [t("Google reviews"), link(I.reviews)], [t("Medical form"), link(I.medical)]]],
+      ];
+      $("#info").innerHTML = groups.map(function (g) {
+        var rows = g[1].filter(function (r) { return r[1]; });
+        return rows.length ? '<dt class="ih">' + esc(g[0]) + "</dt>" + rows.map(function (r) { return "<dt>" + esc(r[0]) + "</dt><dd>" + r[1] + "</dd>"; }).join("") : "";
+      }).join("") + (I.facts ? '<dt class="ih">' + t("What else {a} knows", { a: esc(cfg.assistant) }) + '</dt><dd class="facts">' + esc(I.facts) + "</dd>" : "");
     }).catch(function (e) { if (e.message !== "auth") say("#miaMsg", e.message, true); });
   }
   $("#miaToggle").onclick = function () {

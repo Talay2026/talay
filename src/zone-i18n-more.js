@@ -532,6 +532,15 @@ export const ZONE_ZH = {
   "More options": "更多选项",
   "More": "更多",
   "Less": "收起",
+  "Your center": "你们的中心",
+  "Island": "岛屿",
+  "Diving": "潜水",
+  "Courses start on": "课程开课日",
+  "Contact and links": "联系方式和链接",
+  "Emergency number": "紧急电话",
+  "Google reviews": "Google 评价",
+  "Medical form": "体检表",
+  "What else {a} knows": "{a} 还知道什么",
 };
 
 // Russian
@@ -1065,6 +1074,15 @@ export const ZONE_RU = {
   "More options": "Ещё",
   "More": "Подробнее",
   "Less": "Свернуть",
+  "Your center": "Ваш центр",
+  "Island": "Остров",
+  "Diving": "Дайвинг",
+  "Courses start on": "Курсы начинаются",
+  "Contact and links": "Контакты и ссылки",
+  "Emergency number": "Экстренный номер",
+  "Google reviews": "Отзывы Google",
+  "Medical form": "Медицинская анкета",
+  "What else {a} knows": "Что ещё знает {a}",
 };
 
 // Italian
@@ -1598,6 +1616,15 @@ export const ZONE_IT = {
   "More options": "Altre opzioni",
   "More": "Altro",
   "Less": "Meno",
+  "Your center": "Il vostro centro",
+  "Island": "Isola",
+  "Diving": "Immersioni",
+  "Courses start on": "I corsi iniziano",
+  "Contact and links": "Contatti e link",
+  "Emergency number": "Numero di emergenza",
+  "Google reviews": "Recensioni Google",
+  "Medical form": "Modulo medico",
+  "What else {a} knows": "Cos’altro sa {a}",
 };
 
 // Korean
@@ -2131,4 +2158,13 @@ export const ZONE_KO = {
   "More options": "더 보기",
   "More": "더 보기",
   "Less": "접기",
+  "Your center": "센터 정보",
+  "Island": "섬",
+  "Diving": "다이빙",
+  "Courses start on": "강습 시작 요일",
+  "Contact and links": "연락처와 링크",
+  "Emergency number": "긴급 번호",
+  "Google reviews": "Google 리뷰",
+  "Medical form": "건강 확인서",
+  "What else {a} knows": "{a}가 더 알고 있는 것",
 };
