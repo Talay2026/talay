@@ -2,7 +2,9 @@
 // after the other. This endpoint lets Claude turn that stack into one natural reply, without
 // changing a single fact. Called by Make right before Webhooks 29: talay.io/api/merge
 //
-// POST form or JSON { key, text, message, language, multi }
+// POST form or JSON { key, text, message, language, multi, repeat }
+// repeat = 1: the guest asks the same thing again and would get the same approved answer
+// twice. Claude says it again, shorter and in other words, and asks what is still unclear.
 // -> { text, merged, why }   text is always safe to send: the merged reply, or the original.
 //
 // Safety: only the part between [[split]] (intro bubble) and [[buttons]] is rewritten. The
@@ -22,6 +24,8 @@ Rules:
 - Short paragraphs with a blank line between them. Plain text, no markdown. Keep bullets only where the drafts use them.
 - At most one question to the guest, at the very end: keep the closing question from the drafts that moves towards booking.
 - Return only the reply.`;
+
+const REPEAT_NOTE = "The guest already got exactly this answer and is asking the same thing again, so it did not land. Do not send it the same way. Say it again shorter and in other words, starting with the part that answers their message most directly, and end with one short question asking what is still unclear. No apology, no \"as I said\". The rules above still apply.";
 
 const URL_RE = /https?:\/\/[^\s<>"]+/g;
 const NUM_RE = /\d+(?:[.,:   ]\d+)*/g;
@@ -80,11 +84,13 @@ export async function handleMerge(request, env) {
   if (!env.PUSH_KEY || p.key !== env.PUSH_KEY) return out({ error: "forbidden" }, 403);
   const text = String(p.text ?? "");
   const keep = (why) => out({ text, merged: false, why });
-  const multi = p.multi === true || p.multi === 1 || /^(1|true|yes)$/i.test(String(p.multi ?? "").trim());
-  if (!multi) return keep("single");
+  const flag = (v) => v === true || v === 1 || /^(1|true|yes)$/i.test(String(v ?? "").trim());
+  const multi = flag(p.multi), repeat = flag(p.repeat);
+  if (!multi && !repeat) return keep("single");
   if (!env.ANTHROPIC_API_KEY) return keep("no key");
   const [head, body, tail] = splitParts(text);
-  if (body.split(/\n\s*\n/).filter((x) => x.trim()).length < 2) return keep("one part");
+  if (!body) return keep("empty");
+  if (!repeat && body.split(/\n\s*\n/).filter((x) => x.trim()).length < 2) return keep("one part");
   if (body.length > 6000) return keep("too long");
 
   const ctrl = new AbortController();
@@ -97,7 +103,7 @@ export async function handleMerge(request, env) {
       headers: { "content-type": "application/json", "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2026-10-21" },
       body: JSON.stringify({
         model: env.MERGE_MODEL || "claude-haiku-5-5", max_tokens: 1500, system: MERGE_PROMPT,
-        messages: [{ role: "user", content: `<guest>\n${String(p.message ?? "").slice(0, 2000)}\n</guest>\n<language>${String(p.language ?? "").slice(0, 10)}</language>\n<drafts>\n${body}\n</drafts>` }],
+        messages: [{ role: "user", content: `<guest>\n${String(p.message ?? "").slice(0, 2000)}\n</guest>\n<language>${String(p.language ?? "").slice(0, 10)}</language>\n<drafts>\n${body}\n</drafts>` + (repeat ? `\n<repeat>${REPEAT_NOTE}</repeat>` : "") }],
       }),
     });
     const d = await r.json().catch(() => ({}));
