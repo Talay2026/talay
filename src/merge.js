@@ -6,7 +6,8 @@
 // -> { text, merged, why }   text is always safe to send: the merged reply, or the original.
 //
 // Safety: only the part between [[split]] (intro bubble) and [[buttons]] is rewritten. The
-// rewrite is thrown away (original text goes out) when a link or number is missing or new,
+// rewrite is thrown away (original text goes out) when a link or price is left out, when a
+// link or number is new (a changed price counts as new),
 // when it is much longer or shorter, when it holds a [[marker]], or when Claude is slow or fails.
 
 const MERGE_PROMPT = `You are the WhatsApp assistant of a dive centre. In <drafts> are ready-made answers, approved by the centre, to the questions in one guest message. They were simply stacked one after the other. Turn them into ONE natural WhatsApp reply to <guest>.
@@ -14,8 +15,9 @@ const MERGE_PROMPT = `You are the WhatsApp assistant of a dive centre. In <draft
 Rules:
 - Write in the language of the drafts.
 - Use only information that is in the drafts. Never add facts, advice, offers, prices or promises.
-- Keep every number, price, currency, date, time, duration, percentage and link exactly as written. Digits stay digits. Every link stays on its own line, as in the drafts.
-- Keep every fact. You may shorten the wording and drop repeated greetings, repeated sign-offs, repeated emojis and sentences that say the same thing twice.
+- Copy every number, price, currency, date, time, duration, percentage and link you use exactly as written. Digits stay digits. Every link stays on its own line, as in the drafts.
+- Always keep every price, deposit and link.
+- Answer what the guest asked, short and complete. Leave out details the guest did not ask about (for example times of other courses), repeated greetings, repeated sign-offs, repeated emojis and sentences that say the same thing twice.
 - Answer in the order the guest asked.
 - Short paragraphs with a blank line between them. Plain text, no markdown. Keep bullets only where the drafts use them.
 - At most one question to the guest, at the very end: keep the closing question from the drafts that moves towards booking.
@@ -30,12 +32,15 @@ function links(s) {
 function numbers(s) {
   return (s.replace(URL_RE, " ").match(NUM_RE) || []).map((n) => n.replace(/[   ]/g, " "));
 }
-function sameBag(a, b) {
-  const count = (arr) => arr.reduce((m, x) => m.set(x, (m.get(x) || 0) + 1), new Map());
-  const A = count(a), B = count(b);
-  for (const k of A.keys()) if (!B.has(k)) return false;
-  for (const k of B.keys()) if (!A.has(k)) return false;
-  return true;
+// Numbers next to a currency: these may never be left out.
+const MONEY_RE = /(?:THB|฿|€|\$|EUR|USD|baht)\s?\d+(?:[.,\u202f\u00a0 ]\d+)*|\d+(?:[.,\u202f\u00a0 ]\d+)*\s?(?:THB|฿|€|\$|EUR|USD|baht)/gi;
+function money(s) {
+  return (s.replace(URL_RE, " ").match(MONEY_RE) || []).flatMap((m) => numbers(m));
+}
+// Every item of `part` must be in `all`; returns the first one that isn't, or "".
+function missing(part, all) {
+  const set = new Set(all);
+  return part.find((x) => !set.has(x)) || "";
 }
 
 // Exported for tests: why a rewrite is not safe, or "" when it is.
@@ -43,10 +48,13 @@ export function checkRewrite(original, rewrite) {
   const o = original.trim(), r = String(rewrite || "").trim();
   if (!r) return "empty";
   if (/\[\[|\]\]/.test(r)) return "marker";
-  if (!sameBag(links(o), links(r))) return "links";
-  if (!sameBag(numbers(o), numbers(r))) return "numbers";
+  let m;
+  if ((m = missing(links(o), links(r)))) return "link left out: " + m;
+  if ((m = missing(links(r), links(o)))) return "new link: " + m;
+  if ((m = missing(numbers(r), numbers(o)))) return "new number: " + m; // a changed price shows up here too
+  if ((m = missing(money(o), numbers(r)))) return "price left out: " + m;
   if (r.length > o.length * 1.1 + 40) return "longer";
-  if (r.length < o.length * 0.35) return "shorter";
+  if (r.length < o.length * 0.2) return "shorter";
   return "";
 }
 
