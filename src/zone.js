@@ -5869,7 +5869,8 @@ details.dfold[open] > summary .dsec h3::after{transform:rotate(225deg);margin-bo
 .cplus{display:none}
 @media (max-width:760px){
  .cplus{display:grid}
- .composer:not(.xopen) .pchips,.composer:not(.xopen) #att,.composer:not(.xopen) #emo,.composer:not(.xopen) .cmeta .sig,.composer:not(.xopen) #trOut{display:none}
+ #emo{display:none}
+ .composer:not(.xopen) .pchips,.composer:not(.xopen) #att,.composer:not(.xopen) .cmeta .sig,.composer:not(.xopen) #trOut{display:none}
  .composer:not(.xopen) .cmeta:not(:has(#sugg)){display:none}
  .composer.xopen .cplus svg{transform:rotate(45deg)}
  .cplus svg{transition:transform .15s}
