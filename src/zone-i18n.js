@@ -565,6 +565,11 @@ export const ZONE_ROWS = [
   ["Use only approved answers", "Usar solo respuestas aprobadas", "Utiliser uniquement les réponses approuvées", "Nur freigegebene Antworten nutzen", "Alleen goedgekeurde antwoorden gebruiken"],
   ["{a} may now write short answers from your facts.", "{a} ya puede escribir respuestas cortas con tus datos.", "{a} peut maintenant écrire des réponses courtes à partir de vos informations.", "{a} darf jetzt kurze Antworten aus deinen Fakten schreiben.", "{a} mag nu korte antwoorden schrijven uit je feiten."],
   ["{a} only uses approved answers again.", "{a} vuelve a usar solo respuestas aprobadas.", "{a} utilise de nouveau uniquement les réponses approuvées.", "{a} nutzt wieder nur freigegebene Antworten.", "{a} gebruikt weer alleen goedgekeurde antwoorden."],
+  ["Advanced", "Avanzado", "Avancé", "Erweitert", "Geavanceerd"],
+  ["Free answers, alert email and what {a} knows about you", "Respuestas libres, email de alertas y lo que {a} sabe de vosotros", "Réponses libres, e-mail d’alerte et ce que {a} sait de vous", "Freie Antworten, Benachrichtigungs-E-Mail und was {a} über euch weiß", "Vrije antwoorden, alarm-e-mail en wat {a} over jullie weet"],
+  ["More options", "Más opciones", "Plus d’options", "Weitere Optionen", "Meer opties"],
+  ["More", "Más", "Plus", "Mehr", "Meer"],
+  ["Less", "Menos", "Moins", "Weniger", "Minder"],
 ];
 
 // { es: { English: Spanish, … }, fr: …, de: …, nl: …, th: … }
@@ -1118,6 +1123,11 @@ export const ZONE_TH = {
   "Use only approved answers": "ใช้เฉพาะคำตอบที่อนุมัติ",
   "{a} may now write short answers from your facts.": "ตอนนี้ {a} เขียนคำตอบสั้น ๆ จากข้อมูลของคุณได้แล้ว",
   "{a} only uses approved answers again.": "{a} กลับมาใช้เฉพาะคำตอบที่อนุมัติแล้ว",
+  "Advanced": "ขั้นสูง",
+  "Free answers, alert email and what {a} knows about you": "คำตอบอิสระ อีเมลแจ้งเตือน และสิ่งที่ {a} รู้เกี่ยวกับคุณ",
+  "More options": "ตัวเลือกเพิ่มเติม",
+  "More": "เพิ่มเติม",
+  "Less": "ย่อ",
 };
 ZONE_TEXT.th = ZONE_TH;
 Object.assign(ZONE_TEXT, ZONE_MORE);

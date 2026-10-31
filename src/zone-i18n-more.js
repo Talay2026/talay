@@ -527,6 +527,11 @@ export const ZONE_ZH = {
   "Use only approved answers": "仅使用已批准的回答",
   "{a} may now write short answers from your facts.": "{a} 现在可以根据你的信息写简短回答。",
   "{a} only uses approved answers again.": "{a} 重新只使用已批准的回答。",
+  "Advanced": "高级",
+  "Free answers, alert email and what {a} knows about you": "自由回答、提醒邮箱以及 {a} 了解的你们的信息",
+  "More options": "更多选项",
+  "More": "更多",
+  "Less": "收起",
 };
 
 // Russian
@@ -1055,6 +1060,11 @@ export const ZONE_RU = {
   "Use only approved answers": "Использовать только одобренные ответы",
   "{a} may now write short answers from your facts.": "{a} теперь может писать короткие ответы по вашим фактам.",
   "{a} only uses approved answers again.": "{a} снова использует только одобренные ответы.",
+  "Advanced": "Дополнительно",
+  "Free answers, alert email and what {a} knows about you": "Свободные ответы, email для оповещений и что {a} знает о вас",
+  "More options": "Ещё",
+  "More": "Подробнее",
+  "Less": "Свернуть",
 };
 
 // Italian
@@ -1583,6 +1593,11 @@ export const ZONE_IT = {
   "Use only approved answers": "Usa solo risposte approvate",
   "{a} may now write short answers from your facts.": "{a} ora può scrivere risposte brevi dalle tue informazioni.",
   "{a} only uses approved answers again.": "{a} usa di nuovo solo risposte approvate.",
+  "Advanced": "Avanzate",
+  "Free answers, alert email and what {a} knows about you": "Risposte libere, email di avviso e cosa sa {a} di voi",
+  "More options": "Altre opzioni",
+  "More": "Altro",
+  "Less": "Meno",
 };
 
 // Korean
@@ -2111,4 +2126,9 @@ export const ZONE_KO = {
   "Use only approved answers": "승인된 답변만 사용",
   "{a} may now write short answers from your facts.": "이제 {a}가 센터 정보로 짧은 답변을 쓸 수 있습니다.",
   "{a} only uses approved answers again.": "{a}가 다시 승인된 답변만 사용합니다.",
+  "Advanced": "고급",
+  "Free answers, alert email and what {a} knows about you": "자유 답변, 알림 이메일, {a}가 알고 있는 정보",
+  "More options": "더 보기",
+  "More": "더 보기",
+  "Less": "접기",
 };

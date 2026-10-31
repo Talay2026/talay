@@ -5840,6 +5840,48 @@ nav,button,.item,.chip,.day,.who{-webkit-user-select:none;user-select:none;-webk
  .btools,.tools .chips{-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent);padding-right:28px}
  .cmeta .bt{display:none}
 }
+/* Clean (31 Oct): long texts on one line, rarely used settings folded away, a lighter chat on the phone */
+.dline{display:flex;align-items:baseline;gap:10px;margin:0 0 14px}
+.pnew .dline{margin:0;flex:1 1 260px;min-width:0}
+#sett .dline > .d.clamp{flex:1;min-width:0;margin:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:1;overflow:hidden}
+#sett .dline > .d.clamp.open{display:block}
+.ptable td.tlinks .pd{margin:0 0 0 6px}
+.dmore{flex:none;border:0;background:none;padding:0;margin:0;font:inherit;font-size:12.5px;font-weight:600;color:var(--muted);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.dmore:hover{color:var(--deep)}
+.dmore[hidden]{display:none}
+#s-push.done .dline{display:none}
+#s-push.done h3{margin-bottom:10px}
+details.sadv{display:block;min-width:0;scroll-margin-top:16px}
+details.sadv > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;padding:16px 20px;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+details.sadv > summary::-webkit-details-marker{display:none}
+details.sadv > summary::before{content:"";flex:none;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s;margin:0 4px}
+details.sadv[open] > summary::before{transform:rotate(45deg)}
+details.sadv > summary b{display:block;font-size:16px}
+details.sadv > summary small{display:block;font-size:13px;color:var(--muted)}
+details.sadv[open] > .scard{margin-top:14px}
+details.dfold{margin-top:22px}
+details.dfold > summary{list-style:none;cursor:pointer}
+details.dfold > summary::-webkit-details-marker{display:none}
+details.dfold > summary .dsec h3::after{content:"";display:inline-block;width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);margin:0 0 3px 10px;transition:transform .15s}
+details.dfold[open] > summary .dsec h3::after{transform:rotate(225deg);margin-bottom:-1px}
+.stsec{align-items:center;flex-wrap:wrap}
+.stsec .sp{flex:1}
+.cplus{display:none}
+@media (max-width:760px){
+ .cplus{display:grid}
+ #emo{display:none}
+ .composer:not(.xopen) .pchips,.composer:not(.xopen) #att,.composer:not(.xopen) .cmeta .sig,.composer:not(.xopen) #trOut{display:none}
+ .composer:not(.xopen) .cmeta:not(:has(#sugg)){display:none}
+ .composer.xopen .cplus svg{transform:rotate(45deg)}
+ .cplus svg{transition:transform .15s}
+ .paused{flex-wrap:nowrap;gap:10px;padding:8px 12px}
+ .paused .pi{display:none}
+ .paused .pt{cursor:pointer}
+ .paused .pt b{font-size:13px}
+ .paused:not(.open) .pt span{display:none}
+ .paused .btn{width:auto;padding:8px 12px;font-size:13px}
+ .stsec #stPrint{display:none}
+}
 </style></head>
 <body>
 <header><div class="brand">${logo}<span class="bn"><b>${esc(center.name)}</b><small>${T("Customer zone")}</small></span></div><span class="sp"></span>${switcher}<div class="htools">${superadmin ? `<a href="/zone/admin" title="Talay HQ">Talay HQ</a>` : ""}<button class="lnk hlang" id="hlang" type="button" title="${T("Language")}" aria-haspopup="menu" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg><span class="sl">${(ZONE_LANGS.find(l => l[0] === lang) || ZONE_LANGS[0])[1]}</span><svg class="chev sl" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><button class="lnk" id="sound" type="button"></button><a href="/cdn-cgi/access/logout" title="${esc(email)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span class="sl">${T("Sign out")}</span></a><div class="soc"><a href="https://www.instagram.com/talay.io/" target="_blank" rel="noopener" title="${T("Talay on Instagram")}" aria-label="${T("Talay on Instagram")}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.5 6.5h.01"/></svg></a><a href="https://www.facebook.com/profile.php?id=61594947457744" target="_blank" rel="noopener" title="${T("Talay on Facebook")}" aria-label="${T("Talay on Facebook")}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg></a></div></div></header><div class="lmenu" id="lmenu" role="menu" hidden>${ZONE_LANGS.map(([code, name]) => `<button type="button" role="menuitemradio" aria-checked="${code === lang}" data-l="${code}"${code === lang ? ' class="on"' : ""}><span class="code">${code}</span>${name}<svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7"/></svg></button>`).join("")}</div>
@@ -5911,7 +5953,7 @@ nav,button,.item,.chip,.day,.who{-webkit-user-select:none;user-select:none;-webk
 <section id="sett" class="view">
   <div class="swrap">
     <div class="phead"><h1>${T("Settings")}</h1></div>
-    <div class="stoc" role="navigation" aria-label="${T("Settings")}"><button type="button" data-s="s-mia">${esc(center.assistant)}</button><button type="button" data-s="s-push">${T("Notifications")}</button><button type="button" data-s="s-prod">${T("Products")}</button><button type="button" data-s="s-hours">${T("Office hours")}</button><button type="button" data-s="s-alert">${T("Alert email")}</button><button type="button" data-s="s-team">${T("Team")}</button><button type="button" data-s="s-quick">${T("Quick replies")}</button><button type="button" data-s="s-info">${T("About you")}</button><button type="button" data-s="s-lang">${T("Language")}</button></div>
+    <div class="stoc" role="navigation" aria-label="${T("Settings")}"><button type="button" data-s="s-mia">${esc(center.assistant)}</button><button type="button" data-s="s-push">${T("Notifications")}</button><button type="button" data-s="s-prod">${T("Products")}</button><button type="button" data-s="s-hours">${T("Office hours")}</button><button type="button" data-s="s-team">${T("Team")}</button><button type="button" data-s="s-quick">${T("Quick replies")}</button><button type="button" data-s="s-adv">${T("Advanced")}</button></div>
     <div id="s-mia" class="scard">
       <h3>${esc(center.assistant)}</h3>
       <p class="d">${T("Pause {a} for the whole dive center, for example during a storm or a holiday. While paused she doesn't answer anyone: your team answers every diver under <b>Conversations → Open</b>.", { a: A })}</p>
@@ -5928,7 +5970,7 @@ nav,button,.item,.chip,.day,.who{-webkit-user-select:none;user-select:none;-webk
     <div id="s-prod" class="scard adm">
       <h3>${T("Products and prices")}</h3>
       <p class="d">${T("What divers pay and until when they can book online. The online deposit is your commission to Talay; divers pay the rest at your shop. Changes reach {a} and the booking page within about two minutes.", { a: A })}</p>
-      <div class="bscroll"><table class="ptable"><thead><tr><th>${T("Product")}</th><th>${T("Price (THB)")}</th><th>${T("Deposit")}</th><th>${T("Book until (day before)")}</th><th>${T("Max divers per day")}</th><th>${T("Bookable online")}</th><th></th></tr></thead><tbody id="prods"></tbody></table></div>
+      <div class="bscroll"><table class="ptable"><thead><tr><th>${T("Product")}</th><th>${T("Price (THB)")}</th><th>${T("Deposit")}</th><th>${T("Bookable online")}</th><th></th></tr></thead><tbody id="prods"></tbody></table></div>
       <div id="pEdit"></div>
       <div class="pnew"><button class="ghost" id="pAdd" type="button">+ ${T("Add a product")}</button><span class="d">${T("Something you offer that isn't listed, like a night dive or a snorkel trip? Add it here. {a} and your booking page pick it up straight away.", { a: A })}</span></div>
       <div class="smsg" id="pMsg"></div>
@@ -5941,18 +5983,6 @@ nav,button,.item,.chip,.day,.who{-webkit-user-select:none;user-select:none;-webk
       <p class="d">${T("Prefer to answer divers yourselves during the day? Then {a} only answers outside these hours. During office hours she stays silent and every message waits for your team under <b>Conversations → Open</b>. Reminders follow the same rule.", { a: A })}</p>
       <div class="switch"><span class="pill" id="modeState">…</span><button class="ghost" id="modeToggle" type="button">…</button></div>
       <div class="smsg" id="modeMsg"></div>
-    </div>
-    <div id="s-free" class="scard adm">
-      <h3>${T("Free answers")}</h3>
-      <p class="d">${T("When no approved answer fits a question, {a} can write a short answer herself, using only approved facts about your center and general diving knowledge. She never writes prices, bookings, availability, refunds or medical advice: those always go to your team. You still get an alert for every free answer, so you can turn it into an approved answer.", { a: A })}</p>
-      <div class="switch"><span class="pill" id="freeState">…</span><button class="ghost" id="freeToggle" type="button">…</button></div>
-      <div class="smsg" id="freeMsg"></div>
-    </div>
-    <div id="s-alert" class="scard adm">
-      <h3>${T("Alert email")}</h3>
-      <p class="d">${T("Where handovers, large groups and reminders are sent. A shared inbox works best.")}</p>
-      <div class="srow"><input type="email" id="aEmail" placeholder="team@yourdivecenter.com"><button class="btn" id="aSave" type="button">${T("Save")}</button></div>
-      <div class="smsg" id="aMsg"></div>
     </div>
     <div id="s-team" class="scard adm">
       <h3>${T("Team")}</h3>
@@ -5969,16 +5999,26 @@ nav,button,.item,.chip,.day,.who{-webkit-user-select:none;user-select:none;-webk
       <button type="button" class="ghost" id="qNew">${T("+ New quick reply")}</button>
       <div class="smsg" id="qMsg"></div>
     </div>
+    <details id="s-adv" class="sadv">
+      <summary><span><b>${T("Advanced")}</b><small>${T("Free answers, alert email and what {a} knows about you", { a: A })}</small></span></summary>
+      <div id="s-free" class="scard adm">
+      <h3>${T("Free answers")}</h3>
+      <p class="d">${T("When no approved answer fits a question, {a} can write a short answer herself, using only approved facts about your center and general diving knowledge. She never writes prices, bookings, availability, refunds or medical advice: those always go to your team. You still get an alert for every free answer, so you can turn it into an approved answer.", { a: A })}</p>
+      <div class="switch"><span class="pill" id="freeState">…</span><button class="ghost" id="freeToggle" type="button">…</button></div>
+      <div class="smsg" id="freeMsg"></div>
+    </div>
+      <div id="s-alert" class="scard adm">
+      <h3>${T("Alert email")}</h3>
+      <p class="d">${T("Where handovers, large groups and reminders are sent. A shared inbox works best.")}</p>
+      <div class="srow"><input type="email" id="aEmail" placeholder="team@yourdivecenter.com"><button class="btn" id="aSave" type="button">${T("Save")}</button></div>
+      <div class="smsg" id="aMsg"></div>
+    </div>
     <div id="s-info" class="scard">
       <h3>${T("What {a} knows about you", { a: A })}</h3>
       <p class="d">${T("To change any of this, message Jonas at {mail}.", { mail: '<a href="mailto:jonas@talay.io">jonas@talay.io</a>' })}</p>
       <dl class="info" id="info"></dl>
     </div>
-    <div id="s-lang" class="scard">
-      <h3>${T("Language")}</h3>
-      <p class="d">${T("The language of the zone on this device. Every colleague can choose their own. The messages to divers don't change: {a} always answers in the diver's language.", { a: A })}</p>
-      <div class="chips zlangs" role="group" aria-label="${T("Language")}">${langOpts}</div>
-    </div>
+    </details>
   </div>
 </section>
 
@@ -6001,9 +6041,6 @@ nav,button,.item,.chip,.day,.who{-webkit-user-select:none;user-select:none;-webk
     <div class="phead"><h1>${T("Dashboard")}</h1></div>
     <div class="btools">
       <select id="period" aria-label="${T("Period")}" class="psel" hidden></select><button type="button" class="psel pbtn" id="pbtn" aria-haspopup="menu" aria-expanded="false" title="${T("Period")}"><span id="pname">${T("Last 30 days")}</span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><div class="amenu" id="pmenu" role="menu" hidden></div>
-      <span class="sp"></span>
-      <button class="ghost" id="stPrint" type="button">${T("Print statement")}</button>
-      <button class="ghost" id="stCsv" type="button">${T("Download CSV")}</button>
     </div>
     <div class="start" id="start" hidden></div>
     <div class="ms" id="ms" hidden></div>
@@ -6046,7 +6083,7 @@ function zoneClient(cfg) {
     var h = (Date.parse(iso) - Date.now()) / 3600000;
     if (h <= 0) return { t: t("Reply window closed"), soon: false };
     if (h < 1) return { t: t("{n} min left to reply", { n: Math.max(1, Math.round(h * 60)) }), soon: true };
-    return { t: t("{n} h left to reply", { n: Math.floor(h) }), soon: h < 3 };
+    return { t: t("{n} h left to reply", { n: Math.floor(h) }), soon: h < 3, far: h >= 4 };
   }
   function clock(iso) { return new Date(iso).toLocaleString(LOC, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); }
 
@@ -6192,7 +6229,7 @@ function zoneClient(cfg) {
       el.innerHTML = '<div class="empty">' + msg + "</div>"; return;
     }
     el.innerHTML = list.map(function (c) {
-      var l = left(c.closesAt);
+      var l = left(c.closesAt); if (l.far) l = { t: "", soon: false }; // the list shows the reply window only when it matters (< 4 h)
       var who = c.previewDir === "Customer" ? "" : (c.previewDir === "Team" ? t("You") + ": " : cfg.assistant + ": ");
       var un = unread(c);
       return '<button class="item' + (c.id === current ? " on" : "") + (un ? " unread" : "") + '" data-id="' + esc(c.id) + '" data-close="' + esc(c.closesAt || "") + '">' +
@@ -6215,11 +6252,12 @@ function zoneClient(cfg) {
   function tick() {
     document.querySelectorAll(".item").forEach(function (b) {
       var l = left(b.dataset.close), el = b.querySelector(".left");
-      if (el) { el.textContent = l.t; el.classList.toggle("soon", l.soon); }
+      if (el) { el.textContent = l.far ? "" : l.t; el.classList.toggle("soon", l.soon); }
     });
   }
 
   // ---- chat
+  var cplusOpen = false;
   function openChat(id) {
     current = id; lastChat = ""; chatSeenAt = null; ciOpen = null; bkFold = {};
     var it = items.filter(function (c) { return c.id === id; })[0]; if (it) markSeen(id, it.lastAt);
@@ -6270,7 +6308,7 @@ function zoneClient(cfg) {
         var lastTeamAt = 0;
         d.messages.forEach(function (m) { if (m.dir === "Team") lastTeamAt = Math.max(lastTeamAt, Date.parse(m.at) || 0); });
         var back = new Date(Math.ceil((Math.max(lastTeamAt, Date.parse(L.humanAt || 0) || 0, Date.now() - MIA_BACK_H * 3600e3) + MIA_BACK_H * 3600e3) / 3600e3) * 3600e3);
-        paused = '<div class="paused"><span class="pi"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></span><div class="pt"><b>' + t("{a} is paused for this diver", { a: esc(cfg.assistant) }) + "</b><span>" +
+        paused = '<div class="paused" id="pausedBar"><span class="pi"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></span><div class="pt"><b>' + t("{a} is paused for this diver", { a: esc(cfg.assistant) }) + "</b><span>" +
           t("Done helping? Give the chat back, so {a} answers the next question. Otherwise {a} only takes over again around {t}.", { a: esc(cfg.assistant), t: esc(back.toLocaleTimeString(LOC, { hour: "2-digit", minute: "2-digit" })) }) +
           '</span></div><button class="btn primary" id="handback2" type="button">▶ ' + t("Let {a} take over", { a: esc(cfg.assistant) }) + "</button></div>";
       }
@@ -6318,6 +6356,7 @@ function zoneClient(cfg) {
             '<div class="pchips" id="pchips" hidden></div>' +
             '<div class="qpop" id="qpop" role="listbox" hidden></div>' +
             '<div class="cbox"><textarea id="txt" placeholder="' + t("Reply on {ch}…", { ch: esc((L && L.channel) || "WhatsApp") }) + '" title="' + t("Enter sends · Shift + Enter for a new line · replying pauses {a} for this diver for 2 hours.", { a: esc(cfg.assistant) }) + '" rows="1"></textarea>' +
+            '<button class="emo cplus" id="cplus" type="button" title="' + t("More options") + '" aria-label="' + t("More options") + '" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>' +
             '<button class="emo" id="att" type="button" title="' + t("Photo or file") + '" aria-label="' + t("Photo or file") + '"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9"/></svg></button><input type="file" id="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden>' +
             '<button class="emo" id="emo" type="button" title="' + t("Emoji") + '" aria-label="' + t("Emoji") + '" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/></svg></button>' +
             '<button class="send" id="send" aria-label="Send"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>' +
@@ -6387,6 +6426,14 @@ function zoneClient(cfg) {
           if (it) { e.preventDefault(); pickFile(it.getAsFile()); }
         });
         showFile();
+        // Phone: booking link, signing, translating, file and emoji sit behind one "+" (31 Oct: half the space).
+        var cpl = $("#cplus"), cmp = cpl && cpl.closest(".composer");
+        if (cpl) {
+          cmp.classList.toggle("xopen", cplusOpen); cpl.setAttribute("aria-expanded", String(cplusOpen));
+          cpl.onclick = function () { cplusOpen = cmp.classList.toggle("xopen"); cpl.setAttribute("aria-expanded", String(cplusOpen)); };
+        }
+        var pb = $("#pausedBar");
+        if (pb) pb.querySelector(".pt").onclick = function () { pb.classList.toggle("open"); };
         var eb = $("#emo"), ep = $("#epick");
         eb.onclick = function (e) { e.stopPropagation(); ep.hidden = !ep.hidden; eb.setAttribute("aria-expanded", String(!ep.hidden)); };
         ep.querySelectorAll("button").forEach(function (b) {
@@ -6918,32 +6965,43 @@ function zoneClient(cfg) {
   $("#pAdd").onclick = function () { if (sdata && sdata.admin) editProduct(null, null); };
   // Section menu at the top of Settings: jump to a block.
   document.querySelectorAll(".stoc [data-s]").forEach(function (b) {
-    b.onclick = function () { var el = document.getElementById(b.dataset.s); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
+    b.onclick = function () { var el = document.getElementById(b.dataset.s); if (!el) return; if (el.tagName === "DETAILS") el.open = true; el.scrollIntoView({ behavior: "smooth", block: "start" }); };
   });
+  // Long explanations under a card title show one line; "More" opens the rest (31 Oct: a cleaner Settings).
+  document.querySelectorAll("#sett .scard > p.d, #sett .pnew > span.d").forEach(function (p) {
+    var row = document.createElement("div"); row.className = "dline"; p.before(row); row.appendChild(p);
+    p.classList.add("clamp");
+    var b = document.createElement("button"); b.type = "button"; b.className = "dmore"; b.textContent = t("More"); b.hidden = true;
+    b.onclick = function () { var o = p.classList.toggle("open"); b.textContent = o ? t("Less") : t("More"); };
+    row.appendChild(b);
+    var fit = function () { if (!p.classList.contains("open")) b.hidden = p.scrollHeight <= p.clientHeight + 2; };
+    p._fit = fit;
+  });
+  function fitClamps() { document.querySelectorAll("#sett p.clamp").forEach(function (p) { if (p._fit) p._fit(); }); }
+  addEventListener("resize", fitClamps);
+  var advEl = $("#s-adv"); if (advEl) advEl.addEventListener("toggle", fitClamps);
   function loadSettings() {
     return api("settings").then(function (d) {
       sdata = d;
+      setTimeout(fitClamps, 0);
       $("#adminNote").hidden = d.admin;
       document.querySelectorAll(".scard.adm").forEach(function (c) { c.classList.toggle("ro", !d.admin); });
       $("#pEdit").innerHTML = "";
       $("#prods").innerHTML = d.products.map(function (p) {
-        var hours = ""; for (var h = 8; h <= 22; h++) hours += '<option value="' + h + '"' + (h === p.cutoff ? " selected" : "") + ">" + h + ":00</option>";
-        return '<tr class="' + (p.active ? "" : "off") + '" data-id="' + esc(p.id) + '" data-pct="' + (p.fixed ? 0 : p.pct) + '" data-dep="' + Math.round(p.deposit) + '"><td class="nm">' + esc(p.name) + '<br><span class="muted">' + esc(p.code) + '</span><br><button class="pd" type="button"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>' + t("Edit") + "</button></td>" +
+        return '<tr class="' + (p.active ? "" : "off") + '" data-id="' + esc(p.id) + '" data-pct="' + (p.fixed ? 0 : p.pct) + '" data-dep="' + Math.round(p.deposit) + '"><td class="nm">' + esc(p.name) + '<br><span class="muted">' + esc(p.code) + "</span></td>" +
           '<td data-l="' + t("Price (THB)") + '"><input type="number" min="100" step="50" value="' + p.price + '" class="pp" inputmode="numeric"></td>' +
           '<td class="muted dep" data-l="' + t("Deposit") + '">' + Math.round(p.deposit).toLocaleString(NUM) + " THB</td>" +
-          '<td data-l="' + t("Book until (day before)") + '"><select class="pc">' + hours + "</select></td>" +
-          '<td data-l="' + t("Max divers per day") + '"><input type="number" min="1" max="500" step="1" value="' + (p.maxDay || "") + '" placeholder="' + t("No limit") + '" class="pm" inputmode="numeric"></td>' +
           '<td data-l="' + t("Bookable online") + '"><input type="checkbox" class="pa"' + (p.active ? " checked" : "") + "></td>" +
-          '<td class="tlinks"><button class="btn ps" type="button" hidden>' + t("Save") + '</button></td></tr>';
+          '<td class="tlinks"><button class="btn ps" type="button" hidden>' + t("Save") + '</button><button class="pd" type="button"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>' + t("Edit") + "</button></td></tr>";
       }).join("");
       $("#prods").querySelectorAll("tr").forEach(function (tr, i) { tr.querySelector(".pd").onclick = function () { editProduct(tr, d.products[i]); }; });
-      $("#prods").querySelectorAll("tr").forEach(function (tr) {
-        var pp = tr.querySelector(".pp"), changed = function () { tr.querySelector(".ps").hidden = false; };
-        tr.querySelector(".pc").onchange = changed; tr.querySelector(".pa").onchange = changed; tr.querySelector(".pm").oninput = changed;
+      $("#prods").querySelectorAll("tr").forEach(function (tr, i) {
+        var pp = tr.querySelector(".pp"), changed = function () { tr.querySelector(".ps").hidden = false; }, cur = d.products[i];
+        tr.querySelector(".pa").onchange = changed;
         pp.oninput = function () { var pc = Number(tr.dataset.pct); tr.querySelector(".dep").innerHTML = Math.round(pc ? (Number(pp.value) || 0) * pc / 100 : Number(tr.dataset.dep)).toLocaleString(NUM) + " THB"; changed(); };
         tr.querySelector(".ps").onclick = function () {
           var btn = this, name = tr.querySelector(".nm").firstChild.textContent;
-          save({ action: "product", id: tr.dataset.id, price: Number(pp.value), cutoff: Number(tr.querySelector(".pc").value), active: tr.querySelector(".pa").checked, maxDay: Number(tr.querySelector(".pm").value) || 0 },
+          save({ action: "product", id: tr.dataset.id, price: Number(pp.value), cutoff: Number(cur.cutoff) || 15, active: tr.querySelector(".pa").checked, maxDay: Number(cur.maxDay) || 0 },
             "#pMsg", t("{x} saved.", { x: name }), btn);
         };
       });
@@ -7102,6 +7160,7 @@ function zoneClient(cfg) {
       state.textContent = active ? t("On for this device") : (supported ? t("Off") : t("Not available here"));
       state.classList.toggle("on", !!active);
       on.hidden = !!active || !supported; test.hidden = !active; off.hidden = !active;
+      var card = $("#s-push"); if (card) card.classList.toggle("done", !!active);
     }
     if (!supported) {
       setUi(false);
@@ -7385,7 +7444,7 @@ function zoneClient(cfg) {
     }).join("");
     $("#calBody").innerHTML = '<div class="calgrid">' + head + weeks + '</div><div class="agenda">' + (agenda || '<div class="bempty">' + t("No bookings in this period.") + "</div>") + "</div>" +
       '<p class="calhint">' + GROUP_T.map(function (g) { return '<span class="clg"><i class="g' + CAL_G[g[0]] + '"></i>' + esc(g[1]) + "</span>"; }).join("") +
-      '<span class="clg"><b>' + t("AM") + "</b> " + t("Morning") + '</span><span class="clg"><b>' + t("PM") + "</b> " + t("Afternoon") + "</span>" + t("Click a day to see its bookings or to mark it as full.") + "</p>";
+      '<span class="clg"><b>' + t("AM") + "</b> " + t("Morning") + '</span><span class="clg"><b>' + t("PM") + "</b> " + t("Afternoon") + "</span></p>";
     $("#calBody").querySelectorAll("[data-cday]").forEach(function (b) { b.onclick = function () { openDay(b.dataset.cday); }; });
     if ($("#calPast")) $("#calPast").onclick = function () { calPast = !calPast; renderCalendar(); };
     if (calDay) openDay(calDay);
@@ -7655,19 +7714,23 @@ function zoneClient(cfg) {
         mini(t("Collected at your shop"), thb(k.atShop), t("balance paid on arrival"), "atShop") +
       "</div>" +
       '<div class="dgrid"><div class="dmain">' + funnelHtml(d.funnel) + weekPanel + '</div><div class="dside"><div id="msSlot"></div>' + prodPanel + "</div></div>" +
-      sec(t("Your divers"), t("When they write, where they come from and the languages they speak")) +
-      '<div class="dgrid3">' + hp.heat + hp.ctry + langPanel + "</div>" +
-      sec(t("Statement"), t("Every booking through Talay in this period, with the commission")) +
+      '<details class="dfold" id="dDivers"' + (diversOpen ? " open" : "") + "><summary>" + sec(t("Your divers"), t("When they write, where they come from and the languages they speak")) + "</summary>" +
+      '<div class="dgrid3">' + hp.heat + hp.ctry + langPanel + "</div></details>" +
+      '<div class="dsec stsec"><div><h3>' + t("Statement") + "</h3><p>" + t("Every booking through Talay in this period, with the commission") + '</p></div><span class="sp"></span>' +
+        '<button class="ghost" id="stPrint" type="button">' + t("Print statement") + '</button><button class="ghost" id="stCsv" type="button">' + t("Download CSV") + "</button></div>" +
       '<details class="stmt"><summary>' + tn(d.statement.length, "Show 1 booking", "Show {n} bookings") + " · " + thb(k.revenue) + "</summary>" + stmtPanel + "</details>";
     $("#dbody").innerHTML = html;
+    $("#dDivers").addEventListener("toggle", function () { diversOpen = this.open; });
+    $("#stPrint").onclick = stPrint; $("#stCsv").onclick = stCsv;
     var ms = $("#ms"), slot = $("#msSlot"); if (ms && slot) slot.appendChild(ms);
   }
-  $("#stPrint").onclick = function () {
+  var diversOpen = false;
+  function stPrint() {
     var st = document.querySelector("details.stmt"); if (st) st.open = true;
     document.body.classList.add("print-statement"); window.print();
     setTimeout(function () { document.body.classList.remove("print-statement"); }, 500);
-  };
-  $("#stCsv").onclick = function () {
+  }
+  function stCsv() {
     if (!ddata) return;
     var rows = [["Booked", "Ref", "Diver", "Product", "Dive date", "Divers", "Value THB", "Commission THB", "Refunded THB", "Status"]].concat(
       ddata.statement.map(function (r) { return [r.created.slice(0, 10), r.ref, r.name, r.product, r.date, r.divers, r.total, r.commission, r.refunded, r.status]; }));
@@ -7675,7 +7738,7 @@ function zoneClient(cfg) {
     var a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv" }));
     a.download = "talay-statement-" + (ddata.period || "30d") + ".csv"; a.click();
-  };
+  }
 
   // ---- support
   var tdata = null, tfilter = "open", tview = null;
