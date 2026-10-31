@@ -1787,11 +1787,11 @@ async function settings(env, center) {
     info: {
       assistant: s("Assistant name"), languages: s("Languages spoken"), meeting: s("Meeting point"),
       sites: s("Dive sites"), boats: s("Boat departure times"), emergency: s("Center emergency phone"),
-      // 31 Oct: everything the assistant works with, not only six fields. "Center facts" is the long text
-      // Talay writes for the free answers; centers read it here, changes still go through Talay.
+      // 31 Oct: everything the assistant works with, not only six fields. "Center facts" (free answers)
+      // stays internal: Jonas doesn't want centers to see it.
       island: s("Island"), startDays: s("Course start days"), emergencyNumber: s("Emergency number"),
       whatsapp: s("WhatsApp number"), instagram: s("Instagram handle"), reviews: s("Google review link"),
-      medical: s("Medical form link"), facts: s("Center facts").slice(0, 6000),
+      medical: s("Medical form link"),
     },
   };
 }
@@ -4932,7 +4932,6 @@ nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;bor
 .info dd{margin:0;overflow-wrap:anywhere}
 .info dt.ih{grid-column:1/-1;margin-top:12px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .info dt.ih:first-child{margin-top:0}
-.info dd.facts{grid-column:1/-1;white-space:pre-line;background:var(--paper-2,var(--paper));border:1px solid var(--line);border-radius:12px;padding:12px 14px;max-height:320px;overflow:auto;font-size:13.5px;line-height:1.5}
 .info dd a{color:var(--deep);font-weight:600}
 @media (max-width:760px){.info{grid-template-columns:1fr;gap:2px}.info dd{margin-bottom:8px}}
 
@@ -7095,7 +7094,7 @@ function zoneClient(cfg) {
       $("#info").innerHTML = groups.map(function (g) {
         var rows = g[1].filter(function (r) { return r[1]; });
         return rows.length ? '<dt class="ih">' + esc(g[0]) + "</dt>" + rows.map(function (r) { return "<dt>" + esc(r[0]) + "</dt><dd>" + r[1] + "</dd>"; }).join("") : "";
-      }).join("") + (I.facts ? '<dt class="ih">' + t("What else {a} knows", { a: esc(cfg.assistant) }) + '</dt><dd class="facts">' + esc(I.facts) + "</dd>" : "");
+      }).join("");
     }).catch(function (e) { if (e.message !== "auth") say("#miaMsg", e.message, true); });
   }
   $("#miaToggle").onclick = function () {

@@ -540,7 +540,6 @@ export const ZONE_ZH = {
   "Emergency number": "紧急电话",
   "Google reviews": "Google 评价",
   "Medical form": "体检表",
-  "What else {a} knows": "{a} 还知道什么",
 };
 
 // Russian
@@ -1082,7 +1081,6 @@ export const ZONE_RU = {
   "Emergency number": "Экстренный номер",
   "Google reviews": "Отзывы Google",
   "Medical form": "Медицинская анкета",
-  "What else {a} knows": "Что ещё знает {a}",
 };
 
 // Italian
@@ -1624,7 +1622,6 @@ export const ZONE_IT = {
   "Emergency number": "Numero di emergenza",
   "Google reviews": "Recensioni Google",
   "Medical form": "Modulo medico",
-  "What else {a} knows": "Cos’altro sa {a}",
 };
 
 // Korean
@@ -2166,5 +2163,4 @@ export const ZONE_KO = {
   "Emergency number": "긴급 번호",
   "Google reviews": "Google 리뷰",
   "Medical form": "건강 확인서",
-  "What else {a} knows": "{a}가 더 알고 있는 것",
 };

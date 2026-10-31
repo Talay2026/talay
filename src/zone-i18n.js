@@ -578,7 +578,6 @@ export const ZONE_ROWS = [
   ["Emergency number", "Número de emergencias", "Numéro d’urgence", "Notrufnummer", "Noodnummer"],
   ["Google reviews", "Reseñas de Google", "Avis Google", "Google-Bewertungen", "Google-reviews"],
   ["Medical form", "Formulario médico", "Formulaire médical", "Medizinischer Fragebogen", "Medisch formulier"],
-  ["What else {a} knows", "Qué más sabe {a}", "Ce que {a} sait encore", "Was {a} sonst noch weiß", "Wat {a} nog weet"],
 ];
 
 // { es: { English: Spanish, … }, fr: …, de: …, nl: …, th: … }
@@ -1145,7 +1144,6 @@ export const ZONE_TH = {
   "Emergency number": "เบอร์ฉุกเฉิน",
   "Google reviews": "รีวิว Google",
   "Medical form": "แบบฟอร์มทางการแพทย์",
-  "What else {a} knows": "สิ่งอื่นที่ {a} รู้",
 };
 ZONE_TEXT.th = ZONE_TH;
 Object.assign(ZONE_TEXT, ZONE_MORE);
