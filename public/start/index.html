@@ -17,8 +17,18 @@ a{color:inherit}
 [hidden]{display:none!important}
 header{background:radial-gradient(700px 320px at 90% -10%,#1C5262 0%,transparent 62%),var(--deep);color:var(--paper);padding:24px 0 30px}
 .brand{font-weight:800;font-size:17px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.langsel{font:inherit;font-size:14px;font-weight:600;color:var(--paper);background:rgba(244,240,230,.08);border:1px solid rgba(244,240,230,.22);border-radius:999px;padding:6px 12px;cursor:pointer}
-.langsel option{color:var(--deep);background:#fff}
+.lang{position:relative;flex:none}
+.langbtn{display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:14px;font-weight:600;color:var(--paper);background:rgba(244,240,230,.08);border:1px solid rgba(244,240,230,.22);border-radius:999px;padding:6px 12px 6px 11px;cursor:pointer;transition:background .15s,border-color .15s}
+.langbtn:hover,.langbtn[aria-expanded=true]{background:rgba(244,240,230,.16);border-color:rgba(244,240,230,.4)}
+.langbtn:focus-visible{outline:3px solid var(--sand);outline-offset:3px}
+.langbtn svg{flex:none;opacity:.85}
+.langbtn .chev{transition:transform .15s}
+.langbtn[aria-expanded=true] .chev{transform:rotate(180deg)}
+.langmenu{position:absolute;right:0;top:calc(100% + 8px);z-index:50;min-width:190px;margin:0;padding:6px;list-style:none;background:var(--paper-2);color:var(--deep);border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 40px rgba(9,38,47,.28);font-size:15px;font-weight:500}
+.langmenu li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;border-radius:9px;cursor:pointer}
+.langmenu li:hover,.langmenu li.on{background:var(--paper)}
+.langmenu li[aria-selected=true]{font-weight:700}
+.langmenu li[aria-selected=true]::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--sand)}
 h1{font-size:clamp(28px,4.6vw,40px);line-height:1.1;letter-spacing:-.02em;margin:0 0 10px;font-weight:800}
 h1 em{font-style:normal;color:var(--sand)}
 .lead{color:#C9D4D7;margin:0 0 16px;max-width:640px}
@@ -62,7 +72,6 @@ details.more[open] > summary::before{transform:rotate(45deg)}
 .help{display:block;color:var(--muted);font-size:13.5px;font-weight:400;margin-top:2px}
 input[type=text],input[type=email],input[type=tel],input[type=url],input[type=number],textarea,select{width:100%;font:inherit;font-size:16px;color:var(--deep);background:var(--paper-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 /* 31 Oct: the language choice in the header is a small pill, not a full-width field */
-.brand select.langsel{width:auto;flex:none;font-size:14px;font-weight:600;color:var(--paper);background:rgba(244,240,230,.08) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23F4F0E6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;border:1px solid rgba(244,240,230,.22);border-radius:999px;padding:5px 30px 5px 12px;-webkit-appearance:none;appearance:none}
 input[type=number]{max-width:200px}
 textarea{min-height:78px;resize:vertical}
 input:focus,textarea:focus,select:focus{outline:3px solid var(--sand-2);border-color:var(--sand)}
@@ -128,7 +137,7 @@ footer{color:var(--muted);font-size:14px;padding:16px 0 40px;display:flex;justif
 <body>
 <header>
   <div class="wrap">
-    <div class="brand"><span>Talay</span><select class="langsel" id="lang" aria-label="Language"></select></div>
+    <div class="brand"><span>Talay</span><div class="lang" id="langbox"><button type="button" class="langbtn" id="lang" aria-haspopup="listbox" aria-expanded="false" aria-controls="langmenu"></button><ul class="langmenu" id="langmenu" role="listbox" hidden></ul></div></div>
     <h1 data-t>Set up Talay for <em>your</em> dive centre</h1>
     <p class="lead" data-t>Tell us how your centre works. Your assistant then answers divers with your own prices, times and rules, day and night, under your name. It takes about 20 minutes, in 10 short steps. Everything is saved on this device, so you can stop and come back later.</p>
     <ul class="promise">
@@ -354,10 +363,32 @@ document.title = L(document.title);
 document.querySelectorAll("[data-t]").forEach(el => { const k = el.innerHTML.trim(); if (TR[k]) el.innerHTML = TR[k]; });
 { const m = document.querySelector('meta[name="description"]'); if (m) m.content = L(m.content); }
 {
-  const sel = document.getElementById("lang");
-  sel.innerHTML = LANGS.map(([c, n]) => `<option value="${c}"${c === LANG ? " selected" : ""}>${n}</option>`).join("");
-  sel.setAttribute("aria-label", L("Language"));
-  sel.onchange = () => { try { localStorage.setItem("talay-lang", sel.value); } catch {} location.search = "?l=" + sel.value; };
+  const btn = document.getElementById("lang"), menu = document.getElementById("langmenu");
+  const cur = (LANGS.find(([c]) => c === LANG) || LANGS[0])[1];
+  btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg><span>${cur}</span><svg class="chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>`;
+  btn.setAttribute("aria-label", L("Language") + ": " + cur);
+  menu.setAttribute("aria-label", L("Language"));
+  menu.innerHTML = LANGS.map(([c, n]) => `<li role="option" tabindex="-1" data-l="${c}" lang="${c}" aria-selected="${c === LANG}">${n}</li>`).join("");
+  const items = [...menu.children];
+  let at = 0;
+  const mark = i => { at = (i + items.length) % items.length; items.forEach((li, k) => li.classList.toggle("on", k === at)); items[at].focus(); };
+  const open = () => { menu.hidden = false; btn.setAttribute("aria-expanded", "true"); mark(Math.max(0, items.findIndex(li => li.dataset.l === LANG))); };
+  const close = (back) => { menu.hidden = true; btn.setAttribute("aria-expanded", "false"); if (back) btn.focus(); };
+  const pick = c => { close(); if (c === LANG) return; try { localStorage.setItem("talay-lang", c); } catch {} location.search = "?l=" + c; };
+  btn.onclick = () => menu.hidden ? open() : close();
+  btn.onkeydown = e => { if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); open(); } };
+  menu.onclick = e => { const li = e.target.closest("li"); if (li) pick(li.dataset.l); };
+  menu.onmousemove = e => { const li = e.target.closest("li"); if (li) items.forEach(x => x.classList.toggle("on", x === li)); };
+  menu.onkeydown = e => {
+    if (e.key === "ArrowDown") { e.preventDefault(); mark(at + 1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); mark(at - 1); }
+    else if (e.key === "Home") { e.preventDefault(); mark(0); }
+    else if (e.key === "End") { e.preventDefault(); mark(items.length - 1); }
+    else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(items[at].dataset.l); }
+    else if (e.key === "Escape") { e.preventDefault(); close(true); }
+    else if (e.key === "Tab") close();
+  };
+  document.addEventListener("click", e => { if (!menu.hidden && !e.target.closest("#langbox")) close(); });
 }
 
 const $ = s => document.querySelector(s);
