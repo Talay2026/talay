@@ -614,7 +614,9 @@ export default {
   // Cloudflare cron (wrangler.jsonc → triggers): alerts for Talay HQ and the mail campaign sync, every 15 minutes.
   async scheduled(event, env, ctx) {
     ctx.waitUntil(runHqAlerts(env, event.scheduledTime).catch((e) => console.error("hq alerts", e)));
-    ctx.waitUntil(runOutreachSync(env).catch((e) => console.error("outreach sync", e))); // mailcampagne: Instantly → Airtable Outreach
+    // Mail campaign (Instantly → Airtable Outreach): once an hour, in the run at :00, to spare Airtable calls.
+    if (new Date(event.scheduledTime).getUTCMinutes() < 15)
+      ctx.waitUntil(runOutreachSync(env).catch((e) => console.error("outreach sync", e)));
   },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);

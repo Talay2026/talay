@@ -67,7 +67,7 @@ export async function handleZone(request, env, ctx) {
     const fresh = url.searchParams.get("fresh") === "1";
     if (p === "/zone/api/conversations") {
       const view = url.searchParams.get("view") === "all" ? "all" : "open";
-      return json(await cached(env, `conv/${center.slug}/${view}`, view === "all" ? 60 : 20,
+      return json(await cached(env, `conv/${center.slug}/${view}`, view === "all" ? 60 : CONV_TTL,
         () => conversations(env, center, view), fresh));
     }
     if (p === "/zone/api/chat") {
@@ -344,6 +344,9 @@ const ofCenter = (center) => `ARRAYJOIN({Center}) & '' = '${q(center.name)}'`;
 // Cloudflare cache, shared by everyone of the same center; own actions clear them.
 
 const CACHE_HOST = "https://zone-cache.talay.internal/";
+// The open-conversations list: longer than the zone's 30 s poll, so one viewer does not ask
+// Airtable on every poll. Own actions (send, take over, hand back) clear it straight away.
+const CONV_TTL = 45;
 async function cached(env, key, ttl, fn, fresh = false) {
   const req = new Request(CACHE_HOST + env.AIRTABLE_BASE + "/" + key);
   const cache = caches.default;
@@ -2545,7 +2548,7 @@ async function adminInbox(env, fresh) {
     .filter((c) => /^[a-z0-9-]{1,60}$/.test(c.slug));
   const now = Date.now();
   const lists = await Promise.all(centers.map((c) =>
-    cached(env, `conv/${c.slug}/open`, 20, () => conversations(env, c, "open"), fresh)
+    cached(env, `conv/${c.slug}/open`, CONV_TTL, () => conversations(env, c, "open"), fresh)
       .then((d) => d.conversations.map((x) => ({ ...x, slug: c.slug, center: c.name, test: c.test })))
       .catch(() => [])));
   const items = lists.flat().map((x) => {
@@ -3029,8 +3032,8 @@ async function adminOutreachChange(env, email, b) {
 
 // ---------- Conversie: from question to booking, per center ----------
 // The same numbers as the dashboard in each center's zone (and the same cache).
-async function hqCenters(env) {
-  const recs = await at(env, "Centers", { sort: [{ field: "Name" }] });
+async function hqCenters(env, recs) {
+  recs = recs || await at(env, "Centers", { sort: [{ field: "Name" }] });
   return recs.map((r) => ({ ...centerOut(r, true), ...centerMeta(r), outsideOnly: !!r.fields["Outside hours only"], paused: !!r.fields["Mia paused"] }))
     .filter((c) => /^[a-z0-9-]{1,60}$/.test(c.slug));
 }
@@ -3208,10 +3211,10 @@ async function adminWebsite(env, days) {
 // nothing. Demo and Test centers only count with ALERT_INCLUDE_TEST = 1.
 const ALERT_EVERY = 15 * 60000, ALERT_HANDOVER_MIN = 30, ALERT_WAIT_MIN = 30;
 const SMALL_TALK = /^(ok(ay)?|oke|k|thanks?( you)?|thx|ty|merci|danke|gracias|dank ?je(wel)?|bedankt|perfect|great|cool|super|top|nice|👍|🙏|❤️|😊|🙂)[\s!.👍🙏😊🙂❤️]*$/i;
-async function hqAlerts(env, at0, { since, withTest = false } = {}) {
+async function hqAlerts(env, at0, { since, withTest = false, centerRecs } = {}) {
   const from = since || at0 - ALERT_EVERY;
   const [centers, leads, chat] = await Promise.all([
-    hqCenters(env),
+    hqCenters(env, centerRecs),
     at(env, "Leads", { formula: `IS_AFTER({Handover at}, DATETIME_PARSE('${isoT(from - ALERT_HANDOVER_MIN * 60000 - 60000)}'))`, max: 500 }),
     at(env, "Chat", {
       formula: `IS_AFTER({Sent at}, DATETIME_PARSE('${isoT(from - Math.max(ALERT_HANDOVER_MIN, ALERT_WAIT_MIN) * 60000 - 3 * 3600000)}'))`,
@@ -3289,23 +3292,35 @@ async function sendAlerts(env, msg) {
 export async function runHqAlerts(env, scheduledTime) {
   if (!env.AIRTABLE_TOKEN) return;
   const at0 = Math.floor((scheduledTime || Date.now()) / 60000) * 60000;
-  const alerts = await hqAlerts(env, at0, { withTest: true });
+  // Airtable limits: the Centers table once per run, shared by every check below.
+  const centerRecs = await at(env, "Centers", { sort: [{ field: "Name" }] });
+  const alerts = await hqAlerts(env, at0, { withTest: true, centerRecs });
   const hq = alerts.filter((a) => env.ALERT_INCLUDE_TEST === "1" || !a.test);
   if (env.ALERT_WEBHOOK && hq.length) await sendAlerts(env, alertMessage(hq, false));
-  await teamEscalations(env, alerts, at0).catch((e) => console.error("escalation", e));
-  await morningSummaries(env, at0).catch((e) => console.error("morning", e));
-  await weeklySummaries(env, at0).catch((e) => console.error("weekly", e));
-  await pausedWaitPush(env, at0).catch((e) => console.error("paused wait push", e));
+  await teamEscalations(env, alerts, at0, centerRecs).catch((e) => console.error("escalation", e));
+  await morningSummaries(env, at0, centerRecs).catch((e) => console.error("morning", e));
+  await weeklySummaries(env, at0, centerRecs).catch((e) => console.error("weekly", e));
+  await pausedWaitPush(env, at0, centerRecs).catch((e) => console.error("paused wait push", e));
 }
 
 // Mia is paused (the team took over) and the diver wrote again without an answer: one push to the
 // center's phones when that wait crosses WAIT_MIN in this cron window (/zone/api/push-latest names the diver).
-async function pausedWaitPush(env, at0) {
+async function pausedWaitPush(env, at0, centerRecs) {
   if (!env.VAPID_PRIVATE) return;
-  const centers = (await at(env, "Centers", { sort: [{ field: "Name" }] })).map(centerMeta)
-    .filter((c) => /^[a-z0-9-]{1,60}$/.test(c.slug));
+  // Only centers with a lead the team took over and that wrote in the last day can have a diver
+  // waiting on a paused Mia: one small Leads call instead of every center's conversations, every run.
+  let busy = null;
+  try {
+    const leads = await at(env, "Leads", {
+      formula: `AND({Human took over}, NOT({Opted out}), OR({Last message at} = BLANK(), IS_AFTER({Last message at}, DATEADD(NOW(), -25, 'hours'))))`,
+      fields: ["C slug"], max: 500,
+    });
+    busy = new Set(leads.map((l) => String(first(l.fields["C slug"]) || "").toLowerCase()).filter(Boolean));
+  } catch (e) { console.error("paused wait leads", e); } // unknown field: check every center, as before
+  const centers = (centerRecs || await at(env, "Centers", { sort: [{ field: "Name" }] })).map(centerMeta)
+    .filter((c) => /^[a-z0-9-]{1,60}$/.test(c.slug) && (!busy || busy.has(c.slug)));
   for (const c of centers) {
-    const d = await cached(env, `conv/${c.slug}/open`, 20, () => conversations(env, c, "open"), true).catch(() => null);
+    const d = await cached(env, `conv/${c.slug}/open`, CONV_TTL, () => conversations(env, c, "open"), true).catch(() => null);
     const hit = (d?.conversations || []).some((x) => {
       const due = Date.parse(x.lastAt) + WAIT_MIN * 60000;
       return x.waitingMin > 0 && due >= at0 - ALERT_EVERY && due < at0;
@@ -3326,10 +3341,10 @@ const thaiMinutes = (ms) => { const t = new Date(ms + TZ_MS); return t.getUTCHou
 
 // A handover with no team reply after 30 minutes (the same check as the HQ alert), only within
 // the center's office hours: template talay_still_waiting to everyone with the topic Escalation.
-async function teamEscalations(env, alerts, at0) {
+async function teamEscalations(env, alerts, at0, centerRecs) {
   const list = alerts.filter((a) => a.kind === "handover");
   if (!list.length) return;
-  const centers = await at(env, "Centers", { formula: `OR(${[...new Set(list.map((a) => a.slug))].map((s) => `{Slug} = '${q(s)}'`).join(",")})` });
+  const centers = centerRecs || await at(env, "Centers", { formula: `OR(${[...new Set(list.map((a) => a.slug))].map((s) => `{Slug} = '${q(s)}'`).join(",")})` });
   for (const a of list) {
     const r = centers.find((c) => String(first(c.fields["Slug"]) || "").toLowerCase() === a.slug);
     if (!r) continue;
@@ -3346,10 +3361,10 @@ async function teamEscalations(env, alerts, at0) {
 
 // Every morning, in the run that starts 30 to 15 minutes before opening time: what happened
 // while the team was off (template talay_morning, topic Morning summary). Skipped when nothing happened.
-async function morningSummaries(env, at0) {
+async function morningSummaries(env, at0, centerRecs) {
   const now = thaiMinutes(at0);
   if (now < 4 * 60 || now >= 12 * 60) return; // opening times are in the morning: no Centers call the rest of the day
-  const recs = await at(env, "Centers", { formula: "{Slug} != ''" });
+  const recs = (centerRecs || await at(env, "Centers", { formula: "{Slug} != ''" })).filter((r) => first(r.fields["Slug"]));
   for (const r of recs) {
     const { open } = officeHours(r.fields);
     if (now < open - 30 || now >= open - 15) continue;
@@ -3380,10 +3395,10 @@ async function morningSummaries(env, at0) {
 }
 // Every Monday, in the run that starts at opening time (just after the morning summary): last week
 // in numbers (template talay_weekly, topic Weekly summary). Skipped when there were no conversations.
-async function weeklySummaries(env, at0) {
+async function weeklySummaries(env, at0, centerRecs) {
   const now = thaiMinutes(at0);
   if (new Date(at0 + TZ_MS).getUTCDay() !== 1 || now < 4 * 60 || now >= 13 * 60) return;
-  const recs = await at(env, "Centers", { formula: "{Slug} != ''" });
+  const recs = (centerRecs || await at(env, "Centers", { formula: "{Slug} != ''" })).filter((r) => first(r.fields["Slug"]));
   const { start, end, week } = weekRange(at0);
   for (const r of recs) {
     const { open } = officeHours(r.fields);
@@ -8007,9 +8022,10 @@ function zoneClient(cfg) {
   (function () { var m = location.search.match(/[?&]c=([A-Za-z0-9:_-]{1,64})/); if (m) openChat(m[1]); })();
   // Polling is kept light on purpose (Airtable limits): the list every 30 s while the page
   // is visible; the open conversation only when the list shows something new in it.
-  // In a background tab the list still refreshes, every minute, so the tab title and icon stay right.
+  // In a background tab the list refreshes every 5 minutes (tab title and icon), and at once when
+  // the tab comes back; new handovers reach the team by push and WhatsApp anyway.
   var listTick = 0;
-  setInterval(function () { listTick++; if (!document.hidden || listTick % 2 === 0) loadList(); }, 30000);
-  setInterval(function () { if (filter !== "open" && filter !== "need") api("conversations?view=open").then(function (d) { badge(d.conversations); }).catch(function () {}); }, 60000);
+  setInterval(function () { listTick++; if (!document.hidden || listTick % 10 === 0) loadList(); }, 30000);
+  setInterval(function () { if (!document.hidden && filter !== "open" && filter !== "need") api("conversations?view=open").then(function (d) { badge(d.conversations); }).catch(function () {}); }, 60000);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) { lastList = ""; loadList(); } });
 }
