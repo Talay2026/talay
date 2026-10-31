@@ -1783,6 +1783,7 @@ async function settings(env, center) {
     to: hours ? hours[2].padStart(5, "0") : "18:00",
     paused: !!f["Mia paused"],
     outsideOnly: !!f["Outside hours only"],
+    freeAnswers: !!f["Free answers"], facts: s("Center facts"),
     info: {
       assistant: s("Assistant name"), languages: s("Languages spoken"), meeting: s("Meeting point"),
       sites: s("Dive sites"), boats: s("Boat departure times"), emergency: s("Center emergency phone"),
@@ -1793,6 +1794,9 @@ async function settings(env, center) {
 // Quick replies: the team's saved texts, typed into a chat with "/". Stored as JSON in the
 // Centers long text field "Quick replies": [{ "title": "Address", "text": "…" }].
 const QUICK_MAX = 30;
+// Free answers (31 Oct): checkbox "Free answers" lets the assistant write a short answer from the long
+// text "Center facts" when no approved answer fits (prompt v13 in Make, route faq · free).
+const FACTS_MAX = 4000;
 function quickReplies(f) {
   try {
     const v = JSON.parse(String(first(f["Quick replies"]) || "[]"));
@@ -1886,6 +1890,12 @@ async function saveSettings(request, env, center, email) {
     for (const [suffix, fn] of Object.entries(HOURS_TEXT)) fields[`Escalation hours${suffix ? " " + suffix : ""}`] = fn(a, b);
   } else if (body.action === "mode") {
     fields["Outside hours only"] = !!body.outsideOnly;
+  } else if (body.action === "free") {
+    fields["Free answers"] = !!body.on;
+  } else if (body.action === "facts") {
+    const text = String(body.text || "").trim();
+    if (text.length > FACTS_MAX) return json({ error: `Maximum ${FACTS_MAX} characters.` }, 400);
+    fields["Center facts"] = text;
   } else if (body.action === "mia") {
     fields["Mia paused"] = !!body.paused;
   } else if (body.action === "quick") {
@@ -1917,6 +1927,8 @@ function describe(b) {
   if (b.action === "alert") return `alert email: ${b.email}`;
   if (b.action === "hours") return `office hours: ${b.from}–${b.to}`;
   if (b.action === "mode") return b.outsideOnly ? "assistant answers only outside office hours" : "assistant answers day and night";
+  if (b.action === "free") return b.on ? "assistant may write short answers from the center facts" : "assistant uses only approved answers";
+  if (b.action === "facts") return `center facts (${String(b.text || "").trim().length} characters)`;
   if (b.action === "mia") return b.paused ? "paused the assistant" : "turned the assistant back on";
   if (b.action === "quick") return `quick replies: ${(b.items || []).map((x) => x.title).join(", ")}`;
   return b.action;
@@ -3627,6 +3639,7 @@ dialog.dlg::backdrop{background:rgba(9,38,47,.45)}
 .aip{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--paper)}
 .aip label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:600}
 .aip textarea{width:100%;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:8px 10px;font-size:14px;resize:vertical;font-weight:400;color:var(--deep)}
+#facts{width:100%;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:8px 10px;font-size:14px;resize:vertical;margin:6px 0 8px;color:var(--deep)}
 .aip .in{width:100%}
 .aifg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 @media (max-width:560px){.aifg{grid-template-columns:1fr}}
@@ -5935,6 +5948,16 @@ nav,button,.item,.chip,.day,.who{-webkit-user-select:none;user-select:none;-webk
       <div class="switch"><span class="pill" id="modeState">…</span><button class="ghost" id="modeToggle" type="button">…</button></div>
       <div class="smsg" id="modeMsg"></div>
     </div>
+    <div id="s-free" class="scard adm">
+      <h3>${T("Free answers")}</h3>
+      <p class="d">${T("When no approved answer fits a question, {a} can write a short answer herself, using only the facts below and general diving knowledge. She never writes prices, bookings, availability, refunds or medical advice: those always go to your team. You still get an alert for every free answer, so you can turn it into an approved answer.", { a: A })}</p>
+      <div class="switch"><span class="pill" id="freeState">…</span><button class="ghost" id="freeToggle" type="button">…</button></div>
+      <div class="smsg" id="freeMsg"></div>
+      <label class="d" for="facts">${T("Facts about your center")}</label>
+      <textarea id="facts" rows="8" maxlength="4000" placeholder="${T("Dive sites, boats, facilities, seasons, anything {a} may tell divers. No prices: those come from your products.", { a: A })}"></textarea>
+      <div class="srow"><button class="btn" id="fSave" type="button">${T("Save")}</button></div>
+      <div class="smsg" id="fMsg"></div>
+    </div>
     <div id="s-alert" class="scard adm">
       <h3>${T("Alert email")}</h3>
       <p class="d">${T("Where handovers, large groups and reminders are sent. A shared inbox works best.")}</p>
@@ -6941,6 +6964,10 @@ function zoneClient(cfg) {
       $("#modeState").textContent = d.outsideOnly ? t("Only outside office hours") : t("Day and night");
       $("#modeState").className = "pill " + (d.outsideOnly ? "off" : "on");
       $("#modeToggle").textContent = d.outsideOnly ? t("Answer day and night") : t("Answer only outside office hours");
+      $("#freeState").textContent = d.freeAnswers ? t("Writes short answers") : t("Only approved answers");
+      $("#freeState").className = "pill " + (d.freeAnswers ? "on" : "off");
+      $("#freeToggle").textContent = d.freeAnswers ? t("Use only approved answers") : t("Allow free answers");
+      if (document.activeElement !== $("#facts")) $("#facts").value = d.facts || "";
       if (document.activeElement !== $("#aEmail")) $("#aEmail").value = d.alert;
       renderTeam(d);
       if ($("#qedit").hidden) renderQuick(d.quick);
@@ -6959,6 +6986,12 @@ function zoneClient(cfg) {
     var only = !sdata.outsideOnly;
     save({ action: "mode", outsideOnly: only }, "#modeMsg", only ? t("{a} now only answers outside office hours.", { a: cfg.assistant }) : t("{a} answers day and night again.", { a: cfg.assistant }), this);
   };
+  $("#freeToggle").onclick = function () {
+    if (!sdata) return;
+    var on = !sdata.freeAnswers;
+    save({ action: "free", on: on }, "#freeMsg", on ? t("{a} may now write short answers from your facts.", { a: cfg.assistant }) : t("{a} only uses approved answers again.", { a: cfg.assistant }), this);
+  };
+  $("#fSave").onclick = function () { save({ action: "facts", text: $("#facts").value }, "#fMsg", t("Facts saved."), this); };
   $("#hSave").onclick = function () { save({ action: "hours", from: $("#hFrom").value, to: $("#hTo").value }, "#hMsg", t("Saved in all ten languages."), this); };
   $("#aSave").onclick = function () { save({ action: "alert", email: $("#aEmail").value }, "#aMsg", t("Saved."), this); };
   $("#tAdd").onclick = function () {
