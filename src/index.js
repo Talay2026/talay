@@ -14,6 +14,7 @@ import { handleZone, runHqAlerts, runOutreachSync, handlePush, handleWeekly } fr
 import { handleDemo } from "./demo.js"; // demo requests from the homepage form: talay.io/api/demo
 import { handleIntake } from "./intake.js"; // onboarding form for a new centre: talay.io/start -> talay.io/api/intake
 import { handleNotify, handleDiver } from "./notify.js"; // WhatsApp and push to dive center staff, called by Make: talay.io/api/notify
+import { handleMerge } from "./merge.js"; // several questions in one message: one natural reply from the approved texts, called by Make: talay.io/api/merge
 import { ZEE_CSS, ZEE_JS } from "./zee.js"; // booking page background with sea animals (design by Lars)
 import { MORE_LANGS, MORE_LOCALES, MORE_SEP, MORE_LABEL, MORE_CLOSED, moreTexts } from "./booking-langs.js"; // th, zh, ru, it, ko
 
@@ -634,6 +635,14 @@ export default {
       } catch (err) {
         console.error(url.pathname, err);
         return new Response(JSON.stringify({ error: String(err.message || err).slice(0, 300) }), { status: 502, headers: { "Content-Type": "application/json" } });
+      }
+    }
+    if (url.pathname === "/api/merge" && request.method === "POST") {
+      try {
+        return await handleMerge(request, env);
+      } catch (err) {
+        console.error("/api/merge", err);
+        return new Response(JSON.stringify({ error: "merge failed" }), { status: 502, headers: { "Content-Type": "application/json" } });
       }
     }
     if (url.pathname.startsWith("/r/")) return sourcePage(request, env, url);
