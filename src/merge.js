@@ -25,7 +25,7 @@ Rules:
 - At most one question to the guest, at the very end: keep the closing question from the drafts that moves towards booking.
 - Return only the reply.`;
 
-const REPEAT_NOTE = "The guest already got exactly this answer and is asking the same thing again, so it did not land. Do not send it the same way. Say it again shorter and in other words, starting with the part that answers their message most directly, and end with one short question asking what is still unclear. No apology, no \"as I said\". The rules above still apply.";
+const REPEAT_NOTE = "The guest already got exactly this answer and is asking the same thing again: maybe it did not arrive, or it was too long. Reply warmly and much shorter: at most one short sentence per question, keep every price, deposit and link, drop the rest. You may start with a light, friendly opener such as \"Here it is in short 😊\". End with one warm, open question such as \"Is there anything I can explain better?\" or \"Shall I help you pick a date?\". Never sound impatient: no \"as I said\", no \"what is still unclear\", no apology. The rules above still apply.";
 
 const URL_RE = /https?:\/\/[^\s<>"]+/g;
 const NUM_RE = /\d+(?:[.,:   ]\d+)*/g;
